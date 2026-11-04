@@ -1,0 +1,20 @@
+node_modules
+.next
+out
+.env
+.env.local
+.env*.local
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+scripts/geo/.cache
+.vercel
+
+# generado por scripts/copy-maplibre-worker.mjs
+public/vendor/
+
+# base de datos local de desarrollo
+.data/
+
+# documentación interna: no va al repositorio
+documentos/

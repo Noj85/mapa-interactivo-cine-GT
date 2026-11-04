@@ -1,0 +1,167 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+[data-theme="light"] {
+  /* Claro: papel frío, tinta azul marino y un azul institucional */
+  --bg: 245 247 250;
+  --surface: 255 255 255;
+  --surface-2: 237 241 246;
+  --line: 214 220 230;
+  --ink: 15 23 42;
+  --muted: 88 100 120;
+  --accent: 29 78 156;
+  --accent-ink: 255 255 255;
+  --brand: 18 39 77;
+  --brand-ink: 255 255 255;
+  --warn: 180 83 9;
+  --ok: 21 128 61;
+  --danger: 185 28 28;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  /* Oscuro: azul noche, no negro puro; el acento se aclara para mantener contraste */
+  --bg: 9 13 22;
+  --surface: 16 22 35;
+  --surface-2: 26 34 51;
+  --line: 44 55 77;
+  --ink: 232 237 246;
+  --muted: 145 158 180;
+  --accent: 128 168 240;
+  --accent-ink: 8 14 28;
+  --brand: 62 101 186;
+  --brand-ink: 255 255 255;
+  --warn: 240 160 70;
+  --ok: 94 190 132;
+  --danger: 240 112 100;
+  color-scheme: dark;
+}
+
+/* Títulos: Biennale SemiBold (Bold en h1), con el espaciado algo cerrado */
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.018em;
+}
+h1 {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+html,
+body {
+  height: 100%;
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--line)) transparent;
+}
+
+::selection {
+  background: rgb(var(--accent) / 0.35);
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  .glass {
+    background: rgb(var(--surface) / 0.88);
+    backdrop-filter: blur(16px) saturate(1.15);
+    -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  }
+  /* Botones: rectángulos sobrios (radio 8px), peso 600, alto mínimo táctil de 40px */
+  .btn {
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold leading-none tracking-[-0.005em] transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand text-brand-ink shadow-sm hover:brightness-110 active:brightness-95;
+  }
+  .btn-ghost {
+    @apply btn font-medium text-muted hover:bg-surface-2 hover:text-ink;
+  }
+  .btn-outline {
+    @apply btn border border-line bg-surface text-ink hover:border-muted/60 hover:bg-surface-2;
+  }
+  .field {
+    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted/70 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25;
+  }
+  .label {
+    @apply mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-muted;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-md border border-line px-2 py-0.5 text-xs font-medium text-muted;
+  }
+  .kbd {
+    @apply rounded border border-line bg-surface-2 px-1.5 py-0.5 font-sans text-[10px] text-muted;
+  }
+}
+
+/* MapLibre: integrar controles con el tema */
+.maplibregl-ctrl-group {
+  background: rgb(var(--surface) / 0.85) !important;
+  backdrop-filter: blur(14px);
+  border: 1px solid rgb(var(--line)) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+.maplibregl-ctrl-group button {
+  border-color: rgb(var(--line)) !important;
+}
+[data-theme="dark"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1) brightness(1.1);
+}
+.maplibregl-ctrl-attrib {
+  background: rgb(var(--surface) / 0.7) !important;
+  color: rgb(var(--muted)) !important;
+  font-size: 10px;
+}
+.maplibregl-ctrl-attrib a {
+  color: rgb(var(--muted)) !important;
+}
+
+/* Marcadores de locación */
+.pin {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgb(var(--accent));
+  border: 2px solid rgb(var(--bg));
+  box-shadow: 0 0 0 4px rgb(var(--accent) / 0.25);
+}
+
+.scroll-fade {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

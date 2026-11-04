@@ -1,0 +1,247 @@
+import type { Gazetteer } from "@/lib/geo/gazetteer";
+import type { PolyCollection } from "@/lib/geo/load";
+import { municipalityAt } from "@/lib/geo/pip";
+import type { FilmInput, OrgInput } from "@/lib/types";
+import { normalize } from "@/lib/utils";
+import {
+  cleanText,
+  detectCurrency,
+  normalizeCategory,
+  normalizeInitiative,
+  normalizeInstagram,
+  normalizeKind,
+  normalizeNationality,
+  normalizeWeb,
+  parseCoord,
+  parseNumber,
+  parseYear,
+} from "./normalize";
+import type { Candidate, ImportPlan, Issue, ParsedFile, ParsedSheet, PlaceResolution, SheetPlan } from "./types";
+
+type Row = Record<string, string>;
+
+const val = (row: Row, plan: SheetPlan, field: string) => {
+  const col = plan.columns[field];
+  return col ? (row[col] ?? "") : "";
+};
+
+/** Consultas de lugar de una fila: "Panajachel, Sololá", "Antigua"… */
+export function placeQueries(row: Row, plan: SheetPlan): { query: string; site: string | null }[] {
+  const place = cleanText(val(row, plan, "place"));
+  const muni = cleanText(val(row, plan, "muni"));
+  const depto = cleanText(val(row, plan, "depto"));
+  const site = cleanText(val(row, plan, "site"));
+  const out: { query: string; site: string | null }[] = [];
+
+  if (place) {
+    const parts = plan.multi_place ? place.split(/[;\n|]| \/ /).map((p) => p.trim()).filter(Boolean) : [place];
+    parts.forEach((p, i) => out.push({ query: depto && !normalize(p).includes(normalize(depto)) ? `${p}, ${depto}` : p, site: i === 0 ? site : null }));
+  } else if (muni) {
+    const parts = plan.multi_place ? muni.split(/[;\n|]| \/ /).map((p) => p.trim()).filter(Boolean) : [muni];
+    parts.forEach((p, i) => out.push({ query: depto ? `${p}, ${depto}` : p, site: i === 0 ? site : null }));
+  } else if (depto) {
+    out.push({ query: depto, site });
+  } else if (site) {
+    out.push({ query: site, site });
+  }
+  return out;
+}
+
+/** Textos de lugar únicos del archivo, para resolverlos de una vez. */
+export function collectPlaceTexts(file: ParsedFile, plan: ImportPlan): string[] {
+  const set = new Set<string>();
+  for (const sp of plan.sheets) {
+    if (sp.entity === "ignore") continue;
+    const sheet = file.sheets.find((s) => s.name === sp.sheet);
+    if (!sheet) continue;
+    for (const row of sheet.rows) for (const q of placeQueries(row, sp)) set.add(q.query);
+  }
+  return [...set];
+}
+
+interface Geo {
+  gaz: Gazetteer;
+  muni?: PolyCollection;
+}
+
+function resolveLocation(
+  q: { query: string; site: string | null } | null,
+  row: Row,
+  plan: SheetPlan,
+  places: Record<string, PlaceResolution>,
+  geo: Geo,
+  withCoords: boolean,
+) {
+  const loc: NonNullable<FilmInput["locations"]>[number] = { site: q?.site ?? null };
+  let issue: Issue | null = null;
+  const lat = withCoords ? parseCoord(val(row, plan, "lat"), "lat") : null;
+  const lng = withCoords ? parseCoord(val(row, plan, "lng"), "lng") : null;
+  if (lat != null && lng != null) {
+    loc.lat = lat;
+    loc.lng = lng;
+  }
+  const res = q ? places[q.query] : undefined;
+  if (res?.status === "ok") {
+    loc.muni_ine = res.muni_ine;
+    loc.depto_ine = res.depto_ine;
+    loc.confidence = res.via === "gazetteer" ? 0.95 : 0.8;
+  } else if (res?.depto_ine != null) {
+    loc.depto_ine = res.depto_ine;
+  }
+  if (loc.muni_ine == null && loc.lat != null && loc.lng != null && geo.muni) {
+    const m = municipalityAt(loc.lng!, loc.lat!, geo.muni, geo.gaz);
+    if (m != null) {
+      loc.muni_ine = m;
+      loc.depto_ine = Math.floor(m / 100);
+      loc.confidence = 0.9;
+    }
+  }
+  if (q && loc.muni_ine == null && !(res?.status === "ok")) {
+    issue = {
+      field: "location",
+      level: "doubt",
+      message: res?.status === "ambiguous" ? `“${q.query}” puede ser varios lugares` : `No pudimos ubicar “${q.query}”`,
+    };
+  }
+  return { loc, issue };
+}
+
+/** Solo se acepta un enlace http(s); se descargará al confirmar la carga. */
+const posterLink = (v: string | null | undefined) => {
+  const s = (v ?? "").trim();
+  return /^https?:\/\/\S+$/i.test(s) ? s : null;
+};
+
+function filmFields(row: Row, plan: SheetPlan): Omit<FilmInput, "locations"> {
+  const vm = plan.value_maps ?? {};
+  const budgetRaw = val(row, plan, "budget");
+  return {
+    title: cleanText(val(row, plan, "title")) ?? "",
+    year: parseYear(val(row, plan, "year")),
+    kind: normalizeKind(val(row, plan, "kind"), vm.kind),
+    director: cleanText(val(row, plan, "director")),
+    producer: cleanText(val(row, plan, "producer")),
+    nationality: normalizeNationality(val(row, plan, "nationality"), vm.nationality),
+    budget: parseNumber(budgetRaw),
+    currency: detectCurrency(val(row, plan, "currency")) ?? detectCurrency(budgetRaw) ?? "GTQ",
+    synopsis: cleanText(val(row, plan, "synopsis")),
+    poster_url: posterLink(val(row, plan, "poster")),
+  };
+}
+
+const merge = <T extends object>(a: T, b: T): T => {
+  const out = { ...a } as Record<string, unknown>;
+  for (const [k, v] of Object.entries(b)) if ((out[k] === null || out[k] === undefined || out[k] === "") && v != null && v !== "") out[k] = v;
+  return out as T;
+};
+
+function filmCandidates(sheet: ParsedSheet, plan: SheetPlan, places: Record<string, PlaceResolution>, geo: Geo): Candidate[] {
+  const map = new Map<string, Candidate>();
+  const order: string[] = [];
+
+  sheet.rows.forEach((row, i) => {
+    const base = filmFields(row, plan);
+    if (!base.title) return;
+    const key =
+      plan.grain === "row_per_location"
+        ? `film:${normalize(base.title)}|${base.year ?? ""}`
+        : `film:${sheet.name}!${i}`;
+    let cand = map.get(key);
+    if (!cand) {
+      cand = {
+        key,
+        type: "film",
+        film: { ...base, locations: [], status: "published", source: undefined },
+        placeTexts: [],
+        rows: [],
+        issues: [],
+        include: true,
+      };
+      map.set(key, cand);
+      order.push(key);
+    } else {
+      cand.film = { ...merge(cand.film!, base as FilmInput), locations: cand.film!.locations };
+    }
+    cand.rows.push(`${sheet.name}!${i + 2}`);
+
+    const qs = placeQueries(row, plan);
+    const days = parseNumber(val(row, plan, "days"));
+    const spend = parseNumber(val(row, plan, "local_spend"));
+    const jobs = parseNumber(val(row, plan, "jobs"));
+    const slots = qs.length ? qs : [null];
+    slots.forEach((q, qi) => {
+      const hasCoords = parseCoord(val(row, plan, "lat"), "lat") != null;
+      if (!q && !hasCoords && !days && !spend && !jobs && cand!.film!.locations.length) return;
+      const { loc, issue } = resolveLocation(q, row, plan, places, geo, qi === 0);
+      // las cifras de la fila se asignan a la primera locación de la fila
+      if (qi === 0) {
+        loc.days = days;
+        loc.local_spend = spend;
+        loc.jobs = jobs;
+      }
+      if (!q && loc.muni_ine == null && loc.depto_ine == null && loc.lat == null) return; // fila sin lugar
+      if (q) cand!.placeTexts.push(q.query);
+      cand!.film!.locations.push(loc);
+      if (issue) cand!.issues.push({ ...issue, field: `location:${cand!.film!.locations.length - 1}` });
+    });
+  });
+  return order.map((k) => map.get(k)!);
+}
+
+function orgCandidates(sheet: ParsedSheet, plan: SheetPlan, places: Record<string, PlaceResolution>, geo: Geo): Candidate[] {
+  const layer = plan.layer ?? "circulacion";
+  const vm = plan.value_maps ?? {};
+  const out: Candidate[] = [];
+  sheet.rows.forEach((row, i) => {
+    const name = cleanText(val(row, plan, "name"));
+    if (!name) return;
+    const qs = placeQueries(row, plan);
+    const { loc, issue } = resolveLocation(qs[0] ?? null, row, plan, places, geo, true);
+    const org: OrgInput = {
+      name,
+      layer,
+      category: normalizeCategory(val(row, plan, "category"), layer, vm.category) ?? "",
+      initiative_type: normalizeInitiative(val(row, plan, "initiative_type"), vm.initiative_type),
+      depto_ine: loc.depto_ine ?? null,
+      muni_ine: loc.muni_ine ?? null,
+      city: cleanText(val(row, plan, "city")),
+      lat: loc.lat ?? null,
+      lng: loc.lng ?? null,
+      web: normalizeWeb(val(row, plan, "web")),
+      instagram: normalizeInstagram(val(row, plan, "instagram")),
+      contact: cleanText(val(row, plan, "contact")),
+      description: cleanText(val(row, plan, "description")),
+      status: "published",
+    };
+    const issues: Issue[] = [];
+    if (issue) issues.push({ ...issue, field: "location:0" });
+    if (!org.category) issues.push({ field: "category", level: "missing", message: "Falta la categoría" });
+    out.push({
+      key: `org:${sheet.name}!${i}`,
+      type: "org",
+      org,
+      placeTexts: qs[0] ? [qs[0].query] : [],
+      rows: [`${sheet.name}!${i + 2}`],
+      issues,
+      include: true,
+    });
+  });
+  return out;
+}
+
+/** Convierte el archivo + plan + lugares resueltos en candidatos listos para revisar. */
+export function buildCandidates(
+  file: ParsedFile,
+  plan: ImportPlan,
+  places: Record<string, PlaceResolution>,
+  geo: Geo,
+): Candidate[] {
+  const out: Candidate[] = [];
+  for (const sp of plan.sheets) {
+    if (sp.entity === "ignore") continue;
+    const sheet = file.sheets.find((s) => s.name === sp.sheet);
+    if (!sheet) continue;
+    out.push(...(sp.entity === "film" ? filmCandidates(sheet, sp, places, geo) : orgCandidates(sheet, sp, places, geo)));
+  }
+  return out;
+}

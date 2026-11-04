@@ -1,0 +1,168 @@
+import type { FilmInput, OrgInput } from "@/lib/types";
+
+// ───────────────────────── archivo leído ─────────────────────────
+
+export interface ParsedSheet {
+  name: string;
+  headers: string[];
+  /** Filas como texto, indexadas por encabezado. */
+  rows: Record<string, string>[];
+  /** Cantidad real de filas del archivo (rows puede estar recortado). */
+  totalRows: number;
+}
+
+export interface ParsedFile {
+  filename: string;
+  sheets: ParsedSheet[];
+  /** Solo si el archivo era un PDF: cómo se leyó. */
+  pdf?: { pages: number; engine: "claude" | "heuristic"; notes: string[] };
+}
+
+// ───────────────────────── campos destino ─────────────────────────
+
+export interface FieldDef {
+  id: string;
+  label: string;
+  hint?: string;
+}
+
+export const FILM_FIELDS: FieldDef[] = [
+  { id: "title", label: "Título", hint: "Nombre de la película o proyecto" },
+  { id: "year", label: "Año" },
+  { id: "kind", label: "Tipo", hint: "ficción, documental, serie, comercial, corto" },
+  { id: "director", label: "Dirección" },
+  { id: "producer", label: "Productora" },
+  { id: "nationality", label: "Nacionalidad", hint: "guatemalteca, coproducción, extranjera" },
+  { id: "budget", label: "Presupuesto" },
+  { id: "currency", label: "Moneda" },
+  { id: "synopsis", label: "Sinopsis" },
+  { id: "poster", label: "Póster (enlace)", hint: "URL de una imagen; se descarga y se guarda al confirmar" },
+  { id: "place", label: "Lugar (texto libre)", hint: "Municipio, departamento o sitio en una sola columna" },
+  { id: "muni", label: "Municipio" },
+  { id: "depto", label: "Departamento" },
+  { id: "site", label: "Sitio de rodaje" },
+  { id: "lat", label: "Latitud" },
+  { id: "lng", label: "Longitud" },
+  { id: "days", label: "Días de rodaje" },
+  { id: "local_spend", label: "Inversión local" },
+  { id: "jobs", label: "Empleos" },
+];
+
+export const ORG_FIELDS: FieldDef[] = [
+  { id: "name", label: "Nombre" },
+  { id: "category", label: "Categoría" },
+  { id: "initiative_type", label: "Tipo de iniciativa", hint: "pública, privada, comunitaria, transnacional" },
+  { id: "place", label: "Lugar (texto libre)" },
+  { id: "muni", label: "Municipio" },
+  { id: "depto", label: "Departamento" },
+  { id: "city", label: "Ciudad o referencia" },
+  { id: "lat", label: "Latitud" },
+  { id: "lng", label: "Longitud" },
+  { id: "web", label: "Sitio web" },
+  { id: "instagram", label: "Instagram" },
+  { id: "contact", label: "Contacto" },
+  { id: "description", label: "Descripción" },
+];
+
+// ───────────────────────── plan (lo que "entendimos") ─────────────────────────
+
+export interface SheetPlan {
+  sheet: string;
+  /** Qué representa cada fila de esta hoja. */
+  entity: "film" | "org" | "ignore";
+  /** Solo para entidades: capa del mapa. */
+  layer?: "circulacion" | "industria";
+  /** La capa se dedujo de las categorías del archivo (no hace falta preguntar). */
+  layerGuessed?: boolean;
+  /** Películas: una fila por película o una fila por locación (película repetida). */
+  grain: "row_per_film" | "row_per_location";
+  /** campo destino -> encabezado de columna */
+  columns: Record<string, string>;
+  /** campo destino -> 0..1 */
+  confidence: Record<string, number>;
+  /** Separadores si una celda trae varios lugares ("Antigua; Panajachel"). */
+  multi_place?: boolean;
+  /** Valores crudos -> valor canónico, para campos de lista. */
+  value_maps?: Record<string, Record<string, string>>;
+  note?: string;
+}
+
+export interface PlanQuestion {
+  id: string;
+  question: string;
+  options?: string[];
+  /** Hoja y campo que afecta, para aplicar la respuesta. */
+  sheet?: string;
+  field?: string;
+}
+
+export interface ImportPlan {
+  sheets: SheetPlan[];
+  summary: string;
+  questions: PlanQuestion[];
+  /** "claude" si el análisis lo hizo el modelo; "heuristic" si fue el modo sin conexión. */
+  engine: "claude" | "heuristic";
+}
+
+// ───────────────────────── resolución de lugares ─────────────────────────
+
+export interface PlaceCandidate {
+  type: "depto" | "muni";
+  code: number;
+  name: string;
+  depto: string;
+}
+
+export interface PlaceResolution {
+  status: "ok" | "ambiguous" | "unknown";
+  muni_ine: number | null;
+  depto_ine: number | null;
+  candidates: PlaceCandidate[];
+  via: "gazetteer" | "claude" | "user";
+}
+
+export interface DuplicateMatch {
+  id: string;
+  title: string;
+  year: number | null;
+  score: number;
+}
+
+// ───────────────────────── candidatos a publicar ─────────────────────────
+
+export type DuplicateDecision = "update" | "create" | "skip";
+
+export interface Issue {
+  /** film: "title" | "year" | "location:<i>" ... */
+  field: string;
+  level: "missing" | "doubt";
+  message: string;
+}
+
+export interface Candidate {
+  key: string;
+  type: "film" | "org";
+  film?: FilmInput;
+  org?: OrgInput;
+  /** Textos de lugar originales por locación (para resolver o preguntar). */
+  placeTexts: string[];
+  /** Filas del archivo que dieron origen: "Hoja!12". */
+  rows: string[];
+  issues: Issue[];
+  include: boolean;
+  duplicate?: DuplicateMatch;
+  decision?: DuplicateDecision;
+}
+
+export interface ResolveItem {
+  key: string;
+  type: "film" | "org";
+  title: string;
+  year: number | null;
+}
+
+export interface ResolveResponse {
+  places: Record<string, PlaceResolution>;
+  duplicates: Record<string, DuplicateMatch>;
+  engine: "claude" | "gazetteer";
+}
