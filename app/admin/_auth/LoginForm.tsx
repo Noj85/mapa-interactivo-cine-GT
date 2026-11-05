@@ -37,6 +37,21 @@ export function SupabaseLogin() {
     setBusy(false);
   };
 
+  /** Envía un enlace para elegir una contraseña nueva; el enlace pasa por /auth/callback y termina en /admin/restablecer. */
+  const forgot = async () => {
+    if (!email.trim()) return setMsg({ kind: "error", text: "Escribe primero tu correo y vuelve a pulsar «Olvidé mi contraseña»." });
+    setBusy(true);
+    setMsg(null);
+    const sb = createBrowserSupabase();
+    const { error } = await sb.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/auth/callback?next=/admin/restablecer`,
+    });
+    // misma respuesta exista o no la cuenta: no revela quién es del equipo
+    if (error && /rate|seconds|limit/i.test(error.message)) setMsg({ kind: "error", text: "Ya enviamos un correo hace poco. Espera unos minutos e inténtalo de nuevo." });
+    else setMsg({ kind: "ok", text: "Si ese correo tiene acceso, te enviamos un enlace para elegir una contraseña nueva." });
+    setBusy(false);
+  };
+
   return (
     <form onSubmit={submit} className="space-y-4">
       <div>
@@ -57,6 +72,11 @@ export function SupabaseLogin() {
       <button type="button" className="w-full text-center text-xs text-muted hover:text-ink" onClick={() => setMode(mode === "password" ? "link" : "password")}>
         {mode === "password" ? "Prefiero entrar con un enlace por correo" : "Prefiero usar contraseña"}
       </button>
+      {mode === "password" && (
+        <button type="button" disabled={busy} className="w-full text-center text-xs text-muted hover:text-ink" onClick={forgot}>
+          Olvidé mi contraseña
+        </button>
+      )}
     </form>
   );
 }

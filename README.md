@@ -33,7 +33,9 @@ Copia `.env.example` a `.env.local` (o configúralas en Vercel).
    - `0003_submissions.sql`: aportes del público.
    - `0004_images_public.sql`: logo de las entidades y bucket `aportes` para las imágenes que sube el público.
 3. En *Authentication → Users* crea a las personas del equipo; en la tabla `profiles` asígnales el rol `admin` o `editor`. En *Authentication → Sign In / Providers → Email* desactiva «Allow new users to sign up» para que nadie más pueda crear cuentas.
-4. En *Authentication → URL configuration* agrega la URL de producción y `/auth/callback` para el enlace mágico.
+4. En *Authentication → URL configuration* agrega la URL de producción y `/auth/callback` para el enlace mágico y para recuperar la contraseña.
+
+Contraseña olvidada: en `/admin` se pulsa «Olvidé mi contraseña», llega un correo con un enlace que abre la sesión y lleva a `/admin/restablecer`, donde se elige la nueva (mínimo 10 caracteres). Para que el correo llegue, la dirección `https://tu-sitio/auth/callback` debe estar en las redirecciones permitidas; el correo integrado de Supabase envía pocos mensajes por hora (para uso real conviene configurar un SMTP propio).
 
 La lectura pública solo ve registros con `status = 'published'`. Escribir exige una sesión del equipo (RLS).
 
