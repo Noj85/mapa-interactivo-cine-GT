@@ -122,7 +122,7 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
         )}
       </div>
       {(view.layer === "produccion" ? films.length : orgs.length) > 0 && (
-        <DownloadLink href={downloadHref({ layer: view.layer, place, cat: view.cat })} label={`Descargar datos de ${entry?.name ?? "este lugar"}`} />
+        <DownloadLink href={downloadHref({ layer: view.layer, place, filmFilter: view.filmFilter, orgFilter: view.orgFilter })} label={`Descargar datos de ${entry?.name ?? "este lugar"}`} />
       )}
     </PanelShell>
   );

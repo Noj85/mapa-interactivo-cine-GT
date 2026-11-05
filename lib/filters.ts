@@ -28,6 +28,13 @@ export interface FilmFilter {
   presupuestoMin: number | null;
   presupuestoMax: number | null;
   moneda: BudgetCurrency;
+  /** Totales de rodaje (suma de las locaciones): días, inversión local y empleos. */
+  diasMin: number | null;
+  diasMax: number | null;
+  inversionMin: number | null;
+  inversionMax: number | null;
+  empleosMin: number | null;
+  empleosMax: number | null;
   q: string;
   /** Solo producciones con todas las locaciones ubicadas en un municipio. */
   soloCompletas: boolean;
@@ -51,6 +58,12 @@ export const EMPTY_FILM_FILTER: FilmFilter = {
   presupuestoMin: null,
   presupuestoMax: null,
   moneda: "GTQ",
+  diasMin: null,
+  diasMax: null,
+  inversionMin: null,
+  inversionMax: null,
+  empleosMin: null,
+  empleosMax: null,
   q: "",
   soloCompletas: false,
 };
@@ -103,6 +116,12 @@ export function parseFilmFilter(p: URLSearchParams): FilmFilter {
     presupuestoMin: num(p, "presupuesto_min"),
     presupuestoMax: num(p, "presupuesto_max"),
     moneda: p.get("moneda") === "USD" ? "USD" : "GTQ",
+    diasMin: num(p, "dias_min"),
+    diasMax: num(p, "dias_max"),
+    inversionMin: num(p, "inversion_min"),
+    inversionMax: num(p, "inversion_max"),
+    empleosMin: num(p, "empleos_min"),
+    empleosMax: num(p, "empleos_max"),
     q: (p.get("q") ?? "").trim().slice(0, 120),
     soloCompletas: p.get("completas") === "1",
   };
@@ -129,6 +148,12 @@ export function filmFilterToParams(f: FilmFilter, into = new URLSearchParams()) 
   if (f.presupuestoMin != null) into.set("presupuesto_min", String(f.presupuestoMin));
   if (f.presupuestoMax != null) into.set("presupuesto_max", String(f.presupuestoMax));
   if ((f.presupuestoMin != null || f.presupuestoMax != null) && f.moneda !== "GTQ") into.set("moneda", f.moneda);
+  if (f.diasMin != null) into.set("dias_min", String(f.diasMin));
+  if (f.diasMax != null) into.set("dias_max", String(f.diasMax));
+  if (f.inversionMin != null) into.set("inversion_min", String(f.inversionMin));
+  if (f.inversionMax != null) into.set("inversion_max", String(f.inversionMax));
+  if (f.empleosMin != null) into.set("empleos_min", String(f.empleosMin));
+  if (f.empleosMax != null) into.set("empleos_max", String(f.empleosMax));
   if (f.q) into.set("q", f.q);
   if (f.soloCompletas) into.set("completas", "1");
   return into;
@@ -173,6 +198,19 @@ export function filmMatches(f: Film, flt: FilmFilter): boolean {
     if (b == null) return false;
     if (flt.presupuestoMin != null && b < flt.presupuestoMin) return false;
     if (flt.presupuestoMax != null && b > flt.presupuestoMax) return false;
+  }
+  const ranges: [keyof Pick<Film["locations"][number], "days" | "local_spend" | "jobs">, number | null, number | null][] = [
+    ["days", flt.diasMin, flt.diasMax],
+    ["local_spend", flt.inversionMin, flt.inversionMax],
+    ["jobs", flt.empleosMin, flt.empleosMax],
+  ];
+  for (const [k, min, max] of ranges) {
+    if (min == null && max == null) continue;
+    const vals = f.locations.map((l) => l[k]).filter((v): v is number => typeof v === "number");
+    if (!vals.length) return false;
+    const total = vals.reduce((a, b) => a + b, 0);
+    if (min != null && total < min) return false;
+    if (max != null && total > max) return false;
   }
   if (flt.soloCompletas && !(f.locations.length > 0 && f.locations.every((l) => l.muni_ine != null))) return false;
   if (flt.q && !norm(`${f.title} ${f.director ?? ""} ${f.producer ?? ""}`).includes(norm(flt.q))) return false;
@@ -219,6 +257,14 @@ export function describeFilmFilter(f: FilmFilter, deptoName: (code: number) => s
   if (f.presupuestoMin != null && f.presupuestoMax != null) out.push(`Presupuesto entre ${money(f.presupuestoMin, f.moneda)} y ${money(f.presupuestoMax, f.moneda)}`);
   else if (f.presupuestoMin != null) out.push(`Presupuesto de ${money(f.presupuestoMin, f.moneda)} o más`);
   else if (f.presupuestoMax != null) out.push(`Presupuesto de ${money(f.presupuestoMax, f.moneda)} o menos`);
+  const range = (label: string, min: number | null, max: number | null) => {
+    if (min != null && max != null) out.push(`${label}: de ${min.toLocaleString("es-GT")} a ${max.toLocaleString("es-GT")}`);
+    else if (min != null) out.push(`${label}: ${min.toLocaleString("es-GT")} o más`);
+    else if (max != null) out.push(`${label}: ${max.toLocaleString("es-GT")} o menos`);
+  };
+  range("Días de rodaje", f.diasMin, f.diasMax);
+  range("Inversión local", f.inversionMin, f.inversionMax);
+  range("Empleos", f.empleosMin, f.empleosMax);
   if (f.soloCompletas) out.push("Solo con todas las locaciones ubicadas en un municipio");
   if (f.q) out.push(`Búsqueda: “${f.q}”`);
   return out;

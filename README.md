@@ -90,9 +90,16 @@ La app es una sola, con dos áreas separadas. **`/` siempre es el mapa público*
 - Una producción puede tener **todas las locaciones que haga falta** (cada una con su lugar, sitio, días, inversión local y empleos). En el editor: «Agregar locación», o «Pegar varios lugares» para escribir una lista (uno por línea o separados por «;») que se resuelve con los códigos del INE. En un archivo importado, una fila por locación.
 - Las producciones **sin lugar de rodaje** ya no quedan ocultas: con tener título se publican y se muestran en una zona punteada «Sin ubicación» en el Pacífico, fuera del territorio de Guatemala, para que se entienda que no tienen ubicación. Tocarla abre la lista de esas producciones (`?sinlugar=1`), y la vista general avisa cuántas son. Al agregarles un lugar pasan solas al mapa.
 
-## Filtro por departamento
+## Filtros del mapa
 
 En el mapa, el desplegable «Todo el país» (debajo de las capas) acerca la cámara a un departamento, atenúa el resto del país y deja en el mapa y en el panel solo lo de ese departamento. El filtro vive en la URL (`?lugar=d9`), así que se puede compartir; la «×» o «Todo el país» lo quita.
+
+Junto al departamento hay un botón **«Filtros»** que abre un panel compacto. Sin filtros el mapa no muestra nada más; los filtros se **añaden a la carta** («+ Añadir filtro») y se quitan con la «×»:
+
+- **Producción:** tipo de obra, nacionalidad, año, presupuesto (con moneda), días de rodaje, inversión local, empleos, «solo con todas las locaciones ubicadas» y búsqueda por texto.
+- **Circulación e Industria:** categoría (varias), naturaleza y búsqueda por texto.
+- **Medir por** (solo Producción): producciones, días de rodaje, inversión local o empleos; cambia los colores y la leyenda.
+- Los filtros se aplican al mapa, la leyenda y los paneles, y viven en la URL con los mismos parámetros que `/descargas` (`clase`, `desde`, `presupuesto_min`, `dias_min`, `categoria`…, más `metrica`), así que «Copiar enlace de esta vista» y «Descargar estos datos» llevan exactamente lo que se ve. Los enlaces anteriores con `?categoria=` siguen funcionando.
 
 ## Pósters
 

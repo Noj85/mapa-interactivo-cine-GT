@@ -1,6 +1,7 @@
 "use client";
 
-import { orgCategories } from "@/lib/categories";
+import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
+import { filmFilterActive, filterFilms, orgFilterActive, orgMatches } from "@/lib/filters";
 import { AnimatePresence, motion } from "framer-motion";
 import { Download, HandHeart, Moon, Search, Sun } from "lucide-react";
 import { DepartmentFilter } from "./DepartmentFilter";
@@ -13,10 +14,11 @@ import { aggregate } from "@/lib/aggregate";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
 import { useTheme } from "@/lib/use-theme";
 import { LAYER_METRICS, type Dataset, type LayerId } from "@/lib/types";
-import { DEFAULT_VIEW, parseView, serializeView, type Place, type ViewState } from "@/lib/view";
+import { DEFAULT_VIEW, downloadHref, parseView, serializeView, type Place, type ViewState } from "@/lib/view";
 import { Breadcrumbs } from "./Breadcrumbs";
 import FilmPanel from "./FilmPanel";
-import { CategoryFilter, LayerSwitcher } from "./LayerSwitcher";
+import { FilterPanel } from "./FilterPanel";
+import { LayerSwitcher } from "./LayerSwitcher";
 import { Legend } from "./Legend";
 import { MapControls } from "./MapControls";
 import OrgPanel from "./OrgPanel";
@@ -75,15 +77,14 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
   const go = useMemo<PanelCtx["go"]>(
     () => ({
       place: (p: Place | null) => commit({ ...view, place: p, film: null, org: null, noloc: false }),
-      film: (slug: string) => commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", film: slug, org: null, noloc: false, cat: view.layer === "produccion" ? view.cat : null }),
+      film: (slug: string) => commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", film: slug, org: null, noloc: false }),
       org: (slug: string) => {
         const o = data.orgs.find((x) => x.slug === slug);
         const layer: LayerId = o?.layer ?? view.layer;
-        const keep = layer === view.layer && o && view.cat && orgCategories(o).includes(view.cat) ? view.cat : null;
-        commit({ ...view, layer, metric: LAYER_METRICS[layer][0], org: slug, film: null, noloc: false, cat: keep });
+        commit({ ...view, layer, metric: layer === view.layer ? view.metric : LAYER_METRICS[layer][0], org: slug, film: null, noloc: false });
       },
       layer: (l: LayerId) =>
-        commit({ ...view, layer: l, metric: LAYER_METRICS[l][0], film: null, org: null, noloc: false, cat: null }),
+        commit({ ...view, layer: l, metric: LAYER_METRICS[l][0], film: null, org: null, noloc: false }),
       unlocated: () => commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", place: null, film: null, org: null, noloc: true }),
       up: () => {
         if (view.film || view.org) return commit({ ...view, film: null, org: null });
@@ -117,18 +118,37 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
   }, [searchOpen, view, go]);
 
 
-  // El filtro por categoría (Atlas) recorta solo las entidades de la capa activa.
+  // Los filtros recortan solo la capa activa (las demás se ven completas). El lugar lo maneja `view.place`, no el filtro.
+  const filteredFilms = useMemo(
+    () => (view.layer === "produccion" && filmFilterActive(view.filmFilter) ? filterFilms(data.films, { ...view.filmFilter, depto: [], muni: [] }) : data.films),
+    [data.films, view.layer, view.filmFilter],
+  );
+  const filteredOrgs = useMemo(() => {
+    if (view.layer === "produccion" || !orgFilterActive(view.orgFilter)) return data.orgs;
+    const f = { ...view.orgFilter, capa: null, depto: [] };
+    return data.orgs.filter((o) => o.layer !== view.layer || orgMatches(o, f));
+  }, [data.orgs, view.layer, view.orgFilter]);
+  // lo que está seleccionado nunca desaparece del mapa, aunque no cumpla los filtros
   const shown = useMemo<Dataset>(() => {
-    if (!view.cat) return data;
-    if (view.layer === "produccion") return { ...data, films: data.films.filter((f) => f.kind === view.cat) };
-    return { ...data, orgs: data.orgs.filter((o) => o.layer !== view.layer || orgCategories(o).includes(view.cat!)) };
-  }, [data, view.cat, view.layer]);
+    const films = filteredFilms === data.films || !view.film ? filteredFilms : filteredFilms.some((f) => f.slug === view.film) ? filteredFilms : [...filteredFilms, ...data.films.filter((f) => f.slug === view.film)];
+    const orgs = filteredOrgs === data.orgs || !view.org ? filteredOrgs : filteredOrgs.some((o) => o.slug === view.org) ? filteredOrgs : [...filteredOrgs, ...data.orgs.filter((o) => o.slug === view.org)];
+    return films === data.films && orgs === data.orgs ? data : { ...data, films, orgs };
+  }, [data, filteredFilms, filteredOrgs, view.film, view.org]);
+  const layerCount = view.layer === "produccion" ? filteredFilms.length : filteredOrgs.filter((o) => o.layer === view.layer).length;
+  const layerTotal = view.layer === "produccion" ? data.films.length : data.orgs.filter((o) => o.layer === view.layer).length;
+  const extraCategories = useMemo(() => {
+    if (view.layer === "produccion") return [];
+    const known: readonly string[] = view.layer === "circulacion" ? CIRC_CATEGORIES : IND_CATEGORIES;
+    const out = new Set<string>();
+    for (const o of data.orgs) if (o.layer === view.layer) for (const c of o.categories ?? []) if (!known.includes(c)) out.add(c);
+    return [...out];
+  }, [data.orgs, view.layer]);
   const aggs = useMemo(() => aggregate(shown, view.layer), [shown, view.layer]);
   const hasSelection = !!(view.place || view.film || view.org || view.noloc);
   const desktop = vw.w >= 900;
   const padding = desktop
     ? { top: 20, right: PANEL_W + 16, bottom: 20, left: 460 }
-    : { top: view.layer === "produccion" ? 150 : 190, right: 0, bottom: hasSelection ? Math.round(vw.h * 0.5) : 0, left: 0 };
+    : { top: 190, right: 0, bottom: hasSelection ? Math.round(vw.h * 0.5) : 0, left: 0 };
 
   const ctx: PanelCtx | null = geo ? { data: shown, gaz: geo.gaz, aggs, view, go, canEdit } : null;
 
@@ -230,14 +250,22 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
         <div className="pointer-events-auto flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap">
           <LayerSwitcher layer={view.layer} onChange={go.layer} />
         </div>
-        {geo && <DepartmentFilter gaz={geo.gaz} place={view.place} onPlace={go.place} onClear={go.clear} />}
-        <CategoryFilter
-          layer={view.layer}
-          orgs={data.orgs}
-          films={data.films}
-          value={view.cat}
-          onChange={(cat) => commit({ ...view, cat, org: null, place: view.place })}
-        />
+        <div className="pointer-events-none relative flex flex-wrap items-start gap-2">
+          {geo && <DepartmentFilter gaz={geo.gaz} place={view.place} onPlace={go.place} onClear={go.clear} />}
+          <FilterPanel
+            layer={view.layer}
+            metric={view.metric}
+            filmFilter={view.filmFilter}
+            orgFilter={view.orgFilter}
+            count={layerCount}
+            total={layerTotal}
+            extraCategories={extraCategories}
+            onFilm={(filmFilter) => commit({ ...view, filmFilter, film: null, org: null, noloc: false })}
+            onOrg={(orgFilter) => commit({ ...view, orgFilter, film: null, org: null, noloc: false })}
+            onMetric={(metric) => commit({ ...view, metric })}
+            downloadHref={downloadHref(view)}
+          />
+        </div>
         {geo && (
           <div className="pointer-events-auto glass w-fit max-w-full rounded-xl border border-line px-3 py-1.5">
             <Breadcrumbs view={view} gaz={geo.gaz} data={data} onPlace={go.place} onClear={go.clear} />

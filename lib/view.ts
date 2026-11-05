@@ -1,3 +1,15 @@
+import {
+  EMPTY_FILM_FILTER,
+  EMPTY_ORG_FILTER,
+  filmFilterActive,
+  filmFilterToParams,
+  orgFilterActive,
+  orgFilterToParams,
+  parseFilmFilter,
+  parseOrgFilter,
+  type FilmFilter,
+  type OrgFilter,
+} from "@/lib/filters";
 import type { LayerId, MetricId } from "@/lib/types";
 import { FILM_KINDS, LAYER_METRICS } from "@/lib/types";
 
@@ -14,8 +26,10 @@ export interface ViewState {
   film: string | null;
   /** slug de organización seleccionada */
   org: string | null;
-  /** categoría del Atlas (Circulación e Industria) o tipo de obra (Producción) */
-  cat: string | null;
+  /** Filtros de Producción (solo se aplican con esa capa). El lugar lo maneja `place`, no el filtro. */
+  filmFilter: FilmFilter;
+  /** Filtros de entidades de Circulación e Industria (la capa la fija `layer`). */
+  orgFilter: OrgFilter;
   /** mostrando las producciones sin lugar de rodaje (el punto «Sin ubicación») */
   noloc: boolean;
 }
@@ -26,7 +40,8 @@ export const DEFAULT_VIEW: ViewState = {
   place: null,
   film: null,
   org: null,
-  cat: null,
+  filmFilter: EMPTY_FILM_FILTER,
+  orgFilter: EMPTY_ORG_FILTER,
   noloc: false,
 };
 
@@ -35,17 +50,26 @@ const LAYERS = ["produccion", "circulacion", "industria"];
 export function parseView(search: string): ViewState {
   const p = new URLSearchParams(search);
   const layer = (LAYERS.includes(p.get("capa") ?? "") ? p.get("capa") : "produccion") as LayerId;
-  // Ya no hay selector de métrica: el mapa siempre usa la principal de la capa (un ?metrica= viejo se ignora).
-  const metric: MetricId = LAYER_METRICS[layer][0];
+  const rawMetric = p.get("metrica") as MetricId | null;
+  const metric: MetricId = rawMetric && LAYER_METRICS[layer].includes(rawMetric) ? rawMetric : LAYER_METRICS[layer][0];
   const lugar = p.get("lugar");
   let place: Place | null = null;
   if (lugar && /^[dm]\d+$/.test(lugar)) {
     place = { type: lugar[0] === "d" ? "depto" : "muni", code: Number(lugar.slice(1)) };
   }
-  const rawCat = p.get("categoria");
-  const cat = layer === "produccion" ? (FILM_KINDS.some((k) => k.id === rawCat) ? rawCat : null) : rawCat;
+  // Los filtros usan los mismos parámetros que /descargas; el lugar y la capa los fijan `lugar` y `capa`.
+  let filmFilter = EMPTY_FILM_FILTER;
+  let orgFilter = EMPTY_ORG_FILTER;
+  if (layer === "produccion") {
+    filmFilter = { ...parseFilmFilter(p), depto: [], muni: [] };
+    // enlaces anteriores: ?categoria=ficcion era el tipo de obra
+    const old = p.get("categoria");
+    if (!filmFilter.clase.length && FILM_KINDS.some((k) => k.id === old)) filmFilter = { ...filmFilter, clase: [old as (typeof filmFilter.clase)[number]] };
+  } else {
+    orgFilter = { ...parseOrgFilter(p), capa: null, depto: [] };
+  }
   const noloc = layer === "produccion" && p.get("sinlugar") === "1" && !place && !p.get("pelicula") && !p.get("entidad");
-  return { layer, metric, place, film: p.get("pelicula"), org: p.get("entidad"), cat, noloc };
+  return { layer, metric, place, film: p.get("pelicula"), org: p.get("entidad"), filmFilter, orgFilter, noloc };
 }
 
 export function serializeView(v: ViewState): string {
@@ -54,17 +78,20 @@ export function serializeView(v: ViewState): string {
   if (v.place) p.set("lugar", (v.place.type === "depto" ? "d" : "m") + v.place.code);
   if (v.film) p.set("pelicula", v.film);
   if (v.org) p.set("entidad", v.org);
-  if (v.cat) p.set("categoria", v.cat);
+  if (v.metric !== LAYER_METRICS[v.layer][0]) p.set("metrica", v.metric);
+  if (v.layer === "produccion") filmFilterToParams({ ...v.filmFilter, depto: [], muni: [] }, p);
+  else orgFilterToParams({ ...v.orgFilter, capa: null, depto: [] }, p);
   if (v.noloc) p.set("sinlugar", "1");
   const s = p.toString();
   return s ? `?${s}` : "";
 }
 
 /** Enlace a /descargas con lo que se está viendo en el mapa ya filtrado. */
-export function downloadHref(v: Pick<ViewState, "layer" | "place" | "cat">): string {
+export function downloadHref(v: Pick<ViewState, "layer" | "place" | "filmFilter" | "orgFilter">): string {
   const p = new URLSearchParams();
   p.set("tipo", v.layer === "produccion" ? "producciones" : v.layer === "circulacion" ? "circulacion" : "entidades");
-  if (v.cat) p.set(v.layer === "produccion" ? "clase" : "categoria", v.cat);
+  if (v.layer === "produccion") filmFilterToParams({ ...v.filmFilter, depto: [], muni: [] }, p);
+  else orgFilterToParams({ ...v.orgFilter, capa: null, depto: [] }, p);
   if (v.place) {
     const depto = v.place.type === "depto" ? v.place.code : Math.floor(v.place.code / 100);
     p.set("depto", String(depto));
@@ -78,3 +105,17 @@ export function deptoOf(place: Place | null | undefined): number | null {
   if (!place) return null;
   return place.type === "depto" ? place.code : Math.floor(place.code / 100);
 }
+
+/** Cuántos filtros de la capa activa están en uso (para el botón «Filtros»). */
+export function activeFilterCount(v: Pick<ViewState, "layer" | "filmFilter" | "orgFilter">): number {
+  const params = v.layer === "produccion" ? filmFilterToParams({ ...v.filmFilter, depto: [], muni: [] }) : orgFilterToParams({ ...v.orgFilter, capa: null, depto: [] });
+  // moneda es un ajuste del presupuesto, no un filtro aparte
+  params.delete("moneda");
+  // presupuesto, año y demás rangos cuentan como un solo filtro cada uno
+  const groups = new Set<string>();
+  for (const k of params.keys()) groups.add(k.replace(/_(min|max)$/, "").replace(/^(desde|hasta)$/, "anio"));
+  return groups.size;
+}
+
+export const hasActiveFilters = (v: Pick<ViewState, "layer" | "filmFilter" | "orgFilter">) =>
+  v.layer === "produccion" ? filmFilterActive({ ...v.filmFilter, depto: [], muni: [] }) : orgFilterActive({ ...v.orgFilter, capa: null, depto: [] });
