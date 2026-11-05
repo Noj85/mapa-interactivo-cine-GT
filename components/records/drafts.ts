@@ -77,7 +77,7 @@ export function filmDraft(film?: Film): FilmDraft {
   };
 }
 
-/** Datos de la película listos para enviar (sin estado ni id: los agrega quien llama). */
+/** Datos de la producción listos para enviar (sin estado ni id: los agrega quien llama). */
 export function filmPayload(d: FilmDraft) {
   return {
     title: d.title,

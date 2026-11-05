@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-/** Pestañas Películas | Entidades que encabezan los dos listados de registros. */
+/** Pestañas Producciones | Entidades que encabezan los dos listados de registros. */
 export function RecordsTabs({ current, films, orgs }: { current: "films" | "orgs"; films: number; orgs: number }) {
   const tabs = [
-    { id: "films" as const, href: "/admin/peliculas", label: "Películas", count: films },
+    { id: "films" as const, href: "/admin/peliculas", label: "Producciones", count: films },
     { id: "orgs" as const, href: "/admin/entidades", label: "Entidades", count: orgs },
   ];
   return (

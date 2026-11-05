@@ -94,7 +94,7 @@ export function StepQuestions({
       incomplete: live.length - complete,
       // Solo las entidades sin ubicación (o registros sin título) quedan como borrador.
       drafts: st.filter((s) => !s.publishable).length,
-      // Películas sin lugar de rodaje: se publican en la zona «Sin ubicación» del mapa.
+      // Producciones sin lugar de rodaje: se publican en la zona «Sin ubicación» del mapa.
       nowhere: live.filter(
         (c) => c.type === "film" && !(c.film?.locations ?? []).some((l) => l.muni_ine || l.depto_ine || (l.lat != null && l.lng != null)),
       ).length,
@@ -220,7 +220,7 @@ export function StepQuestions({
             )}
 
             {err && <p className="mt-3 text-sm text-warn">{err}</p>}
-            {current.kind === "bulk" && <p className="mt-4 text-xs text-muted">Solo se completan las películas a las que les falta este dato; no se cambia lo que ya tienen.</p>}
+            {current.kind === "bulk" && <p className="mt-4 text-xs text-muted">Solo se completan las producciones a las que les falta este dato; no se cambia lo que ya tienen.</p>}
 
             <div className="mt-8 flex items-center justify-between border-t border-line pt-4">
               <button className="text-sm text-muted hover:text-ink" onClick={() => defer(current)}>
@@ -301,7 +301,7 @@ export function StepQuestions({
         ))}
       </div>
       <ul className="mt-4 space-y-1 text-sm text-muted">
-        {summary.films > 0 && <li>{summary.films} películas · {summary.orgs} entidades</li>}
+        {summary.films > 0 && <li>{summary.films} producciones · {summary.orgs} entidades</li>}
         {summary.films === 0 && <li>{summary.orgs} entidades</li>}
         {summary.drafts > 0 && (
           <li className="text-warn">
@@ -310,7 +310,7 @@ export function StepQuestions({
         )}
         {summary.nowhere > 0 && (
           <li>
-            {summary.nowhere === 1 ? "1 película no tiene" : `${summary.nowhere} películas no tienen`} lugar de rodaje: se muestran en la zona «Sin ubicación», fuera del territorio, hasta que agregues sus locaciones.
+            {summary.nowhere === 1 ? "1 producción no tiene" : `${summary.nowhere} producciones no tienen`} lugar de rodaje: se muestran en la zona «Sin ubicación», fuera del territorio, hasta que agregues sus locaciones.
           </li>
         )}
         {summary.updates > 0 && <li>{summary.updates} completan registros que ya existían (no se pisa nada).</li>}

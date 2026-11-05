@@ -136,7 +136,7 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
       {!correcting && (
         <div role="tablist" aria-label="Qué quieres aportar" className="inline-flex rounded-2xl border border-line bg-surface p-1">
           {([
-            ["film", "Una película", Clapperboard],
+            ["film", "Una producción", Clapperboard],
             ["org", "Una entidad", Landmark],
           ] as const).map(([id, label, Icon]) => (
             <button

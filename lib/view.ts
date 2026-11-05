@@ -10,13 +10,13 @@ export interface ViewState {
   layer: LayerId;
   metric: MetricId;
   place: Place | null;
-  /** slug de película seleccionada */
+  /** slug de producción seleccionada */
   film: string | null;
   /** slug de organización seleccionada */
   org: string | null;
   /** categoría del Atlas (Circulación e Industria) o tipo de obra (Producción) */
   cat: string | null;
-  /** mostrando las películas sin lugar de rodaje (el punto «Sin ubicación») */
+  /** mostrando las producciones sin lugar de rodaje (el punto «Sin ubicación») */
   noloc: boolean;
 }
 
@@ -63,8 +63,7 @@ export function serializeView(v: ViewState): string {
 /** Enlace a /descargas con lo que se está viendo en el mapa ya filtrado. */
 export function downloadHref(v: Pick<ViewState, "layer" | "place" | "cat">): string {
   const p = new URLSearchParams();
-  p.set("tipo", v.layer === "produccion" ? "peliculas" : "entidades");
-  if (v.layer !== "produccion") p.set("capa", v.layer);
+  p.set("tipo", v.layer === "produccion" ? "producciones" : v.layer === "circulacion" ? "circulacion" : "entidades");
   if (v.cat) p.set(v.layer === "produccion" ? "clase" : "categoria", v.cat);
   if (v.place) {
     const depto = v.place.type === "depto" ? v.place.code : Math.floor(v.place.code / 100);

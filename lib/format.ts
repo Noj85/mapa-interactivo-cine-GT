@@ -4,13 +4,13 @@ import { fmtInt, fmtMoney } from "@/lib/utils";
 
 const plural = (n: number, one: string, many: string) => `${fmtInt(n)} ${n === 1 ? one : many}`;
 
-/** Texto corto del valor de una métrica ("3 películas", "Q 1.2 M"). */
+/** Texto corto del valor de una métrica ("3 producciones", "Q 1.2 M"). */
 export function metricText(a: Agg | undefined, metric: MetricId, layer: LayerId = "produccion"): string {
   const v = a ? a[metric] : 0;
   if (!v) return "";
   switch (metric) {
     case "films":
-      return plural(v, "película", "películas");
+      return plural(v, "producción", "producciones");
     case "days":
       return plural(v, "día", "días");
     case "spend":

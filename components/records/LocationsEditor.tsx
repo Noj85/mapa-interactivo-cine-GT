@@ -9,7 +9,7 @@ import { blankLoc, isBlankLoc, type LocDraft } from "./drafts";
 
 const MAX_LOCS = 20;
 
-/** Dónde se rodó una película: una locación por lugar, con su punto en el mapa, días, inversión y empleos. */
+/** Dónde se rodó una producción: una locación por lugar, con su punto en el mapa, días, inversión y empleos. */
 export function LocationsEditor({ locs, onChange }: { locs: LocDraft[]; onChange: (next: LocDraft[]) => void }) {
   const [picker, setPicker] = useState<number | null>(null);
   const [geo, setGeo] = useState<GeoBundle | null>(null);
@@ -56,7 +56,7 @@ export function LocationsEditor({ locs, onChange }: { locs: LocDraft[]; onChange
         </div>
       </div>
       <p className="-mt-1 mb-3 text-xs leading-relaxed text-muted">
-        Una película puede rodarse en varios lugares: agrega una locación por cada uno, con sus propios días, inversión y empleos.
+        Una producción puede rodarse en varios lugares: agrega una locación por cada uno, con sus propios días, inversión y empleos.
       </p>
       {bulkOpen && (
         <div className="mb-3 rounded-2xl border border-line bg-surface p-4">
@@ -123,7 +123,7 @@ export function LocationsEditor({ locs, onChange }: { locs: LocDraft[]; onChange
         ))}
         {locs.length === 0 && (
           <div className="rounded-2xl border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
-            Sin locaciones todavía. La película se muestra en la zona «Sin ubicación» del mapa hasta que agregues dónde se rodó.
+            Sin locaciones todavía. La producción se muestra en la zona «Sin ubicación» del mapa hasta que agregues dónde se rodó.
           </div>
         )}
       </div>

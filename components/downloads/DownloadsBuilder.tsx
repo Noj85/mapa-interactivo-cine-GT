@@ -1,7 +1,7 @@
 "use client";
 
 import { categoriesText } from "@/lib/categories";
-import { Check, Clapperboard, Copy, Download, FileSpreadsheet, FileText, Landmark, MapPin, X } from "lucide-react";
+import { Check, Clapperboard, Copy, Download, FileSpreadsheet, FileText, Landmark, Presentation, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { MultiSelect } from "@/components/ui/MultiSelect";
 import {
@@ -18,9 +18,12 @@ import {
   orgFilterActive,
   orgFilterToParams,
   parseFilmFilter,
+  kindLayer,
+  parseExportRequest,
   parseOrgFilter,
   type ExportFormat,
   type ExportKind,
+  type ExportRows,
   type FilmFilter,
   type OrgFilter,
 } from "@/lib/filters";
@@ -36,9 +39,9 @@ interface Props {
 }
 
 const KINDS: { id: ExportKind; title: string; blurb: string; icon: typeof Clapperboard }[] = [
-  { id: "peliculas", title: "Películas", blurb: "Una fila por película, con sus datos y totales de rodaje.", icon: Clapperboard },
-  { id: "locaciones", title: "Locaciones", blurb: "Una fila por lugar de rodaje, con coordenadas y cifras locales.", icon: MapPin },
-  { id: "entidades", title: "Entidades", blurb: "Festivales, salas, productoras, escuelas y servicios.", icon: Landmark },
+  { id: "producciones", title: "Producciones", blurb: "Una fila por producción, con sus datos y totales de rodaje; o una fila por locación.", icon: Clapperboard },
+  { id: "circulacion", title: "Circulación", blurb: "Festivales, salas de cine, cineclubs y espacios de exhibición.", icon: Presentation },
+  { id: "entidades", title: "Entidades", blurb: "Productoras, escuelas, servicios y demás empresas e instituciones de la industria.", icon: Landmark },
 ];
 
 const digits = (s: string) => s.replace(/[^\d]/g, "");
@@ -46,10 +49,8 @@ const group = (s: string) => (s ? Number(s).toLocaleString("es-GT") : "");
 
 export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: Props) {
   const init = useMemo(() => new URLSearchParams(initialQuery), [initialQuery]);
-  const [tipo, setTipo] = useState<ExportKind>(() => {
-    const t = init.get("tipo");
-    return t === "locaciones" || t === "entidades" ? t : "peliculas";
-  });
+  const [tipo, setTipoRaw] = useState<ExportKind>(() => parseExportRequest(init).tipo);
+  const [filas, setFilas] = useState<ExportRows>(() => parseExportRequest(init).filas);
   const [formato, setFormato] = useState<ExportFormat>(() => (init.get("formato") === "xlsx" ? "xlsx" : "csv"));
   const [ff, setFf] = useState<FilmFilter>(() => parseFilmFilter(init));
   const [of, setOf] = useState<OrgFilter>(() => parseOrgFilter(init));
@@ -58,26 +59,38 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
   const deptoName = (c: number) => names[`depto:${c}`] ?? String(c);
   const muniName = (c: number) => names[`muni:${c}`] ?? String(c);
 
+  const layer = kindLayer(tipo);
+  const isOrgs = tipo !== "producciones";
+  const byLocation = !isOrgs && filas === "locaciones";
+  // las categorías de circulación y de industria no se comparten: al cambiar de una a otra se limpia la categoría
+  const setTipo = (t: ExportKind) => {
+    if (t !== tipo && t !== "producciones" && isOrgs) setOf((f) => ({ ...f, categoria: [] }));
+    setTipoRaw(t);
+  };
+
   const filmsHit = useMemo(() => filterFilms(films, ff), [films, ff]);
-  const orgsHit = useMemo(() => filterOrgs(orgs, of), [orgs, of]);
+  const orgsHit = useMemo(() => filterOrgs(orgs, { ...of, capa: layer }), [orgs, of, layer]);
 
   const locCount = useMemo(
     () => filmsHit.reduce((n, f) => n + (f.locations.length ? locationsMatching(f.locations, ff).length : 1), 0),
     [filmsHit, ff],
   );
 
-  const count = tipo === "peliculas" ? filmsHit.length : tipo === "locaciones" ? locCount : orgsHit.length;
-  const total = tipo === "entidades" ? orgs.length : films.length;
-  const noun = tipo === "peliculas" ? ["película", "películas"] : tipo === "locaciones" ? ["locación", "locaciones"] : ["entidad", "entidades"];
+  const count = isOrgs ? orgsHit.length : byLocation ? locCount : filmsHit.length;
+  const total = isOrgs ? orgs.filter((o) => o.layer === layer).length : films.length;
+  const noun = isOrgs ? ["entidad", "entidades"] : byLocation ? ["locación", "locaciones"] : ["producción", "producciones"];
 
   const query = useMemo(() => {
     const p = new URLSearchParams();
     p.set("tipo", tipo);
     if (formato !== "csv") p.set("formato", formato);
-    if (tipo === "entidades") orgFilterToParams(of, p);
-    else filmFilterToParams(ff, p);
+    if (isOrgs) orgFilterToParams({ ...of, capa: null }, p);
+    else {
+      if (byLocation) p.set("filas", "locaciones");
+      filmFilterToParams(ff, p);
+    }
     return p.toString();
-  }, [tipo, formato, ff, of]);
+  }, [tipo, isOrgs, byLocation, formato, ff, of]);
 
   // La dirección de la página refleja los filtros: se puede copiar y compartir.
   useEffect(() => {
@@ -96,27 +109,30 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
   const patchFilm = (p: Partial<FilmFilter>) => setFf((f) => ({ ...f, ...p }));
   const patchOrg = (p: Partial<OrgFilter>) => setOf((f) => ({ ...f, ...p }));
 
-  const chips = tipo === "entidades" ? describeOrgFilter(of, deptoName) : describeFilmFilter(ff, deptoName, muniName);
-  const active = tipo === "entidades" ? orgFilterActive(of) : filmFilterActive(ff);
-  const clear = () => (tipo === "entidades" ? setOf(EMPTY_ORG_FILTER) : setFf(EMPTY_FILM_FILTER));
+  const chips = isOrgs ? describeOrgFilter({ ...of, capa: null }, deptoName) : describeFilmFilter(ff, deptoName, muniName);
+  const active = isOrgs ? orgFilterActive({ ...of, capa: null }) : filmFilterActive(ff);
+  const clear = () => (isOrgs ? setOf(EMPTY_ORG_FILTER) : setFf(EMPTY_FILM_FILTER));
   const deptoOptions = deptos.map((d) => ({ value: d.code, label: d.name }));
 
   const presets: { label: string; apply(): void }[] =
-    tipo === "entidades"
+    tipo === "circulacion"
       ? [
-          { label: "Festivales", apply: () => setOf({ ...EMPTY_ORG_FILTER, capa: "circulacion", categoria: ["Festivales"] }) },
-          { label: "Salas y cine clubs", apply: () => setOf({ ...EMPTY_ORG_FILTER, capa: "circulacion", categoria: ["Salas de cine comerciales y cadenas", "Cine clubs", "Espacios de exhibición"] }) },
-          { label: "Productoras", apply: () => setOf({ ...EMPTY_ORG_FILTER, capa: "industria", categoria: ["Productoras"] }) },
-          { label: "Formación", apply: () => setOf({ ...EMPTY_ORG_FILTER, capa: "industria", categoria: ["Formación"] }) },
+          { label: "Festivales", apply: () => setOf({ ...EMPTY_ORG_FILTER, categoria: ["Festivales"] }) },
+          { label: "Salas y cine clubs", apply: () => setOf({ ...EMPTY_ORG_FILTER, categoria: ["Salas de cine comerciales y cadenas", "Cine clubs", "Espacios de exhibición"] }) },
         ]
-      : [
-          { label: "Ficción", apply: () => setFf({ ...EMPTY_FILM_FILTER, clase: ["ficcion"] }) },
-          { label: "Documentales", apply: () => setFf({ ...EMPTY_FILM_FILTER, clase: ["documental"] }) },
-          { label: "Guatemaltecas desde 2010", apply: () => setFf({ ...EMPTY_FILM_FILTER, nacionalidad: ["guatemalteca"], desde: 2010 }) },
-          { label: "Con presupuesto declarado", apply: () => setFf({ ...EMPTY_FILM_FILTER, presupuestoMin: 1 }) },
-        ];
+      : tipo === "entidades"
+        ? [
+            { label: "Productoras", apply: () => setOf({ ...EMPTY_ORG_FILTER, categoria: ["Productoras"] }) },
+            { label: "Formación", apply: () => setOf({ ...EMPTY_ORG_FILTER, categoria: ["Formación"] }) },
+          ]
+        : [
+            { label: "Ficción", apply: () => setFf({ ...EMPTY_FILM_FILTER, clase: ["ficcion"] }) },
+            { label: "Documentales", apply: () => setFf({ ...EMPTY_FILM_FILTER, clase: ["documental"] }) },
+            { label: "Guatemaltecas desde 2010", apply: () => setFf({ ...EMPTY_FILM_FILTER, nacionalidad: ["guatemalteca"], desde: 2010 }) },
+            { label: "Con presupuesto declarado", apply: () => setFf({ ...EMPTY_FILM_FILTER, presupuestoMin: 1 }) },
+          ];
 
-  const sample = tipo === "entidades" ? orgsHit.slice(0, 6) : filmsHit.slice(0, 6);
+  const sample = isOrgs ? orgsHit.slice(0, 6) : filmsHit.slice(0, 6);
   const empty = films.length + orgs.length === 0;
   const canDownload = count > 0;
 
@@ -174,27 +190,14 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
           </div>
 
           <div className="rounded-lg border border-line bg-surface p-5">
-            {tipo === "entidades" ? (
+            {isOrgs ? (
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="label" htmlFor="f-capa">Capa</label>
-                  <select
-                    id="f-capa"
-                    className="field"
-                    value={of.capa ?? ""}
-                    onChange={(e) => patchOrg({ capa: (e.target.value || null) as OrgFilter["capa"], categoria: [] })}
-                  >
-                    <option value="">Circulación e industria</option>
-                    <option value="circulacion">Circulación</option>
-                    <option value="industria">Industria</option>
-                  </select>
-                </div>
                 <MultiSelect
                   label="Categoría"
                   placeholder="Todas"
                   value={of.categoria}
                   onChange={(categoria) => patchOrg({ categoria })}
-                  options={(of.capa ? [...ORG_CATEGORIES[of.capa]] : [...ORG_CATEGORIES.circulacion, ...ORG_CATEGORIES.industria]).map((c) => ({ value: c, label: c }))}
+                  options={[...ORG_CATEGORIES[layer ?? "industria"]].map((c) => ({ value: c, label: c }))}
                 />
                 <MultiSelect label="Departamento" placeholder="Todo el país" value={of.depto} onChange={(depto) => patchOrg({ depto })} options={deptoOptions} searchable />
                 <MultiSelect
@@ -204,13 +207,32 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
                   onChange={(iniciativa) => patchOrg({ iniciativa })}
                   options={INITIATIVE_TYPES.map((i) => ({ value: i.id, label: i.label }))}
                 />
-                <div className="sm:col-span-2">
+                <div>
                   <label className="label" htmlFor="f-q-org">Buscar por nombre</label>
                   <input id="f-q-org" className="field" placeholder="Nombre, categoría o descripción" value={of.q} onChange={(e) => patchOrg({ q: e.target.value })} />
                 </div>
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
+                <div role="radiogroup" aria-label="Qué es una fila" className="flex rounded-md border border-line bg-surface-2 p-0.5 text-sm sm:col-span-2 sm:w-fit">
+                  {(
+                    [
+                      ["producciones", "Una fila por producción"],
+                      ["locaciones", "Una fila por locación"],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="radio"
+                      aria-checked={filas === id}
+                      onClick={() => setFilas(id)}
+                      className={cn("flex-1 rounded px-3 py-1.5 transition-colors", filas === id ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink")}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 <MultiSelect label="Departamento de rodaje" placeholder="Todo el país" value={ff.depto} onChange={(depto) => patchFilm({ depto })} options={deptoOptions} searchable />
                 <MultiSelect
                   label="Tipo de obra"
@@ -247,7 +269,7 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
                       <option value="USD">Dólares (US$)</option>
                     </select>
                   </div>
-                  <p className="mt-1.5 text-xs text-muted">Solo salen las películas con presupuesto registrado. Si están en otra moneda se comparan con un cambio de referencia de Q 7.70 por dólar.</p>
+                  <p className="mt-1.5 text-xs text-muted">Solo salen las producciones con presupuesto registrado. Si están en otra moneda se comparan con un cambio de referencia de Q 7.70 por dólar.</p>
                 </fieldset>
 
                 <div className="sm:col-span-2">
@@ -256,7 +278,7 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
                 </div>
                 <label className="flex cursor-pointer items-center gap-2.5 text-sm sm:col-span-2">
                   <input type="checkbox" className="h-4 w-4 accent-[rgb(var(--accent))]" checked={ff.soloCompletas} onChange={(e) => patchFilm({ soloCompletas: e.target.checked })} />
-                  Solo películas con todas sus locaciones ubicadas en un municipio
+                  Solo producciones con todas sus locaciones ubicadas en un municipio
                 </label>
               </div>
             )}
@@ -274,7 +296,7 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
               <p className="px-4 py-8 text-center text-sm text-muted">{total === 0 ? "Todavía no hay datos publicados." : "Ningún registro coincide con estos filtros."}</p>
             ) : (
               <ul className="divide-y divide-line">
-                {tipo === "entidades"
+                {isOrgs
                   ? (sample as Org[]).map((o) => (
                       <li key={o.id} className="flex items-baseline justify-between gap-4 px-4 py-2.5 text-sm">
                         <span className="min-w-0 truncate font-medium">{o.name}</span>

@@ -32,7 +32,7 @@ export default async function FilmsPage() {
       )}
       {films.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-line px-4 py-12 text-center text-sm text-muted">
-          Aún no hay películas. <Link className="text-accent underline" href="/admin/agregar">Agrega datos</Link> con un archivo o a mano.
+          Aún no hay producciones. <Link className="text-accent underline" href="/admin/agregar">Agrega datos</Link> con un archivo o a mano.
         </div>
       ) : (
         <div className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface">

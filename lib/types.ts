@@ -151,7 +151,7 @@ export const METRICS: Record<
   MetricId,
   { id: MetricId; label: string; unit: string; layer: LayerId; format: "int" | "money" }
 > = {
-  films: { id: "films", label: "Películas", unit: "películas", layer: "produccion", format: "int" },
+  films: { id: "films", label: "Producciones", unit: "producciones", layer: "produccion", format: "int" },
   days: { id: "days", label: "Días de rodaje", unit: "días", layer: "produccion", format: "int" },
   spend: { id: "spend", label: "Inversión local", unit: "GTQ", layer: "produccion", format: "money" },
   jobs: { id: "jobs", label: "Empleos", unit: "empleos", layer: "produccion", format: "int" },
@@ -192,7 +192,7 @@ export interface ImportQuestion {
   created_at: string;
 }
 
-/** Entrada para crear o editar una película (ids y completitud se calculan en el servidor). */
+/** Entrada para crear o editar una producción (ids y completitud se calculan en el servidor). */
 export interface FilmInput {
   id?: string;
   title: string;
@@ -248,7 +248,7 @@ export interface Submission {
   target_id: string | null;
   /** Nombre del registro al enviar el aporte (para mostrarlo en la lista). */
   label: string;
-  /** Datos propuestos (película u organización, sin estado ni póster). */
+  /** Datos propuestos (producción u organización, sin estado ni póster). */
   payload: FilmInput | OrgInput;
   /** Comentario o fuente que acompaña el aporte. */
   note: string | null;

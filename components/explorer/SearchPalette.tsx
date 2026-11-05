@@ -63,7 +63,7 @@ export function SearchPalette({
           kind: "film",
           id: `f${f.id}`,
           label: f.title,
-          sub: ["Película", f.year].filter(Boolean).join(" · "),
+          sub: ["Producción", f.year].filter(Boolean).join(" · "),
           slug: f.slug,
         });
     }
@@ -122,7 +122,7 @@ export function SearchPalette({
                   setIdx(0);
                 }}
                 onKeyDown={onKey}
-                placeholder="Busca un municipio, película o entidad…"
+                placeholder="Busca un municipio, producción o entidad…"
                 className="h-14 w-full bg-transparent text-base text-ink placeholder:text-muted/70 focus:outline-none"
               />
               <span className="kbd">esc</span>
@@ -130,7 +130,7 @@ export function SearchPalette({
             <div className="max-h-[50vh] overflow-y-auto p-2">
               {!q && (
                 <p className="px-3 py-6 text-center text-sm text-muted">
-                  Prueba con “Panajachel”, “Xela”, “Tikal” o el título de una película.
+                  Prueba con “Panajachel”, “Xela”, “Tikal” o el título de una producción.
                 </p>
               )}
               {q && results.length === 0 && (

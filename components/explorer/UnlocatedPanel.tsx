@@ -9,7 +9,7 @@ import { Empty, FilmCard, PanelShell, type PanelCtx, SectionTitle } from "./part
 
 const STEP = 40;
 
-/** Películas que todavía no tienen lugar de rodaje: viven en la zona «Sin ubicación», fuera del territorio. */
+/** Producciones que todavía no tienen lugar de rodaje: viven en la zona «Sin ubicación», fuera del territorio. */
 export default function UnlocatedPanel({ ctx }: { ctx: PanelCtx }) {
   const { data, gaz, go, canEdit } = ctx;
   const films = useMemo(() => unlocatedFilms(data.films).sort((a, b) => a.title.localeCompare(b.title, "es")), [data.films]);
@@ -30,7 +30,7 @@ export default function UnlocatedPanel({ ctx }: { ctx: PanelCtx }) {
         <h2 className="font-display text-[30px] leading-[1.05] tracking-tight text-ink">Sin ubicación</h2>
       </div>
       <p className="mt-3 text-sm leading-relaxed text-muted">
-        {films.length === 1 ? "Esta película aún no tiene" : `Estas ${films.length.toLocaleString("es-GT")} películas aún no tienen`} un lugar de rodaje registrado. Se
+        {films.length === 1 ? "Esta producción aún no tiene" : `Estas ${films.length.toLocaleString("es-GT")} producciones aún no tienen`} un lugar de rodaje registrado. Se
         muestran en la zona punteada del Pacífico, fuera de Guatemala, hasta que se sepa dónde se filmaron.
       </p>
       {canEdit && (
@@ -41,7 +41,7 @@ export default function UnlocatedPanel({ ctx }: { ctx: PanelCtx }) {
 
       {films.length > 8 && (
         <label className="relative mt-5 block">
-          <span className="sr-only">Buscar entre las películas sin ubicación</span>
+          <span className="sr-only">Buscar entre las producciones sin ubicación</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             className="field !pl-9"
@@ -55,12 +55,12 @@ export default function UnlocatedPanel({ ctx }: { ctx: PanelCtx }) {
         </label>
       )}
 
-      <SectionTitle aside={list.length.toLocaleString("es-GT")}>Películas sin lugar de rodaje</SectionTitle>
+      <SectionTitle aside={list.length.toLocaleString("es-GT")}>Producciones sin lugar de rodaje</SectionTitle>
       <div className="-mx-2 space-y-0.5">
         {list.length ? (
           list.slice(0, shown).map((f) => <FilmCard key={f.id} film={f} gaz={gaz} onClick={() => go.film(f.slug)} />)
         ) : (
-          <Empty>{films.length ? "Ninguna coincide con la búsqueda." : "Todas las películas ya tienen lugar de rodaje."}</Empty>
+          <Empty>{films.length ? "Ninguna coincide con la búsqueda." : "Todas las producciones ya tienen lugar de rodaje."}</Empty>
         )}
       </div>
       {list.length > shown && (

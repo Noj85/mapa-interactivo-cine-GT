@@ -1,6 +1,6 @@
 import { categoriesText } from "@/lib/categories";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
-import { filmFilterActive, locDepto, locationsMatching, orgFilterActive, type ExportKind, type FilmFilter, type OrgFilter } from "@/lib/filters";
+import { filmFilterActive, locDepto, locationsMatching, orgFilterActive, type ExportKind, type ExportRows, type FilmFilter, type OrgFilter } from "@/lib/filters";
 import { FILM_KINDS, INITIATIVE_TYPES, NATIONALITIES, type Film, type Org } from "@/lib/types";
 
 export interface Table {
@@ -20,6 +20,7 @@ const estado = (s: string) => (s === "published" ? "Publicado" : "Borrador");
 
 export function buildTable(
   tipo: ExportKind,
+  filas: ExportRows,
   films: Film[],
   orgs: Org[],
   gaz: Gazetteer,
@@ -28,12 +29,12 @@ export function buildTable(
   const depto = (c: number | null) => gaz.depto(c)?.name ?? "";
   const muni = (c: number | null) => gaz.muni(c)?.name ?? "";
 
-  if (tipo === "locaciones") {
+  if (tipo === "producciones" && filas === "locaciones") {
     const f = filters.film;
     return {
       name: "locaciones",
       title: "Locaciones de rodaje",
-      header: ["Película", "Año", "Tipo", "Departamento", "Municipio", "Sitio", "Latitud", "Longitud", "Días de rodaje", "Inversión local", "Moneda", "Empleos", "Registro completo (%)", "Estado"],
+      header: ["Producción", "Año", "Tipo", "Departamento", "Municipio", "Sitio", "Latitud", "Longitud", "Días de rodaje", "Inversión local", "Moneda", "Empleos", "Registro completo (%)", "Estado"],
       widths: [34, 7, 14, 16, 18, 28, 10, 10, 10, 14, 8, 9, 12, 11],
       rows: films.flatMap((film) => {
         // Si se filtró por lugar, solo salen las locaciones de ese lugar.
@@ -58,16 +59,14 @@ export function buildTable(
     };
   }
 
-  if (tipo === "entidades") {
-    const capa = filters.org.capa;
+  if (tipo === "circulacion" || tipo === "entidades") {
     return {
-      name: capa ? `entidades-${capa}` : "entidades",
-      title: "Entidades",
-      header: ["Nombre", "Capa", "Categorías", "Naturaleza", "Departamento", "Municipio", "Ciudad o referencia", "Latitud", "Longitud", "Sitio web", "Instagram", "Contacto", "Descripción", "Registro completo (%)", "Estado"],
-      widths: [34, 12, 26, 14, 16, 18, 22, 10, 10, 30, 22, 30, 60, 12, 11],
+      name: tipo,
+      title: tipo === "circulacion" ? "Circulación" : "Entidades",
+      header: ["Nombre", "Categorías", "Naturaleza", "Departamento", "Municipio", "Ciudad o referencia", "Latitud", "Longitud", "Sitio web", "Instagram", "Contacto", "Descripción", "Registro completo (%)", "Estado"],
+      widths: [34, 26, 14, 16, 18, 22, 10, 10, 30, 22, 30, 60, 12, 11],
       rows: orgs.map((o) => [
         o.name,
-        o.layer === "circulacion" ? "Circulación" : "Industria",
         categoriesText(o, "; "),
         iniLabel(o.initiative_type),
         depto(o.depto_ine ?? (o.muni_ine != null ? Math.floor(o.muni_ine / 100) : null)),
@@ -90,8 +89,8 @@ export function buildTable(
     return vals.length ? vals.reduce((a, b) => a + b, 0) : "";
   };
   return {
-    name: "peliculas",
-    title: "Películas",
+    name: "producciones",
+    title: "Producciones",
     header: ["Título", "Año", "Tipo", "Dirección", "Productora", "Nacionalidad", "Presupuesto", "Moneda", "Locaciones", "Departamentos", "Días de rodaje", "Inversión local", "Empleos", "Sinopsis", "Registro completo (%)", "Falta", "Estado"],
     widths: [34, 7, 14, 26, 26, 14, 14, 8, 10, 28, 10, 14, 9, 70, 12, 30, 11],
     rows: films.map((f) => [
@@ -171,7 +170,7 @@ export const filterSlug = (tipo: ExportKind, f: FilmFilter, o: OrgFilter, gaz: G
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
   const parts: string[] = [];
-  if (tipo === "entidades") {
+  if (tipo !== "producciones") {
     if (o.categoria.length === 1) parts.push(slug(o.categoria[0]));
     if (o.depto.length === 1) parts.push(slug(gaz.depto(o.depto[0])?.name ?? ""));
     if (!parts.length && orgFilterActive(o)) parts.push("filtrado");

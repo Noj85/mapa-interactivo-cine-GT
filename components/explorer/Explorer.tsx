@@ -137,11 +137,11 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
   useEffect(() => setSheetFull(false), [selectionKey]);
 
   const liveText = view.film
-    ? `Película: ${data.films.find((f) => f.slug === view.film)?.title ?? ""}`
+    ? `Producción: ${data.films.find((f) => f.slug === view.film)?.title ?? ""}`
     : view.org
       ? `Entidad: ${data.orgs.find((o) => o.slug === view.org)?.name ?? ""}`
       : view.noloc
-        ? "Películas sin ubicación"
+        ? "Producciones sin ubicación"
       : view.place
         ? `Territorio: ${(view.place.type === "depto" ? geo?.gaz.depto(view.place.code) : geo?.gaz.muni(view.place.code))?.name ?? ""}`
         : `Capa ${view.layer}`;
@@ -221,7 +221,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
           <Link
             href="/aportar"
             className="btn-primary pointer-events-auto h-11 w-full justify-center gap-2 rounded-2xl text-[15px] shadow-soft"
-            title="Aporta una película o entidad que falta en el mapa"
+            title="Aporta una producción o entidad que falta en el mapa"
           >
             <HandHeart className="h-5 w-5" aria-hidden />
             Aportar al mapa

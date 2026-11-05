@@ -177,10 +177,10 @@ export function buildMask(pais: GeometryCollection): FeatureCollection<Polygon> 
   };
 }
 
-// ───────────────────────── películas sin lugar de rodaje ─────────────────────────
+// ───────────────────────── producciones sin lugar de rodaje ─────────────────────────
 
 /**
- * Las películas sin locación no se esconden: se agrupan en una zona marcada en el Pacífico,
+ * Las producciones sin locación no se esconden: se agrupan en una zona marcada en el Pacífico,
  * fuera del territorio, para que se vea que existen pero que todavía no tienen lugar.
  */
 export const NOWHERE = { lng: -93.6, lat: 12.7, radius: 0.72 };
@@ -210,7 +210,7 @@ export function buildNowhere(count: number, selected: boolean): FeatureCollectio
       { type: "Feature", properties: { kind: "zone", sel: selected }, geometry: { type: "Polygon", coordinates: [ring] } },
       {
         type: "Feature",
-        properties: { kind: "label", count, text: count === 1 ? "1 película" : `${count.toLocaleString("es-GT")} películas` },
+        properties: { kind: "label", count, text: count === 1 ? "1 producción" : `${count.toLocaleString("es-GT")} producciones` },
         geometry: { type: "Point", coordinates: [NOWHERE.lng, NOWHERE.lat] },
       },
     ],

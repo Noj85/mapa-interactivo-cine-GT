@@ -155,7 +155,7 @@ const pubLocation = z.object({
   jobs: optNum,
 });
 
-/** Película propuesta por el público: sin estado ni fuente (los fija el equipo); el póster solo si lo subió por nuestro endpoint. */
+/** Producción propuesta por el público: sin estado ni fuente (los fija el equipo); el póster solo si lo subió por nuestro endpoint. */
 export const publicFilmSchema = z.object({
   title: z.string().trim().min(1, "El título es obligatorio").max(300).transform(clean),
   year: optNum,

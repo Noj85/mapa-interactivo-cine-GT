@@ -57,7 +57,7 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
 
       {view.layer === "produccion" ? (
         <div className="mt-4 grid grid-cols-2 gap-2.5">
-          <Stat label={agg.films === 1 ? "Película" : "Películas"} value={fmtInt(agg.films)} />
+          <Stat label={agg.films === 1 ? "Producción" : "Producciones"} value={fmtInt(agg.films)} />
           <Stat label="Días de rodaje" value={fmtInt(agg.days)} />
           <Stat label="Inversión local" value={fmtMoney(agg.spend)} />
           <Stat label="Empleos" value={fmtInt(agg.jobs)} />
@@ -97,7 +97,7 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
       )}
 
       <SectionTitle aside={view.layer === "produccion" ? films.length : orgs.length}>
-        {view.layer === "produccion" ? "Películas rodadas aquí" : "Registros aquí"}
+        {view.layer === "produccion" ? "Producciones rodadas aquí" : "Registros aquí"}
       </SectionTitle>
       <div className="-mx-2 space-y-0.5">
         {view.layer === "produccion" ? (
@@ -113,7 +113,7 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
               />
             ))
           ) : (
-            <Empty>Todavía no hay películas registradas en {entry?.name}.</Empty>
+            <Empty>Todavía no hay producciones registradas en {entry?.name}.</Empty>
           )
         ) : orgs.length ? (
           orgs.map((o) => <OrgCard key={o.id} org={o} gaz={gaz} onClick={() => go.org(o.slug)} />)

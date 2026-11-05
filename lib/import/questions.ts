@@ -97,7 +97,7 @@ export function buildQuestions(
           kind: "bulk",
           field: b.field,
           status: "open",
-          question: `El archivo no trae ${b.label} en ${missing} de ${films.length} películas. ¿Quieres usar el mismo valor para todas?`,
+          question: `El archivo no trae ${b.label} en ${missing} de ${films.length} producciones. ¿Quieres usar el mismo valor para todas?`,
           options: b.options,
           placeholder: b.placeholder,
         });

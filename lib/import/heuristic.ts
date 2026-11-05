@@ -128,7 +128,7 @@ function planSheet(sheet: ParsedSheet): SheetPlan {
       confidence: org.confidence,
     };
   }
-  return { sheet: sheet.name, entity: "ignore", grain: "row_per_film", columns: {}, confidence: {}, note: "No se reconocieron columnas de películas ni de entidades." };
+  return { sheet: sheet.name, entity: "ignore", grain: "row_per_film", columns: {}, confidence: {}, note: "No se reconocieron columnas de producciones ni de entidades." };
 }
 
 /** Análisis sin conexión: reconoce encabezados comunes en español e inglés. */
@@ -139,7 +139,7 @@ export function heuristicPlan(file: ParsedFile): ImportPlan {
   return {
     sheets,
     engine: "heuristic",
-    summary: `Reconocimos ${films} hoja(s) de películas y ${orgs} de entidades por los nombres de las columnas. Revisa que cada columna esté bien asignada.`,
+    summary: `Reconocimos ${films} hoja(s) de producciones y ${orgs} de entidades por los nombres de las columnas. Revisa que cada columna esté bien asignada.`,
     questions: sheets
       .filter((s) => s.entity === "org" && !s.layerGuessed)
       .map((s) => ({

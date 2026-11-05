@@ -11,7 +11,7 @@ export const hasAnchor = (l: Pick<FilmLocation, "depto_ine" | "muni_ine" | "lat"
   l.muni_ine != null || l.depto_ine != null || (l.lat != null && l.lng != null);
 
 /**
- * Una película se puede publicar con solo el título. Si todavía no tiene lugar de rodaje,
+ * Una producción se puede publicar con solo el título. Si todavía no tiene lugar de rodaje,
  * el mapa la muestra en el punto «Sin ubicación», fuera del territorio.
  * Todo lo demás suma al porcentaje y a la lista de faltantes.
  */

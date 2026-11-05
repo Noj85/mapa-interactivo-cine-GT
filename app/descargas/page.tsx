@@ -8,7 +8,7 @@ import { serverGazetteer } from "@/lib/geo/server";
 export const revalidate = 60;
 export const metadata: Metadata = {
   title: "Descargas · Mapa del Cine de Guatemala",
-  description: "Descarga en CSV o Excel las películas, locaciones y entidades del mapa, filtradas por departamento, tipo, año, presupuesto y más.",
+  description: "Descarga en CSV o Excel las producciones, la circulación y las entidades del mapa, filtradas por departamento, tipo, año, presupuesto y más.",
 };
 
 export default async function DescargasPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -29,7 +29,7 @@ export default async function DescargasPage({ searchParams }: { searchParams: Pr
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Datos abiertos</p>
         <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight sm:text-[44px]">Descargas</h1>
         <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted">
-          Elige qué quieres y filtra por lugar, tipo de obra, año o presupuesto. Te llevas un archivo CSV o Excel con lo que coincide, listo para tu informe, tesis o proyecto.
+          Elige entre producciones, circulación o entidades y filtra por lugar, tipo de obra, año o presupuesto. Te llevas un archivo CSV o Excel con lo que coincide, listo para tu informe, tesis o proyecto.
         </p>
         <DownloadsBuilder
           films={data.films}

@@ -7,14 +7,14 @@ const options = [
     href: "/admin/cargar",
     icon: FileUp,
     title: "Cargar archivo",
-    text: "Sube un Excel, CSV o PDF con muchas películas o entidades. Revisas lo que entendimos antes de publicar.",
+    text: "Sube un Excel, CSV o PDF con muchas producciones o entidades. Revisas lo que entendimos antes de publicar.",
     primary: true,
   },
   {
     href: "/admin/peliculas/nueva",
     icon: Clapperboard,
-    title: "Película a mano",
-    text: "Registra una película con sus locaciones, días de rodaje, inversión y empleos.",
+    title: "Producción a mano",
+    text: "Registra una producción con sus locaciones, días de rodaje, inversión y empleos.",
   },
   {
     href: "/admin/entidades/nueva",
@@ -29,7 +29,7 @@ export default async function AddDataPage() {
   return (
     <div>
       <h1 className="font-display text-4xl tracking-tight">Agregar datos</h1>
-      <p className="mt-1 text-sm text-muted">Sube un archivo o registra una película o entidad a mano.</p>
+      <p className="mt-1 text-sm text-muted">Sube un archivo o registra una producción o entidad a mano.</p>
 
       <div className="mt-8 grid gap-3 md:grid-cols-3">
         {options.map((o) => (

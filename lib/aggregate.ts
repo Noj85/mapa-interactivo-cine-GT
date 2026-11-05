@@ -16,7 +16,7 @@ export interface Aggregates {
   total: Agg;
 }
 
-/** Suma por territorio para una capa. Una película cuenta una vez por territorio. */
+/** Suma por territorio para una capa. Una producción cuenta una vez por territorio. */
 export function aggregate(data: Dataset, layer: LayerId): Aggregates {
   const depto = new Map<number, Agg>();
   const muni = new Map<number, Agg>();

@@ -6,7 +6,7 @@ import { FILM_FIELDS, ORG_FIELDS, type ImportPlan, type ParsedFile, type SheetPl
 import { cn } from "@/lib/utils";
 
 const ENTITY_LABEL: Record<SheetPlan["entity"], string> = {
-  film: "Películas y locaciones",
+  film: "Producciones y locaciones",
   org: "Entidades (circulación o industria)",
   ignore: "Ignorar esta hoja",
 };
@@ -205,7 +205,7 @@ export function StepUnderstand({
                   )}
                   {sp.entity === "film" && (
                     <select className="field !w-auto !py-1.5 text-xs" value={sp.grain} onChange={(e) => update(sp.sheet, { grain: e.target.value as SheetPlan["grain"] })}>
-                      <option value="row_per_film">Una fila por película</option>
+                      <option value="row_per_film">Una fila por producción</option>
                       <option value="row_per_location">Una fila por locación</option>
                     </select>
                   )}
@@ -270,7 +270,7 @@ export function StepUnderstand({
           {!busy && <ArrowRight className="h-4 w-4" />}
         </button>
       </div>
-      {!canContinue && <p className="text-right text-xs text-warn">Falta indicar qué columna trae el título (películas) o el nombre (entidades).</p>}
+      {!canContinue && <p className="text-right text-xs text-warn">Falta indicar qué columna trae el título (producciones) o el nombre (entidades).</p>}
     </div>
   );
 }

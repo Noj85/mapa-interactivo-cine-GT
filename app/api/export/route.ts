@@ -1,7 +1,7 @@
 import { adminStore, getSession } from "@/lib/auth";
 import { loadDataset } from "@/lib/data/load";
 import { buildTable, filterSlug, toCsv, toXlsx } from "@/lib/export";
-import { describeFilmFilter, describeOrgFilter, filterFilms, filterOrgs, parseFilmFilter, parseOrgFilter, type ExportKind } from "@/lib/filters";
+import { describeFilmFilter, describeOrgFilter, filterFilms, filterOrgs, kindLayer, parseExportRequest, parseFilmFilter, parseOrgFilter } from "@/lib/filters";
 import { serverGazetteer } from "@/lib/geo/server";
 import type { Film, Org } from "@/lib/types";
 
@@ -11,10 +11,12 @@ export const runtime = "nodejs";
 /**
  * Descarga de datos, abierta a cualquier persona (solo lo publicado).
  *
- *  tipo       peliculas (por defecto) | locaciones | entidades
+ *  tipo       producciones (por defecto) | circulacion | entidades (la capa de industria)
+ *  filas      solo en producciones: producciones (por defecto) | locaciones (una fila por lugar de rodaje)
+ *             Los enlaces anteriores siguen funcionando: tipo=peliculas, tipo=locaciones y tipo=entidades&capa=circulacion.
  *  formato    csv (por defecto) | xlsx
  *
- *  Filtros de películas y locaciones:
+ *  Filtros de producciones:
  *    depto=7,1            códigos INE de departamento (al menos una locación ahí)
  *    muni=101             códigos INE de municipio
  *    clase=ficcion,corto  tipo de obra
@@ -24,8 +26,7 @@ export const runtime = "nodejs";
  *    completas=1          solo con todas las locaciones ubicadas en un municipio
  *    q=texto              título, dirección o productora
  *
- *  Filtros de entidades:
- *    capa=circulacion|industria
+ *  Filtros de circulación y entidades:
  *    categoria=Festivales,Productoras
  *    iniciativa=publica,privada
  *    depto=… y q=…
@@ -35,8 +36,7 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const p = url.searchParams;
-  const rawTipo = p.get("tipo") ?? "peliculas";
-  const tipo: ExportKind = rawTipo === "locaciones" || rawTipo === "entidades" ? rawTipo : "peliculas";
+  const { tipo, filas } = parseExportRequest(p);
   const formato = p.get("formato") === "xlsx" ? "xlsx" : "csv";
 
   const session = await getSession();
@@ -54,12 +54,14 @@ export async function GET(req: Request) {
   }
 
   const ff = parseFilmFilter(p);
-  const of = parseOrgFilter(p);
-  const table = buildTable(tipo, tipo === "entidades" ? [] : filterFilms(films, ff), tipo === "entidades" ? filterOrgs(orgs, of) : [], gaz, { film: ff, org: of });
+  // la capa de las entidades la define la categoría de descarga, no un filtro
+  const of = { ...parseOrgFilter(p), capa: kindLayer(tipo) };
+  const isOrgs = tipo !== "producciones";
+  const table = buildTable(tipo, filas, isOrgs ? [] : filterFilms(films, ff), isOrgs ? filterOrgs(orgs, of) : [], gaz, { film: ff, org: of });
 
   const deptoName = (c: number) => gaz.depto(c)?.name ?? String(c);
   const muniName = (c: number) => gaz.muni(c)?.name ?? String(c);
-  const notes = tipo === "entidades" ? describeOrgFilter(of, deptoName) : describeFilmFilter(ff, deptoName, muniName);
+  const notes = isOrgs ? describeOrgFilter({ ...of, capa: null }, deptoName) : describeFilmFilter(ff, deptoName, muniName);
 
   const today = new Date().toISOString().slice(0, 10);
   const slug = filterSlug(tipo, ff, of, gaz);

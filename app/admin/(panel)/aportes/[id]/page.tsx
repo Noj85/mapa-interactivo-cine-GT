@@ -41,7 +41,7 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
     <div className="max-w-3xl">
       <Link href="/admin/aportes" className="text-sm text-muted hover:text-ink">← Aportes</Link>
       <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-accent">
-        {isCorrection ? "Corrección" : "Registro nuevo"} · {sub.kind === "film" ? "Película" : "Entidad"}
+        {isCorrection ? "Corrección" : "Registro nuevo"} · {sub.kind === "film" ? "Producción" : "Entidad"}
       </p>
       <h1 className="mt-1 font-display text-4xl tracking-tight">{sub.label}</h1>
       <p className="mt-1 text-sm text-muted">

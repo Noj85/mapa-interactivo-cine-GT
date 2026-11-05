@@ -3,7 +3,7 @@
 import { FILM_KINDS, NATIONALITIES, type FilmKind, type Nationality } from "@/lib/types";
 import type { FilmDraft } from "./drafts";
 
-/** Campos de una película. Los usa el editor del equipo y el formulario público. */
+/** Campos de una producción. Los usa el editor del equipo y el formulario público. */
 export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange: (patch: Partial<FilmDraft>) => void }) {
   return (
     <section className="space-y-4">

@@ -15,7 +15,7 @@ interface Target {
 
 type Line = { name: string; state: "ok" | "nomatch" | "error" | "working"; film?: string; detail?: string };
 
-/** Carga masiva: el nombre del archivo debe coincidir con el título (o el slug) de la película. */
+/** Carga masiva: el nombre del archivo debe coincidir con el título (o el slug) de la producción. */
 export function BulkPosterUploader({ films }: { films: Target[] }) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
@@ -40,7 +40,7 @@ export function BulkPosterUploader({ films }: { films: Target[] }) {
       const file = images[i];
       const film = index.get(normalize(file.name.replace(/\.[^.]+$/, "")));
       if (!film) {
-        out[i] = { name: file.name, state: "nomatch", detail: "Ninguna película se llama así" };
+        out[i] = { name: file.name, state: "nomatch", detail: "Ninguna producción se llama así" };
       } else {
         const up = await uploadPoster(file);
         if (!up.ok) out[i] = { name: file.name, state: "error", film: film.title, detail: up.error };
@@ -70,7 +70,7 @@ export function BulkPosterUploader({ films }: { films: Target[] }) {
         <div>
           <h2 className="font-display text-xl">Pósters en lote</h2>
           <p className="mt-1 max-w-xl text-sm text-muted">
-            Suelta varias imágenes a la vez. Cada archivo debe llamarse como la película (por ejemplo <span className="font-mono text-[13px]">la-llorona.jpg</span> para «La Llorona»). Se optimizan solas.
+            Suelta varias imágenes a la vez. Cada archivo debe llamarse como la producción (por ejemplo <span className="font-mono text-[13px]">la-llorona.jpg</span> para «La Llorona»). Se optimizan solas.
           </p>
         </div>
         <button className="text-muted hover:text-ink" aria-label="Cerrar" onClick={() => setOpen(false)}>

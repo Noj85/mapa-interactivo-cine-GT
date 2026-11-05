@@ -8,7 +8,7 @@ import { loadDataset } from "@/lib/data/load";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Aportar · Mapa del Cine de Guatemala",
-  description: "Sugiere una película o una entidad que falta en el mapa, o corrige un dato. El equipo de la Academia lo verifica antes de publicarlo.",
+  description: "Sugiere una producción o una entidad que falta en el mapa, o corrige un dato. El equipo de la Academia lo verifica antes de publicarlo.",
 };
 
 export default async function AportarPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -28,7 +28,7 @@ export default async function AportarPage({ searchParams }: { searchParams: Prom
           {film || org ? "Sugerir una corrección" : "Aportar al mapa"}
         </h1>
         <p className="mt-3 max-w-3xl text-[15px] leading-relaxed text-muted">
-          ¿Falta una película o una entidad, o hay un dato equivocado? Cuéntanos lo que sabes. Nada se publica de inmediato: el equipo de la Academia verifica cada aporte antes de sumarlo al mapa.
+          ¿Falta una producción o una entidad, o hay un dato equivocado? Cuéntanos lo que sabes. Nada se publica de inmediato: el equipo de la Academia verifica cada aporte antes de sumarlo al mapa.
         </p>
         <div className="mt-6 grid gap-3 md:grid-cols-2">
           <aside className="flex items-start gap-3 rounded-2xl border border-accent/40 bg-accent/5 px-4 py-3 text-sm leading-relaxed">

@@ -17,7 +17,7 @@ const TOOL = {
     properties: {
       films: {
         type: "array",
-        description: "Películas, cortometrajes, series o producciones audiovisuales.",
+        description: "Producciones audiovisuales: películas, cortometrajes, series, etc.",
         items: {
           type: "object",
           properties: {
@@ -66,12 +66,12 @@ const TOOL = {
 };
 
 const SYSTEM = `Eres el asistente de carga del "Mapa del Cine de Guatemala", de la Academia de Cine de Guatemala.
-Recibes páginas de un PDF (catálogo, directorio, informe, listado) y extraes SOLO los registros que aparecen: películas y entidades del ecosistema audiovisual.
+Recibes páginas de un PDF (catálogo, directorio, informe, listado) y extraes SOLO los registros que aparecen: producciones (películas, cortometrajes, series) y entidades del ecosistema audiovisual.
 
 Reglas:
 - Transcribe lo que dice el documento. No inventes, no completes de memoria ni deduzcas datos que no estén.
 - Si un dato no aparece, deja la cadena vacía. No pongas "N/A".
-- Cada película o entidad se entrega una sola vez, aunque se mencione en varias páginas; usa la ficha más completa.
+- Cada producción o entidad se entrega una sola vez, aunque se mencione en varias páginas; usa la ficha más completa.
 - Ignora portadas, índices, créditos, encabezados, pies de página y texto institucional que no describa un registro.
 - Un nombre de persona NO es una entidad, salvo que sea claramente un colectivo, productora o empresa.
 - Si el PDF es multicolumna, lee cada ficha completa antes de pasar a la siguiente.
@@ -247,7 +247,7 @@ export async function claudePdf(data: Uint8Array, filename: string): Promise<Cla
   }
 
   const sheets: ParsedSheet[] = [];
-  if (filmRows.size) sheets.push({ name: "Películas", headers: FILM_HEADERS, rows: [...filmRows.values()], totalRows: filmRows.size });
+  if (filmRows.size) sheets.push({ name: "Producciones", headers: FILM_HEADERS, rows: [...filmRows.values()], totalRows: filmRows.size });
   if (orgRows.size) sheets.push({ name: "Entidades", headers: ORG_HEADERS, rows: [...orgRows.values()], totalRows: orgRows.size });
   return { file: { filename, sheets }, pages, notes: [...new Set(notes)] };
 }

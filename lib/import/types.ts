@@ -27,7 +27,7 @@ export interface FieldDef {
 }
 
 export const FILM_FIELDS: FieldDef[] = [
-  { id: "title", label: "Título", hint: "Nombre de la película o proyecto" },
+  { id: "title", label: "Título", hint: "Nombre de la producción o proyecto" },
   { id: "year", label: "Año" },
   { id: "kind", label: "Tipo", hint: "ficción, documental, serie, comercial, corto" },
   { id: "director", label: "Dirección" },
@@ -74,7 +74,7 @@ export interface SheetPlan {
   layer?: "circulacion" | "industria";
   /** La capa se dedujo de las categorías del archivo (no hace falta preguntar). */
   layerGuessed?: boolean;
-  /** Películas: una fila por película o una fila por locación (película repetida). */
+  /** Producciones: una fila por producción o una fila por locación (producción repetida). */
   grain: "row_per_film" | "row_per_location";
   /** campo destino -> encabezado de columna */
   columns: Record<string, string>;

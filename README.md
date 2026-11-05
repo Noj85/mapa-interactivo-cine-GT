@@ -55,25 +55,25 @@ La lectura pública solo ve registros con `status = 'published'`. Escribir exige
 
 Además de CSV y Excel, el asistente acepta **PDF** (catálogos, directorios, listados, hasta 25 MB). El PDF se convierte en filas (nombre, categoría, lugar, contacto, página del PDF…) y sigue el mismo camino de revisión.
 
-- **Con `ANTHROPIC_API_KEY`**: Claude lee el PDF por partes de 6 páginas (texto, tablas y maquetación en columnas) y entrega películas y entidades. Solo transcribe lo que el documento dice; lo que no aparece queda vacío. Un PDF largo puede tardar un par de minutos (la ruta permite hasta 300 s; en Vercel eso requiere un plan que lo soporte, y las peticiones están limitadas a ~4.5 MB).
+- **Con `ANTHROPIC_API_KEY`**: Claude lee el PDF por partes de 6 páginas (texto, tablas y maquetación en columnas) y entrega producciones y entidades. Solo transcribe lo que el documento dice; lo que no aparece queda vacío. Un PDF largo puede tardar un par de minutos (la ruta permite hasta 300 s; en Vercel eso requiere un plan que lo soporte, y las peticiones están limitadas a ~4.5 MB).
 - **Sin clave**: lectura básica de dos maquetaciones: *fichas* (un nombre en letra grande y datos con etiquetas que se repiten, como un directorio de servicios) y *tablas* con fila de encabezados. Si no reconoce ninguna, lo dice y sugiere Excel o activar Claude.
 - Los PDF escaneados (solo imagen) no tienen texto: la lectura básica no los entiende.
 
 
 ### Primera carga
 
-El mapa arranca vacío y se llena desde cero: entra a `/admin/agregar` y sube un archivo (CSV, Excel o PDF) o registra una película o entidad a mano. El proyecto no trae datos ni catálogos propios. Las películas sin lugar de rodaje salen en la zona **«Sin ubicación»** del mapa (ver abajo) hasta que les agregues sus locaciones desde `/admin/peliculas`; el botón «Publicar todas» de esa pantalla publica de una vez los borradores que ya tienen título.
+El mapa arranca vacío y se llena desde cero: entra a `/admin/agregar` y sube un archivo (CSV, Excel o PDF) o registra una producción o entidad a mano. El proyecto no trae datos ni catálogos propios. Las producciones sin lugar de rodaje salen en la zona **«Sin ubicación»** del mapa (ver abajo) hasta que les agregues sus locaciones desde `/admin/peliculas`; el botón «Publicar todas» de esa pantalla publica de una vez los borradores que ya tienen título.
 
 ## Dos partes: mapa público y equipo
 
-La app es una sola, con dos áreas separadas. **`/` siempre es el mapa público**, incluso si tienes sesión del equipo. **`/admin` es la única puerta del equipo**: sin sesión muestra el acceso (la URL no cambia, no existe `/login`); con sesión muestra el mismo mapa con borradores, botón «Editar» y la barra de herramientas . El menú del equipo tiene cinco opciones: **Mapa**, **Resumen** (`/admin/resumen`: cifras y lo que falta), **Aportes**, **Agregar datos** (`/admin/agregar`: cargar un archivo, o registrar una película o entidad a mano, más las cargas recientes) y **Registros** (`/admin/peliculas` y `/admin/entidades`, con pestañas, para revisar, editar y publicar). Los intentos de entrada están limitados por IP y `/admin` no se indexa.
+La app es una sola, con dos áreas separadas. **`/` siempre es el mapa público**, incluso si tienes sesión del equipo. **`/admin` es la única puerta del equipo**: sin sesión muestra el acceso (la URL no cambia, no existe `/login`); con sesión muestra el mismo mapa con borradores, botón «Editar» y la barra de herramientas . El menú del equipo tiene cinco opciones: **Mapa**, **Resumen** (`/admin/resumen`: cifras y lo que falta), **Aportes**, **Agregar datos** (`/admin/agregar`: cargar un archivo, o registrar una producción o entidad a mano, más las cargas recientes) y **Registros** (`/admin/peliculas` y `/admin/entidades`, con pestañas, para revisar, editar y publicar). Los intentos de entrada están limitados por IP y `/admin` no se indexa.
 
 | | Mapa público (`/`, `/descargas`, `/aportar`) | Equipo (`/admin/*`) |
 |---|---|---|
 | Quién | Cualquier persona, sin cuenta | Solo el equipo (login) |
-| Qué hace | Explorar el mapa, descargar datos filtrados, **aportar** | Revisar aportes, cargar archivos (CSV/Excel/PDF), editar películas y entidades, preguntas pendientes, pósters, exportar para informes |
+| Qué hace | Explorar el mapa, descargar datos filtrados, **aportar** | Revisar aportes, cargar archivos (CSV/Excel/PDF), editar producciones y entidades, preguntas pendientes, pósters, exportar para informes |
 
-**Aportes del público.** En `/aportar` cualquiera puede sugerir una película o entidad nueva (con varias locaciones), y desde la ficha de cada registro, «Sugerir corrección» abre el mismo formulario con los datos actuales. Nada se publica de inmediato: el aporte queda **pendiente** en `/admin/aportes`, donde el equipo ve los datos propuestos (en una corrección, lo que cambia frente al registro actual) y puede **aprobar y publicar**, **aprobar como borrador y editar**, **aplicar la corrección** o **rechazar** con una nota. El número de pendientes aparece en el menú y en el resumen.
+**Aportes del público.** En `/aportar` cualquiera puede sugerir una producción o entidad nueva (con varias locaciones), y desde la ficha de cada registro, «Sugerir corrección» abre el mismo formulario con los datos actuales. Nada se publica de inmediato: el aporte queda **pendiente** en `/admin/aportes`, donde el equipo ve los datos propuestos (en una corrección, lo que cambia frente al registro actual) y puede **aprobar y publicar**, **aprobar como borrador y editar**, **aplicar la corrección** o **rechazar** con una nota. El número de pendientes aparece en el menú y en el resumen.
 
 - Solo registros individuales: el público no puede subir archivos (Excel, CSV, PDF). `/api/aportes` rechaza todo lo que no sea JSON, y las cargas masivas exigen sesión del equipo. Quien quiera aportar una base de datos escribe a contacto@academiadecinegt.org.
 - Sin cuenta: la **fuente** (un enlace, un catálogo o cómo se sabe) y un **correo** son obligatorios para enviar, de modo que la curaduría pueda corroborar los datos; el correo solo lo ve el equipo. Protecciones: campo trampa, tiempo mínimo, límite de 10 aportes por hora por IP, texto sin HTML y enlaces solo http(s). Los aportes **nunca** tocan los registros publicados hasta que se aprueban.
@@ -81,14 +81,14 @@ La app es una sola, con dos áreas separadas. **`/` siempre es el mapa público*
 
 ## Lugar, categorías y contacto
 
-- **Lugar**: siempre es *Departamento → Municipio* (con la lista del INE) y una **dirección exacta** opcional. Vale igual para locaciones de películas y para entidades. En el mapa de «Elegir en el mapa» se ven ciudades y calles, hay vista satelital y se centra en el lugar elegido.
+- **Lugar**: siempre es *Departamento → Municipio* (con la lista del INE) y una **dirección exacta** opcional. Vale igual para locaciones de producciones y para entidades. En el mapa de «Elegir en el mapa» se ven ciudades y calles, hay vista satelital y se centra en el lugar elegido.
 - **Categorías**: una entidad puede tener varias (por ejemplo, producción, posproducción y efectos especiales). La primera es la principal; es la que usan el color y el resumen, y el resto cuenta en filtros y descargas. En archivos importados se pueden separar con «;», «,» o «/».
 - **Contacto**: teléfono y/o correo, en campos separados. Los teléfonos de Guatemala se guardan como `+502 5555 1234`; los extranjeros con su código de país. En archivos importados se extraen y estandarizan, y lo que no sea teléfono ni correo (nombres, notas) se avisa en la revisión y no se guarda.
 
-## Varias locaciones y películas «Sin ubicación»
+## Varias locaciones y producciones «Sin ubicación»
 
-- Una película puede tener **todas las locaciones que haga falta** (cada una con su lugar, sitio, días, inversión local y empleos). En el editor: «Agregar locación», o «Pegar varios lugares» para escribir una lista (uno por línea o separados por «;») que se resuelve con los códigos del INE. En un archivo importado, una fila por locación.
-- Las películas **sin lugar de rodaje** ya no quedan ocultas: con tener título se publican y se muestran en una zona punteada «Sin ubicación» en el Pacífico, fuera del territorio de Guatemala, para que se entienda que no tienen ubicación. Tocarla abre la lista de esas películas (`?sinlugar=1`), y la vista general avisa cuántas son. Al agregarles un lugar pasan solas al mapa.
+- Una producción puede tener **todas las locaciones que haga falta** (cada una con su lugar, sitio, días, inversión local y empleos). En el editor: «Agregar locación», o «Pegar varios lugares» para escribir una lista (uno por línea o separados por «;») que se resuelve con los códigos del INE. En un archivo importado, una fila por locación.
+- Las producciones **sin lugar de rodaje** ya no quedan ocultas: con tener título se publican y se muestran en una zona punteada «Sin ubicación» en el Pacífico, fuera del territorio de Guatemala, para que se entienda que no tienen ubicación. Tocarla abre la lista de esas producciones (`?sinlugar=1`), y la vista general avisa cuántas son. Al agregarles un lugar pasan solas al mapa.
 
 ## Filtro por departamento
 
@@ -96,9 +96,9 @@ En el mapa, el desplegable «Todo el país» (debajo de las capas) acerca la cá
 
 ## Pósters
 
-Una película tiene un póster (`poster_url`). Hay tres formas de subirlo y todas pasan por `/api/posters`, que valida que sea una imagen real (JPG, PNG o WebP, hasta 5 MB), la endereza, y guarda dos WebP: póster de 900 px y miniatura de 400 px.
+Una producción tiene un póster (`poster_url`). Hay tres formas de subirlo y todas pasan por `/api/posters`, que valida que sea una imagen real (JPG, PNG o WebP, hasta 5 MB), la endereza, y guarda dos WebP: póster de 900 px y miniatura de 400 px.
 
-1. **Una por una**: en el editor de la película, arrastra la imagen al recuadro «Póster».
+1. **Una por una**: en el editor de la producción, arrastra la imagen al recuadro «Póster».
 2. **En lote**: en `/admin/peliculas`, «Subir pósters en lote» y suelta muchas imágenes. El nombre del archivo debe coincidir con el título o el slug (`la-llorona.jpg` para «La Llorona»).
 3. **Con la carga de archivos**: si el Excel trae una columna «Póster (URL)», el asistente la reconoce, descarga cada imagen y la guarda como archivo propio.
 
@@ -113,30 +113,31 @@ Con Supabase los archivos van al bucket público `posters`; en modo local, a `.d
 
 ## Descargas con filtros
 
-La página `/descargas` es pública: cualquiera elige películas, locaciones o entidades, filtra y baja un CSV o un Excel. Los mismos filtros funcionan como parámetros de `/api/export`, así que un enlace sirve para informes que se actualizan solos:
+La página `/descargas` es pública: cualquiera elige entre **Producciones**, **Circulación** o **Entidades** (la industria), filtra y baja un CSV o un Excel. Los mismos filtros funcionan como parámetros de `/api/export`, así que un enlace sirve para informes que se actualizan solos:
 
 ```
-/api/export?tipo=peliculas&depto=17&formato=xlsx
-/api/export?tipo=peliculas&nacionalidad=guatemalteca&presupuesto_min=1000000&moneda=GTQ
-/api/export?tipo=locaciones&muni=101&desde=2015
-/api/export?tipo=entidades&capa=circulacion&categoria=Festivales
+/api/export?tipo=producciones&depto=17&formato=xlsx
+/api/export?tipo=producciones&nacionalidad=guatemalteca&presupuesto_min=1000000&moneda=GTQ
+/api/export?tipo=producciones&filas=locaciones&muni=101&desde=2015
+/api/export?tipo=circulacion&categoria=Festivales
 ```
 
 | Parámetro | Valores |
 | --- | --- |
-| `tipo` | `peliculas` (por defecto), `locaciones`, `entidades` |
+| `tipo` | `producciones` (por defecto), `circulacion` (festivales, salas, cineclubs…), `entidades` (capa de industria) |
+| `filas` | solo en producciones: `producciones` (por defecto) o `locaciones` (una fila por lugar de rodaje) |
 | `formato` | `csv` (por defecto), `xlsx` (con hoja «Léeme» que lista los filtros aplicados) |
 | `depto`, `muni` | códigos INE separados por coma (basta con que una locación esté ahí) |
 | `clase` | `ficcion`, `documental`, `serie`, `comercial`, `corto`, `otro` |
 | `nacionalidad` | `guatemalteca`, `coproduccion`, `extranjera` |
 | `desde`, `hasta` | año |
-| `presupuesto_min`, `presupuesto_max`, `moneda` | monto y `GTQ` o `USD` (otra moneda se compara a Q 7.70 por dólar); solo salen películas con presupuesto registrado |
-| `completas=1` | solo películas con todas las locaciones ubicadas en un municipio |
+| `presupuesto_min`, `presupuesto_max`, `moneda` | monto y `GTQ` o `USD` (otra moneda se compara a Q 7.70 por dólar); solo salen producciones con presupuesto registrado |
+| `completas=1` | solo producciones con todas las locaciones ubicadas en un municipio |
 | `q` | texto en título, dirección o productora (o nombre y descripción en entidades) |
-| `capa`, `categoria`, `iniciativa` | solo para `tipo=entidades` |
+| `categoria`, `iniciativa` | solo para `tipo=circulacion` y `tipo=entidades` |
 | `borradores=1` | incluye borradores; solo con sesión del equipo |
 
-Sin sesión sale únicamente lo publicado. En el mapa, el panel de cada lugar y la vista general tienen un botón «Descargar» que abre esta página con los filtros ya puestos, y la fila de categorías también filtra la capa de Producción por tipo de obra.
+Los enlaces anteriores (`tipo=peliculas`, `tipo=locaciones`, `tipo=entidades&capa=circulacion`) siguen funcionando; `tipo=entidades` ahora trae solo la industria. Sin sesión sale únicamente lo publicado. En el mapa, el panel de cada lugar y la vista general tienen un botón «Descargar» que abre esta página con los filtros ya puestos, y la fila de categorías también filtra la capa de Producción por tipo de obra.
 
 ## Identidad visual
 

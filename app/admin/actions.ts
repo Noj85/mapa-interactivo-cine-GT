@@ -40,14 +40,14 @@ export async function saveOrgAction(raw: unknown): Promise<Result> {
   }
 }
 
-/** Cambia solo el póster de una película existente (carga masiva). */
+/** Cambia solo el póster de una producción existente (carga masiva). */
 export async function setPosterAction(filmId: string, url: string | null): Promise<Result> {
   await requireSession();
   if (url !== null && !/^(https:\/\/|\/api\/posters\/)/.test(url)) return { ok: false, error: "Enlace de póster no válido" };
   try {
     const store = await adminStore();
     const film = await store.getFilm(filmId);
-    if (!film) return { ok: false, error: "Película no encontrada" };
+    if (!film) return { ok: false, error: "Producción no encontrada" };
     await store.saveFilm({ ...film, poster_url: url, locations: film.locations, status: film.status });
     refresh();
     return { ok: true, id: filmId };
@@ -56,7 +56,7 @@ export async function setPosterAction(filmId: string, url: string | null): Promi
   }
 }
 
-/** Publica todas las películas en borrador que ya tienen título (las que no tienen lugar salen en «Sin ubicación»). */
+/** Publica todas las producciones en borrador que ya tienen título (las que no tienen lugar salen en «Sin ubicación»). */
 export async function publishDraftFilmsAction(): Promise<{ ok: true; published: number } | { ok: false; error: string }> {
   await requireSession();
   try {

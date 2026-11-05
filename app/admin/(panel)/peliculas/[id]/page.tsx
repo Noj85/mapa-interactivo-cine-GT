@@ -9,7 +9,7 @@ export default async function EditFilm({ params }: { params: Promise<{ id: strin
   if (!film) notFound();
   return (
     <div>
-      <Link href="/admin/peliculas" className="text-sm text-muted hover:text-ink">← Películas</Link>
+      <Link href="/admin/peliculas" className="text-sm text-muted hover:text-ink">← Producciones</Link>
       <h1 className="mb-8 mt-2 font-display text-4xl tracking-tight">{film.title}</h1>
       <FilmEditor key={film.id + film.completeness} film={film} />
     </div>

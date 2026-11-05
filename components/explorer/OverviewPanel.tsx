@@ -72,7 +72,7 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
       <div className="mt-5 grid grid-cols-2 gap-2.5">
         {view.layer === "produccion" ? (
           <>
-            <Stat label="Películas con locación" value={fmtInt(t.films)} />
+            <Stat label="Producciones con locación" value={fmtInt(t.films)} />
             <Stat label="Días de rodaje" value={fmtInt(t.days)} />
             <Stat label="Inversión local" value={fmtMoney(t.spend)} />
             <Stat label="Empleos generados" value={fmtInt(t.jobs)} />
@@ -92,7 +92,7 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
         >
           <MapPinOff className="h-4 w-4 shrink-0" />
           <span>
-            <b className="font-medium text-ink">{fmtInt(unlocated)}</b> {unlocated === 1 ? "película no tiene" : "películas no tienen"} lugar de rodaje. Están en la zona «Sin ubicación».
+            <b className="font-medium text-ink">{fmtInt(unlocated)}</b> {unlocated === 1 ? "producción no tiene" : "producciones no tienen"} lugar de rodaje. Están en la zona «Sin ubicación».
           </span>
         </button>
       )}
@@ -121,7 +121,7 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
         </div>
       )}
 
-      <SectionTitle aside={`${list.length}`}>{view.layer === "produccion" ? "Películas" : "Registros"}</SectionTitle>
+      <SectionTitle aside={`${list.length}`}>{view.layer === "produccion" ? "Producciones" : "Registros"}</SectionTitle>
       <div className="-mx-2 space-y-0.5">
         {view.layer === "produccion"
           ? (shown as typeof films).map((f) => <FilmCard key={f.id} film={f} gaz={gaz} onClick={() => go.film(f.slug)} />)

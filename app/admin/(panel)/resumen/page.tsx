@@ -62,7 +62,7 @@ export default async function AdminHome() {
       )}
 
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        {stat("Películas", films.length, `${films.filter((f) => f.status === "published").length} publicadas`)}
+        {stat("Producciones", films.length, `${films.filter((f) => f.status === "published").length} publicadas`)}
         {stat("Entidades", orgs.length, `${orgs.filter((o) => o.status === "published").length} publicadas`)}
         {stat("Con información pendiente", pending.length)}
         {stat("Preguntas sin responder", openQs.length)}
@@ -72,8 +72,9 @@ export default async function AdminHome() {
         <span className="mr-1 flex items-center gap-1.5 text-muted">
           <Download className="h-4 w-4" /> Descargar para informes (incluye borradores):
         </span>
-        <a className="chip transition hover:border-accent hover:text-ink" href="/api/export?tipo=peliculas&borradores=1" download>Películas</a>
-        <a className="chip transition hover:border-accent hover:text-ink" href="/api/export?tipo=locaciones&borradores=1" download>Locaciones por territorio</a>
+        <a className="chip transition hover:border-accent hover:text-ink" href="/api/export?tipo=producciones&borradores=1" download>Producciones</a>
+        <a className="chip transition hover:border-accent hover:text-ink" href="/api/export?tipo=producciones&filas=locaciones&borradores=1" download>Locaciones por territorio</a>
+        <a className="chip transition hover:border-accent hover:text-ink" href="/api/export?tipo=circulacion&borradores=1" download>Circulación</a>
         <a className="chip transition hover:border-accent hover:text-ink" href="/api/export?tipo=entidades&borradores=1" download>Entidades</a>
         <a className="chip transition hover:border-accent hover:text-ink" href="/descargas">Con filtros →</a>
       </section>

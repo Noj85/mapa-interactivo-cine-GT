@@ -3,14 +3,17 @@ import { CIRC_CATEGORIES, FILM_KINDS, IND_CATEGORIES, INITIATIVE_TYPES, NATIONAL
 
 /**
  * Filtros de descarga. Se leen de la URL, de modo que un enlace como
- *   /api/export?tipo=peliculas&depto=7&presupuesto_min=500000&formato=xlsx
+ *   /api/export?tipo=producciones&depto=7&presupuesto_min=500000&formato=xlsx
  * funciona igual desde la página de descargas, un correo o un script.
  */
 
 /** Tipo de cambio de referencia para comparar presupuestos en monedas distintas. */
 export const USD_TO_GTQ = 7.7;
 
-export type ExportKind = "peliculas" | "locaciones" | "entidades";
+/** Las tres categorías de descarga: producciones, entidades de circulación y entidades de industria. */
+export type ExportKind = "producciones" | "circulacion" | "entidades";
+/** Qué es una fila en las producciones: una por producción o una por locación de rodaje. */
+export type ExportRows = "producciones" | "locaciones";
 export type ExportFormat = "csv" | "xlsx";
 export type BudgetCurrency = "GTQ" | "USD";
 
@@ -26,7 +29,7 @@ export interface FilmFilter {
   presupuestoMax: number | null;
   moneda: BudgetCurrency;
   q: string;
-  /** Solo películas con todas las locaciones ubicadas en un municipio. */
+  /** Solo producciones con todas las locaciones ubicadas en un municipio. */
   soloCompletas: boolean;
 }
 
@@ -73,6 +76,21 @@ const num = (p: URLSearchParams, key: string) => {
 
 const pick = <T extends string>(values: string[], allowed: readonly { id: T }[]): T[] =>
   values.filter((v): v is T => allowed.some((a) => a.id === v));
+
+/** Capa de las entidades de cada categoría de descarga (las producciones no tienen). */
+export const kindLayer = (k: ExportKind): "circulacion" | "industria" | null => (k === "circulacion" ? "circulacion" : k === "entidades" ? "industria" : null);
+
+/**
+ * Qué se pide: `tipo` (producciones | circulacion | entidades) y, en producciones, `filas` (producciones | locaciones).
+ * Entiende también los enlaces anteriores: tipo=peliculas, tipo=locaciones y tipo=entidades&capa=circulacion.
+ */
+export function parseExportRequest(p: URLSearchParams): { tipo: ExportKind; filas: ExportRows } {
+  const t = p.get("tipo");
+  if (t === "circulacion") return { tipo: "circulacion", filas: "producciones" };
+  if (t === "entidades") return { tipo: p.get("capa") === "circulacion" ? "circulacion" : "entidades", filas: "producciones" };
+  if (t === "locaciones") return { tipo: "producciones", filas: "locaciones" };
+  return { tipo: "producciones", filas: p.get("filas") === "locaciones" ? "locaciones" : "producciones" };
+}
 
 export function parseFilmFilter(p: URLSearchParams): FilmFilter {
   return {
@@ -173,7 +191,7 @@ export function orgMatches(o: Org, flt: OrgFilter): boolean {
   return true;
 }
 
-/** Locaciones de una película que cumplen el filtro de lugar (si no hay filtro de lugar, todas). */
+/** Locaciones de una producción que cumplen el filtro de lugar (si no hay filtro de lugar, todas). */
 export const locationsMatching = <L extends { depto_ine: number | null; muni_ine: number | null }>(locs: L[], f: Pick<FilmFilter, "depto" | "muni">): L[] =>
   locs.filter((l) => (!f.depto.length || f.depto.includes(locDepto(l) ?? -1)) && (!f.muni.length || (l.muni_ine != null && f.muni.includes(l.muni_ine))));
 

@@ -54,7 +54,7 @@ export default async function AportesPage({ searchParams }: { searchParams: Prom
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-display text-[15px]">{x.label}</span>
                   <span className="block truncate text-xs text-muted">
-                    {x.target_id ? "Corrección" : "Registro nuevo"} · {x.kind === "film" ? "Película" : "Entidad"} ·{" "}
+                    {x.target_id ? "Corrección" : "Registro nuevo"} · {x.kind === "film" ? "Producción" : "Entidad"} ·{" "}
                     {new Date(x.created_at).toLocaleString("es-GT", { dateStyle: "medium", timeStyle: "short" })}
                     {x.contact ? ` · ${x.contact}` : ""}
                   </span>

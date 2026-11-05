@@ -12,8 +12,8 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
   const film = data.films.find((f) => f.slug === view.film);
   if (!film)
     return (
-      <PanelShell eyebrow="Película" onBack={go.up} onClose={go.clear}>
-        <p className="text-sm text-muted">No encontramos esta película.</p>
+      <PanelShell eyebrow="Producción" onBack={go.up} onClose={go.clear}>
+        <p className="text-sm text-muted">No encontramos esta producción.</p>
       </PanelShell>
     );
 
@@ -26,7 +26,7 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
   const meta = [film.year, kind, nat].filter(Boolean).join(" · ");
 
   return (
-    <PanelShell eyebrow="Película" onBack={go.up} onClose={go.clear}>
+    <PanelShell eyebrow="Producción" onBack={go.up} onClose={go.clear}>
       {film.poster_url && (
         <div className="mb-4 overflow-hidden rounded-lg border border-line bg-surface-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}

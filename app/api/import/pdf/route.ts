@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     try {
       const r = await claudePdf(data, file.name);
       if (total(r.file) > 0) return NextResponse.json({ file: r.file, engine: "claude", pages: r.pages, notes: r.notes } satisfies PdfResponse);
-      notes.push("Claude no encontró películas ni entidades en el PDF.");
+      notes.push("Claude no encontró producciones ni entidades en el PDF.");
     } catch (e) {
       console.error("[import/pdf] Claude falló:", (e as Error).message);
       notes.push(`No pudimos leer el PDF con Claude (${(e as Error).message.slice(0, 120)}). Probamos con la lectura básica.`);

@@ -33,11 +33,11 @@ export async function uploadImage(
 }
 
 const COPY = {
-  poster: { label: "Póster", alt: "Póster de la película", frame: "aspect-[2/3] max-w-[200px]", fit: "object-cover" },
+  poster: { label: "Póster", alt: "Póster de la producción", frame: "aspect-[2/3] max-w-[200px]", fit: "object-cover" },
   logo: { label: "Logo", alt: "Logo de la entidad", frame: "aspect-square max-w-[160px]", fit: "object-contain p-3" },
 } as const;
 
-/** Imagen de una película (póster) o de una entidad (logo). Igual para el equipo y para el público. */
+/** Imagen de una producción (póster) o de una entidad (logo). Igual para el equipo y para el público. */
 export function ImageField({
   kind,
   audience = "team",

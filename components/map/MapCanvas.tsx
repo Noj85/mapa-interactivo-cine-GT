@@ -89,7 +89,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
   const fitCountry = useCallback((animate = true) => {
     const map = mapRef.current;
     if (!map) return;
-    // si hay películas sin lugar, la vista incluye también la zona «Sin ubicación»
+    // si hay producciones sin lugar, la vista incluye también la zona «Sin ubicación»
     const { data, view } = propsRef.current;
     const withZone = view.layer === "produccion" && unlocatedFilms(data.films).length > 0;
     const b = withZone ? [Math.min(COUNTRY_BBOX[0], NOWHERE_BBOX[0]), Math.min(COUNTRY_BBOX[1], NOWHERE_BBOX[1]), COUNTRY_BBOX[2], COUNTRY_BBOX[3]] : COUNTRY_BBOX;
@@ -196,7 +196,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
         "fill-opacity": ["interpolate", ["linear"], ["zoom"], 6.6, 0, 8, 0.92, 10.5, 0.85, 12.5, 0.4],
       },
     });
-    // territorios de la película seleccionada
+    // territorios de la producción seleccionada
     for (const s of ["depto", "muni"] as const) {
       add({
         id: `${s}-hot`,
@@ -226,7 +226,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       paint: { "fill-color": bg, "fill-opacity": dark ? 0.78 : 0.7 },
     });
 
-    // películas sin lugar de rodaje: zona punteada fuera del territorio
+    // producciones sin lugar de rodaje: zona punteada fuera del territorio
     const neutral = dark ? "#9aa7bd" : "#5b6b85";
     add({
       id: "nowhere-fill",
@@ -445,7 +445,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       paint: { ...textPaint, "text-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0, 11.8, 1] },
     });
 
-    // película / entidad seleccionada
+    // producción / entidad seleccionada
     add({
       id: "film-line",
       type: "line",
@@ -574,7 +574,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
     const zoneTotal = showZone ? unlocatedFilms(data.films).length : 0;
     (map.getSource("nowhere") as MapLibre.GeoJSONSource | undefined)?.setData(buildNowhere(zoneTotal, view.noloc || (!!view.film && unlocatedCount > 0)) as any);
 
-    // película / entidad
+    // producción / entidad
     const empty = { type: "FeatureCollection", features: [] } as any;
     // el logo de la entidad abierta es el único marcador HTML: se quita al cambiar o cerrar
     logoMarker.current?.remove();
@@ -588,7 +588,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       if (film) {
         const route = buildFilmRoute(film, geo.gaz);
         if (!route.coords.length) {
-          // sin lugar de rodaje: la película queda dentro de la zona «Sin ubicación»
+          // sin lugar de rodaje: la producción queda dentro de la zona «Sin ubicación»
           filmSrc.setData({
             type: "FeatureCollection",
             features: [{ type: "Feature", properties: { n: "", site: "Sin ubicación", approx: true }, geometry: { type: "Point", coordinates: [NOWHERE.lng, NOWHERE.lat - 0.46] } }],
@@ -810,7 +810,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
           } else if (hit.kind === "nowhere") {
             const n = unlocatedFilms(data.films).length;
             title = "Sin ubicación";
-            sub = `${n === 1 ? "1 película" : `${n.toLocaleString("es-GT")} películas`} sin lugar de rodaje registrado`;
+            sub = `${n === 1 ? "1 producción" : `${n.toLocaleString("es-GT")} producciones`} sin lugar de rodaje registrado`;
             note = "Clic para ver la lista";
             setHover(null);
           } else {
