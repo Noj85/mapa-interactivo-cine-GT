@@ -134,7 +134,31 @@ function festivalOf(row: Row, plan: SheetPlan): Fest | null {
 
 const festKey = (f: Fest) => `${normalize(f.name ?? "")}|${f.year ?? ""}|${normalize(f.award ?? "")}|${normalize(f.section ?? "")}`;
 
-function filmFields(row: Row, plan: SheetPlan): Omit<FilmInput, "locations" | "festivals"> {
+type Company = NonNullable<FilmInput["companies"]>[number];
+
+const splitList = (v: string) => v.split(/[;\n|]/).map((x) => x.trim()).filter(Boolean);
+
+/**
+ * Casas productoras de la fila: «Casa Uno (México); Casa Dos» o una columna de nombres y otra de países.
+ * Si la producción es guatemalteca y no se dice el país, es Guatemala.
+ */
+function companiesOf(row: Row, plan: SheetPlan, nationality: string | null | undefined): Company[] {
+  const names = splitList(cleanText(val(row, plan, "company")) ?? "");
+  if (!names.length) return [];
+  const countries = splitList(cleanText(val(row, plan, "company_country")) ?? "");
+  return names.map((raw, i) => {
+    const m = raw.match(/^(.*?)\s*\(([^()]{2,60})\)\s*$/);
+    const name = (m ? m[1] : raw).trim();
+    const country = m ? m[2].trim() : (countries.length === names.length ? countries[i] : countries.length === 1 ? countries[0] : "") || null;
+    return { name, country: country || (nationality === "guatemalteca" ? "Guatemala" : null) };
+  });
+}
+
+const addCompanies = (list: Company[], add: Company[]) => {
+  for (const c of add) if (!list.some((x) => normalize(x.name ?? "") === normalize(c.name ?? ""))) list.push(c);
+};
+
+function filmFields(row: Row, plan: SheetPlan): Omit<FilmInput, "locations" | "festivals" | "companies"> {
   const vm = plan.value_maps ?? {};
   const budgetRaw = val(row, plan, "budget");
   return {
@@ -174,7 +198,7 @@ function filmCandidates(sheet: ParsedSheet, plan: SheetPlan, places: Record<stri
       cand = {
         key,
         type: "film",
-        film: { ...base, locations: [], festivals: [], status: "published", source: undefined },
+        film: { ...base, locations: [], festivals: [], companies: [], status: "published", source: undefined },
         placeTexts: [],
         rows: [],
         issues: [],
@@ -183,9 +207,11 @@ function filmCandidates(sheet: ParsedSheet, plan: SheetPlan, places: Record<stri
       map.set(key, cand);
       order.push(key);
     } else {
-      cand.film = { ...merge(cand.film!, base as FilmInput), locations: cand.film!.locations, festivals: cand.film!.festivals };
+      cand.film = { ...merge(cand.film!, base as FilmInput), locations: cand.film!.locations, festivals: cand.film!.festivals, companies: cand.film!.companies };
     }
     cand.rows.push(`${sheet.name}!${i + 2}`);
+
+    addCompanies(cand.film!.companies!, companiesOf(row, plan, cand.film!.nationality));
 
     const fest = festivalOf(row, plan);
     if (fest && !cand.film!.festivals!.some((x) => festKey(x) === festKey(fest))) cand.film!.festivals!.push(fest);

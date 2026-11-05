@@ -36,6 +36,8 @@ export interface FestivalInput {
   city?: string | null;
   founded?: number | null;
   source?: string | null;
+  /** Sin este campo se conserva el vínculo actual; null lo suelta. */
+  org_id?: string | null;
 }
 
 export interface NewInfoRequest {
@@ -97,14 +99,18 @@ export interface Store {
   setRecordsStatus(kind: SubmissionKind, ids: string[], status: RecordStatus): Promise<void>;
 
   /** Catálogo de festivales (lectura pública). `q` vacío lista todo por nombre. */
-  searchFestivals(q: string, opts?: { limit?: number; offset?: number }): Promise<{ rows: Festival[]; total: number }>;
+  searchFestivals(q: string, opts?: { limit?: number; offset?: number; link?: "linked" | "unlinked" }): Promise<{ rows: Festival[]; total: number }>;
   getFestival(id: string): Promise<Festival | null>;
   saveFestival(input: FestivalInput): Promise<Festival>;
   deleteFestival(id: string): Promise<void>;
   /** Pasa todas las participaciones de `fromId` a `intoId` y borra `fromId` (queda como alias). */
   mergeFestivals(fromId: string, intoId: string): Promise<void>;
   /** Agrega al catálogo los que no existan (por slug). Devuelve cuántos agregó. */
-  seedFestivals(list: Omit<Festival, "id">[]): Promise<number>;
+  seedFestivals(list: Omit<Festival, "id" | "org_id">[]): Promise<number>;
+  /** Vincula (o suelta, con null) un festival del catálogo con una entidad de Circulación. Una entidad solo puede estar en una entrada. */
+  linkFestivalOrg(festivalId: string, orgId: string | null): Promise<void>;
+  /** Festival del catálogo -> entidad vinculada (todas; quien llama filtra las publicadas). */
+  festivalOrgMap(): Promise<Record<string, string>>;
   /** Cuántas participaciones tiene cada festival del catálogo. */
   festivalUsage(ids: string[]): Promise<Record<string, number>>;
 
@@ -146,7 +152,7 @@ async function readDb(): Promise<LocalDb> {
     const raw = await fs.readFile(DB_PATH, "utf8");
     const j = JSON.parse(raw) as Partial<LocalDb>;
     return {
-      films: (j.films ?? []).map((f) => ({ ...f, festivals: f.festivals ?? [] })),
+      films: (j.films ?? []).map((f) => ({ ...f, festivals: f.festivals ?? [], companies: f.companies ?? [] })),
       orgs: (j.orgs ?? []).map((o) => ({ ...o, categories: orgCategories(o) })),
       imports: j.imports ?? [],
       questions: j.questions ?? [],
@@ -156,7 +162,7 @@ async function readDb(): Promise<LocalDb> {
         request_id: s.request_id ?? null,
         submitter: s.submitter ?? null,
       })),
-      festivals: j.festivals ?? [],
+      festivals: (j.festivals ?? []).map((f) => ({ ...f, org_id: f.org_id ?? null })),
       info_requests: j.info_requests ?? [],
     };
   } catch {
@@ -231,6 +237,8 @@ export class LocalStore implements Store {
   async deleteOrg(id: string) {
     const db = await readDb();
     db.orgs = db.orgs.filter((o) => o.id !== id);
+    // el vínculo con el catálogo se suelta; la entrada del catálogo se conserva
+    db.festivals = db.festivals.map((f) => (f.org_id === id ? { ...f, org_id: null } : f));
     await writeDb(db);
   }
 
@@ -312,10 +320,11 @@ export class LocalStore implements Store {
 
   // ───── catálogo de festivales ─────
 
-  async searchFestivals(q: string, opts?: { limit?: number; offset?: number }) {
+  async searchFestivals(q: string, opts?: { limit?: number; offset?: number; link?: "linked" | "unlinked" }) {
     const { festivals } = await readDb();
     const nq = normalize(q);
     let rows = nq ? festivals.filter((f) => festivalSearchKey(f.name, f.aliases).includes(nq)) : [...festivals];
+    if (opts?.link) rows = rows.filter((f) => (opts.link === "linked") === !!f.org_id);
     rows.sort((a, b) => {
       const sa = nq && normalize(a.name).startsWith(nq) ? 0 : 1;
       const sb = nq && normalize(b.name).startsWith(nq) ? 0 : 1;
@@ -341,8 +350,11 @@ export class LocalStore implements Store {
       city: input.city?.trim() || null,
       founded: input.founded ?? null,
       source: input.source ?? existing?.source ?? null,
+      org_id: input.org_id === undefined ? (existing?.org_id ?? null) : input.org_id,
     };
-    db.festivals = existing ? db.festivals.map((f) => (f.id === fest.id ? fest : f)) : [...db.festivals, fest];
+    // una entidad solo puede estar vinculada a una entrada
+    const others = fest.org_id ? db.festivals.map((f) => (f.id !== fest.id && f.org_id === fest.org_id ? { ...f, org_id: null } : f)) : db.festivals;
+    db.festivals = existing ? others.map((f) => (f.id === fest.id ? fest : f)) : [...others, fest];
     await writeDb(db);
     return fest;
   }
@@ -362,17 +374,29 @@ export class LocalStore implements Store {
       festivals: f.festivals.map((x) => (x.festival_id === fromId ? { ...x, festival_id: into.id, name: into.name } : x)),
     }));
     into.aliases = cleanAliases(into.name, [...into.aliases, from.name, ...from.aliases]);
+    into.org_id = into.org_id ?? from.org_id;
     db.festivals = db.festivals.filter((f) => f.id !== fromId);
     await writeDb(db);
   }
-  async seedFestivals(list: Omit<Festival, "id">[]) {
+  async linkFestivalOrg(festivalId: string, orgId: string | null) {
+    const db = await readDb();
+    if (!db.festivals.some((f) => f.id === festivalId)) return;
+    db.festivals = db.festivals.map((f) => (f.id === festivalId ? { ...f, org_id: orgId } : orgId && f.org_id === orgId ? { ...f, org_id: null } : f));
+    await writeDb(db);
+  }
+  async festivalOrgMap() {
+    const out: Record<string, string> = {};
+    for (const f of (await readDb()).festivals) if (f.org_id) out[f.id] = f.org_id;
+    return out;
+  }
+  async seedFestivals(list: Omit<Festival, "id" | "org_id">[]) {
     const db = await readDb();
     const taken = new Set(db.festivals.map((f) => f.slug));
     let added = 0;
     for (const f of list) {
       if (taken.has(f.slug)) continue;
       taken.add(f.slug);
-      db.festivals.push({ ...f, id: newId() });
+      db.festivals.push({ ...f, id: newId(), org_id: null });
       added++;
     }
     if (added) await writeDb(db);
@@ -530,6 +554,7 @@ const rowToFestival = (r: any): Festival => ({
   city: r.city ?? null,
   founded: r.founded ?? null,
   source: r.source ?? null,
+  org_id: r.org_id ?? null,
 });
 
 const rowToInfoRequest = (r: any): InfoRequest => ({
@@ -575,6 +600,7 @@ const rowToFilm = (r: any): Film => ({
   festivals: ((r.film_festivals ?? []) as any[])
     .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
     .map(rowToFilmFestival),
+  companies: Array.isArray(r.companies) ? r.companies.map((c: any) => ({ name: String(c.name ?? ""), country: c.country ?? null })) : [],
 });
 const rowToOrg = (r: any): Org => ({
   id: r.id,
@@ -647,6 +673,7 @@ export class SupabaseStore implements Store {
         kind: film.kind,
         director: film.director,
         producer: film.producer,
+        companies: film.companies,
         nationality: film.nationality,
         budget: film.budget,
         currency: film.currency,
@@ -832,13 +859,15 @@ export class SupabaseStore implements Store {
 
   // ───── catálogo de festivales ─────
 
-  async searchFestivals(q: string, opts?: { limit?: number; offset?: number }) {
+  async searchFestivals(q: string, opts?: { limit?: number; offset?: number; link?: "linked" | "unlinked" }) {
     const limit = opts?.limit ?? 50;
     const offset = opts?.offset ?? 0;
     const nq = normalize(q);
     let query = this.db.from("festivals").select("*", { count: "exact" }).order("name");
     // % y _ son comodines de ilike: se quitan (normalize ya deja solo letras, números y espacios)
     if (nq) query = query.ilike("search", `%${nq}%`);
+    if (opts?.link === "linked") query = query.not("org_id", "is", null);
+    if (opts?.link === "unlinked") query = query.is("org_id", null);
     const res = await query.range(offset, offset + limit - 1);
     if (res.error) throw new Error(res.error.message);
     const rows = (res.data as any[]).map(rowToFestival);
@@ -861,12 +890,15 @@ export class SupabaseStore implements Store {
       founded: input.founded ?? null,
       search: festivalSearchKey(name, aliases),
     };
+    // org_id solo se escribe cuando viene: así guardar sigue funcionando si la migración 0010 aún no está aplicada
+    if (input.org_id !== undefined && input.org_id) must(await this.db.from("festivals").update({ org_id: null }).eq("org_id", input.org_id));
+    const link: { org_id?: string | null } = input.org_id === undefined ? {} : { org_id: input.org_id };
     if (existing) {
-      must(await this.db.from("festivals").update({ ...base, source: input.source ?? existing.source }).eq("id", existing.id));
-      return { ...existing, ...base, source: input.source ?? existing.source };
+      must(await this.db.from("festivals").update({ ...base, ...link, source: input.source ?? existing.source }).eq("id", existing.id));
+      return { ...existing, ...base, ...link, source: input.source ?? existing.source };
     }
     const slugs = new Set((must(await this.db.from("festivals").select("slug").ilike("slug", `${uniqueSlug(name, new Set())}%`)) as any[]).map((r) => r.slug));
-    const row = { id: newId(), slug: uniqueSlug(name, slugs), ...base, source: input.source ?? null };
+    const row = { id: newId(), slug: uniqueSlug(name, slugs), ...base, ...link, source: input.source ?? null };
     must(await this.db.from("festivals").insert(row));
     return rowToFestival(row);
   }
@@ -879,10 +911,23 @@ export class SupabaseStore implements Store {
     if (!from || !into) return;
     must(await this.db.from("film_festivals").update({ festival_id: into.id, name: into.name }).eq("festival_id", from.id));
     const aliases = cleanAliases(into.name, [...into.aliases, from.name, ...from.aliases]);
-    must(await this.db.from("festivals").update({ aliases, search: festivalSearchKey(into.name, aliases) }).eq("id", into.id));
+    // el vínculo con la entidad pasa al que queda (se suelta primero del otro por el índice único)
+    const adopt = !into.org_id && from.org_id ? from.org_id : null;
+    if (adopt) must(await this.db.from("festivals").update({ org_id: null }).eq("id", from.id));
+    must(await this.db.from("festivals").update({ aliases, search: festivalSearchKey(into.name, aliases), ...(adopt ? { org_id: adopt } : {}) }).eq("id", into.id));
     must(await this.db.from("festivals").delete().eq("id", from.id));
   }
-  async seedFestivals(list: Omit<Festival, "id">[]) {
+  async linkFestivalOrg(festivalId: string, orgId: string | null) {
+    if (orgId) must(await this.db.from("festivals").update({ org_id: null }).eq("org_id", orgId));
+    must(await this.db.from("festivals").update({ org_id: orgId }).eq("id", festivalId));
+  }
+  async festivalOrgMap() {
+    const out: Record<string, string> = {};
+    const rows = must(await this.db.from("festivals").select("id, org_id").not("org_id", "is", null)) as any[];
+    for (const r of rows) out[r.id] = r.org_id;
+    return out;
+  }
+  async seedFestivals(list: Omit<Festival, "id" | "org_id">[]) {
     let added = 0;
     for (let i = 0; i < list.length; i += 400) {
       const chunk = list.slice(i, i + 400).map((f) => ({

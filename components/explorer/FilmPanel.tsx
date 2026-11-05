@@ -72,14 +72,27 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
       <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
         {film.director && (
           <>
-            <dt className="text-muted">Dirección</dt>
+            <dt className="text-muted">Director/a</dt>
             <dd className="text-ink">{film.director}</dd>
           </>
         )}
         {film.producer && (
           <>
-            <dt className="text-muted">Productora</dt>
+            <dt className="text-muted">Productor/a</dt>
             <dd className="text-ink">{film.producer}</dd>
+          </>
+        )}
+        {(film.companies ?? []).length > 0 && (
+          <>
+            <dt className="text-muted">{film.companies.length === 1 ? "Casa productora" : "Casas productoras"}</dt>
+            <dd className="text-ink">
+              {film.companies.map((c, i) => (
+                <span key={i} className="block">
+                  {c.name}
+                  {c.country && <span className="text-muted"> · {c.country}</span>}
+                </span>
+              ))}
+            </dd>
           </>
         )}
         {film.budget != null && (
@@ -149,6 +162,10 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
             {fests.map((x) => {
               const result = FESTIVAL_RESULTS.find((r) => r.id === x.result)?.label;
               const where = [x.city, x.country].filter(Boolean).join(", ");
+              // si el festival del catálogo está vinculado a una entidad publicada de Circulación, el nombre la abre
+              const orgId = x.festival_id ? data.festivalOrgs?.[x.festival_id] : undefined;
+              const org = orgId ? data.orgs.find((o) => o.id === orgId) : undefined;
+              const external = x.url && /^https?:\/\//i.test(x.url) ? x.url : null;
               return (
                 <li key={x.id} className="flex items-start gap-3 rounded-2xl border border-line/60 px-3 py-2.5">
                   <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 text-accent">
@@ -156,8 +173,19 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm text-ink">
-                      {x.url && /^https?:\/\//i.test(x.url) ? (
-                        <a href={x.url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 hover:text-accent hover:underline">
+                      {org ? (
+                        <>
+                          <button className="text-left hover:text-accent hover:underline" onClick={() => go.org(org.slug)} title="Ver la entidad en el mapa">
+                            {x.name}
+                          </button>
+                          {external && (
+                            <a href={external} target="_blank" rel="noreferrer noopener" className="ml-1.5 inline-flex align-middle text-muted hover:text-accent" aria-label={`Sitio del festival ${x.name} (abre en otra pestaña)`}>
+                              <ExternalLink className="h-3 w-3 shrink-0" />
+                            </a>
+                          )}
+                        </>
+                      ) : external ? (
+                        <a href={external} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 hover:text-accent hover:underline">
                           {x.name}
                           <ExternalLink className="h-3 w-3 shrink-0" aria-label="Abre en otra pestaña" />
                         </a>

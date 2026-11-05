@@ -7,10 +7,18 @@ import type { Dataset } from "@/lib/types";
 export async function loadDataset(): Promise<Dataset> {
   try {
     const store = publicStore();
-    const [films, orgs] = await Promise.all([store.listFilms(), store.listOrgs()]);
-    return { films, orgs, mode: store.mode };
+    const [films, orgs, links] = await Promise.all([
+      store.listFilms(),
+      store.listOrgs(),
+      // sin catálogo o sin la migración del vínculo, simplemente no hay enlaces
+      store.festivalOrgMap().catch(() => ({}) as Record<string, string>),
+    ]);
+    // solo cuentan los vínculos a entidades publicadas
+    const published = new Set(orgs.map((o) => o.id));
+    const festivalOrgs = Object.fromEntries(Object.entries(links).filter(([, orgId]) => published.has(orgId)));
+    return { films, orgs, festivalOrgs, mode: store.mode };
   } catch (e) {
     console.error("[dataset]", e);
-    return { films: [], orgs: [], mode: supabaseConfigured() ? "supabase" : "local" };
+    return { films: [], orgs: [], festivalOrgs: {}, mode: supabaseConfigured() ? "supabase" : "local" };
   }
 }

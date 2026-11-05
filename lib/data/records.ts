@@ -1,6 +1,6 @@
 import { filmCompleteness, orgCompleteness } from "@/lib/completeness";
 import { normalizeCategories } from "@/lib/categories";
-import { FESTIVAL_RESULTS, type Film, type FilmFestival, type FilmInput, type FilmLocation, type Org, type OrgInput } from "@/lib/types";
+import { FESTIVAL_RESULTS, type Film, type FilmCompany, type FilmFestival, type FilmInput, type FilmLocation, type Org, type OrgInput } from "@/lib/types";
 import { slugify } from "@/lib/utils";
 
 const num = (v: unknown): number | null => {
@@ -49,6 +49,10 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string; e
       award: str(f.award),
       url: str(f.url),
     }));
+  // Sin `companies` en la entrada se conservan las que ya tenía.
+  const companies: FilmCompany[] = (input.companies ?? opts.existing?.companies ?? [])
+    .filter((c) => str(c.name))
+    .map((c) => ({ name: str(c.name)!, country: str(c.country) }));
   const locations: FilmLocation[] = (input.locations ?? []).map((l, i) => {
     const muni = num(l.muni_ine);
     const depto = num(l.depto_ine) ?? (muni != null ? Math.floor(muni / 100) : null);
@@ -78,6 +82,7 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string; e
     synopsis: str(input.synopsis),
     poster_url: str(input.poster_url),
     locations,
+    companies,
   };
   const c = filmCompleteness(base);
   return {

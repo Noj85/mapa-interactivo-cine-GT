@@ -1,6 +1,7 @@
 "use client";
 
 import { FILM_KINDS, NATIONALITIES, type FilmKind, type Nationality } from "@/lib/types";
+import { CompaniesEditor } from "./CompaniesEditor";
 import type { FilmDraft } from "./drafts";
 
 /** Campos de una producción. Los usa el editor del equipo y el formulario público. */
@@ -35,13 +36,14 @@ export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange:
           </select>
         </div>
       </div>
+      <CompaniesEditor companies={d.companies} nationality={d.nationality} onChange={(companies) => onChange({ companies })} />
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="label" htmlFor="f-dir">Dirección</label>
+          <label className="label" htmlFor="f-dir">Director/a</label>
           <input id="f-dir" className="field" maxLength={300} value={d.director} onChange={(e) => onChange({ director: e.target.value })} />
         </div>
         <div>
-          <label className="label" htmlFor="f-prod">Productora</label>
+          <label className="label" htmlFor="f-prod">Productor/a</label>
           <input id="f-prod" className="field" maxLength={300} value={d.producer} onChange={(e) => onChange({ producer: e.target.value })} />
         </div>
       </div>

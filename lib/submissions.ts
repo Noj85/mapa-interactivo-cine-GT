@@ -1,4 +1,5 @@
 import { orgCategories } from "@/lib/categories";
+import { companiesText } from "@/lib/companies";
 import { describeFestival, sortFestivals } from "@/lib/festivals";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { FILM_KINDS, INITIATIVE_TYPES, LAYERS, NATIONALITIES, type Film, type FilmInput, type Org, type OrgInput, type Submission } from "@/lib/types";
@@ -54,8 +55,9 @@ export function diffSubmission(sub: Submission, current: Film | Org | null, gaz:
       row("Año", c?.year != null ? String(c.year) : null, p.year != null ? String(p.year) : null, isNew),
       row("Tipo", kind(c?.kind), kind(p.kind), isNew),
       row("Nacionalidad", nat(c?.nationality), nat(p.nationality), isNew),
-      row("Dirección", c?.director ?? null, p.director ?? null, isNew),
-      row("Productora", c?.producer ?? null, p.producer ?? null, isNew),
+      row("Casas productoras", c ? companiesText(c.companies, "\n") || null : null, companiesText(p.companies, "\n") || null, isNew),
+      row("Director/a", c?.director ?? null, p.director ?? null, isNew),
+      row("Productor/a", c?.producer ?? null, p.producer ?? null, isNew),
       row("Presupuesto", money(c?.budget, c?.currency), money(p.budget, p.currency), isNew),
       row("Sinopsis", c?.synopsis ?? null, p.synopsis ?? null, isNew),
       row("Locaciones", c ? locsText(c.locations, gaz) : null, locsText(p.locations ?? [], gaz), isNew),

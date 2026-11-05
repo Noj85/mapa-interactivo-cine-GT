@@ -40,6 +40,7 @@ export function FilmEditor({ film }: { film?: Film }) {
         budget: data.budget,
         currency: d.currency,
         synopsis: data.synopsis,
+        companies: data.companies,
         locations: data.locations as never,
       }),
     [data, d.title, d.currency],

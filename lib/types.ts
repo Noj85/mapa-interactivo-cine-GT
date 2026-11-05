@@ -60,6 +60,14 @@ export interface Festival {
   city: string | null;
   founded: number | null;
   source: string | null;
+  /** Entidad de Circulación (categoría Festivales) a la que está vinculado, si la hay. */
+  org_id: string | null;
+}
+
+/** Casa productora de una producción, con su país. */
+export interface FilmCompany {
+  name: string;
+  country: string | null;
 }
 
 export interface Film {
@@ -82,6 +90,8 @@ export interface Film {
   missing_fields: string[];
   locations: FilmLocation[];
   festivals: FilmFestival[];
+  /** Casas productoras (nombre y país). */
+  companies: FilmCompany[];
 }
 
 export type FilmKind = "ficcion" | "documental" | "serie" | "comercial" | "corto" | "otro";
@@ -119,6 +129,8 @@ export interface Org {
 export interface Dataset {
   films: Film[];
   orgs: Org[];
+  /** Festival del catálogo -> entidad de Circulación publicada con la que está vinculado. */
+  festivalOrgs: Record<string, string>;
   /** "supabase" | "local" */
   mode: "supabase" | "local";
 }
@@ -253,6 +265,8 @@ export interface FilmInput {
   locations: Partial<Omit<FilmLocation, "film_id">>[];
   /** Si no viene, se conservan los festivales que ya tiene la producción. */
   festivals?: Partial<Omit<FilmFestival, "film_id">>[];
+  /** Sin este campo se conservan las casas productoras actuales. */
+  companies?: Partial<FilmCompany>[];
 }
 
 export interface OrgInput {

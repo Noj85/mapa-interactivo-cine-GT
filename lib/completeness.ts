@@ -17,7 +17,8 @@ export const hasAnchor = (l: Pick<FilmLocation, "depto_ine" | "muni_ine" | "lat"
  */
 export function filmCompleteness(
   // Los festivales no cuentan en el porcentaje: una producción puede no haber ido a ninguno.
-  f: Omit<Film, "completeness" | "missing_fields" | "status" | "id" | "slug" | "locations" | "festivals"> & {
+  f: Omit<Film, "completeness" | "missing_fields" | "status" | "id" | "slug" | "locations" | "festivals" | "companies"> & {
+    companies?: { name?: string | null }[];
     locations: Pick<
       FilmLocation,
       "depto_ine" | "muni_ine" | "lat" | "lng" | "days" | "local_spend" | "jobs"
@@ -38,9 +39,10 @@ export function filmCompleteness(
   check(f.locations.length === 0 || f.locations.every((l) => l.muni_ine != null || (l.lat != null && l.lng != null)), "Municipio por confirmar", 2);
   check(f.year != null, "Año");
   check(!!f.kind, "Tipo");
-  check(!!f.producer, "Productora");
   check(!!f.nationality, "Nacionalidad");
-  check(!!f.director, "Dirección");
+  check((f.companies ?? []).some((c) => !!c.name?.trim()), "Casa productora");
+  check(!!f.producer, "Productor/a");
+  check(!!f.director, "Director/a");
   check(f.budget != null, "Presupuesto");
   check(!!f.synopsis, "Sinopsis");
   if (f.locations.length) {

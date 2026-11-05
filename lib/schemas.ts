@@ -76,6 +76,11 @@ export const festivalSchema = z.object({
   founded: optNum,
 });
 
+export const companyEntrySchema = z.object({
+  name: z.string().trim().min(1, "Escribe el nombre de la casa productora").max(300),
+  country: optStr,
+});
+
 export const filmSchema = z.object({
   id: z.string().optional(),
   title: z.string().trim().min(1, "El título es obligatorio").max(300),
@@ -93,6 +98,8 @@ export const filmSchema = z.object({
   locations: z.array(locationSchema).max(60).default([]),
   /** Sin este campo se conservan los festivales actuales. */
   festivals: z.array(festivalEntrySchema).max(80).optional(),
+  /** Sin este campo se conservan las casas productoras actuales. */
+  companies: z.array(companyEntrySchema).max(40).optional(),
 });
 
 export const ALL_ORG_CATEGORIES = [...CIRC_CATEGORIES, ...IND_CATEGORIES] as const;
@@ -194,6 +201,11 @@ const pubFestival = z.object({
   url: pubUrl,
 });
 
+const pubCompany = z.object({
+  name: z.string().max(600).transform((v) => clean(v).trim().slice(0, 300)).refine((v) => v.length > 0, "Escribe el nombre de la casa productora"),
+  country: pubStr(100),
+});
+
 /** Producción propuesta por el público: sin estado ni fuente (los fija el equipo); el póster solo si lo subió por nuestro endpoint. */
 export const publicFilmSchema = z.object({
   title: z.string().trim().min(1, "El título es obligatorio").max(300).transform(clean),
@@ -208,6 +220,7 @@ export const publicFilmSchema = z.object({
   poster_url: pubImage,
   locations: z.array(pubLocation).max(20).default([]),
   festivals: z.array(pubFestival).max(40).optional(),
+  companies: z.array(pubCompany).max(20).optional(),
 });
 
 export const publicOrgSchema = z.object({

@@ -1,6 +1,7 @@
 "use client";
 
 import { categoriesText } from "@/lib/categories";
+import { companyNames } from "@/lib/companies";
 import { AnimatePresence, motion } from "framer-motion";
 import { Clapperboard, Landmark, MapPin, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -57,7 +58,7 @@ export function SearchPalette({
       });
     }
     for (const f of data.films) {
-      const hay = normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""}`);
+      const hay = normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${companyNames(f.companies).join(" ")}`);
       if (hay.includes(nq))
         out.push({
           kind: "film",

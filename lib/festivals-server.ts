@@ -1,5 +1,7 @@
 import "server-only";
 import type { Store } from "@/lib/data/store";
+import { orgCategories } from "@/lib/categories";
+import type { Festival, Org } from "@/lib/types";
 import { normalize } from "@/lib/utils";
 
 interface FestivalRef {
@@ -64,4 +66,70 @@ export async function linkFestivals<T extends FestivalRef>(store: Store, list: T
     out.push({ ...f, festival_id: id, country, city });
   }
   return out;
+}
+
+// ───────── vínculo con las entidades de Circulación (categoría «Festivales») ─────────
+
+/** Palabras que no distinguen a un festival de otro al comparar nombres. */
+const STOP = new Set(["festival", "festivales", "internacional", "international", "cine", "film", "films", "de", "del", "la", "el", "las", "los", "y", "the", "of", "and", "en", "guatemala", "gt"]);
+const tokens = (s: string) => normalize(s).split(" ").filter((t) => t.length > 1 && !STOP.has(t));
+
+/** ¿Es una entidad de Circulación de categoría «Festivales»? */
+export const isFestivalOrg = (o: Pick<Org, "layer" | "category" | "categories">) => o.layer === "circulacion" && orgCategories(o as Org).includes("Festivales");
+
+/** Entradas del catálogo sin vincular que se parecen al nombre de la entidad (para revisar a mano, nunca se vinculan solas). */
+export async function similarFestivals(store: Store, name: string, exceptOrgId?: string): Promise<Festival[]> {
+  const mine = tokens(name);
+  if (!mine.length) return [];
+  const probe = [...mine].sort((a, b) => b.length - a.length)[0];
+  const { rows } = await store.searchFestivals(probe, { limit: 40 });
+  return rows
+    .filter((r) => !r.org_id || r.org_id === exceptOrgId)
+    .filter((r) => {
+      const theirs = [r.name, ...r.aliases].map(tokens).filter((t) => t.length);
+      return theirs.some((t) => mine.every((m) => t.includes(m)) || t.every((x) => mine.includes(x)));
+    })
+    .slice(0, 5);
+}
+
+export type OrgSyncResult =
+  | { action: "already" | "linked" | "created"; festivalId: string }
+  | { action: "review"; candidates: Festival[] }
+  | { action: "conflict"; festivalId: string }
+  | { action: "skipped" };
+
+/**
+ * Deja a la entidad vinculada con el catálogo:
+ *  - si ya lo está, no hace nada;
+ *  - si el catálogo tiene una entrada con su mismo nombre o alias, la vincula;
+ *  - si solo hay entradas parecidas, no decide: queda «por revisar» (evita duplicados);
+ *  - si no hay nada parecido, crea la entrada (Guatemala, ciudad de la entidad) ya vinculada.
+ */
+export async function syncOrgFestival(store: Store, org: Org): Promise<OrgSyncResult> {
+  if (!isFestivalOrg(org) || !org.name.trim()) return { action: "skipped" };
+  const links = await store.festivalOrgMap();
+  const mine = Object.entries(links).find(([, orgId]) => orgId === org.id);
+  if (mine) return { action: "already", festivalId: mine[0] };
+
+  const key = normalize(org.name);
+  const { rows } = await store.searchFestivals(org.name, { limit: 25 });
+  const exact = rows.find((r) => normalize(r.name) === key || r.aliases.some((a) => normalize(a) === key));
+  if (exact) {
+    if (exact.org_id && exact.org_id !== org.id) return { action: "conflict", festivalId: exact.id };
+    await store.linkFestivalOrg(exact.id, org.id);
+    return { action: "linked", festivalId: exact.id };
+  }
+  const candidates = await similarFestivals(store, org.name, org.id);
+  if (candidates.length) return { action: "review", candidates };
+  const fest = await store.saveFestival({ name: org.name.trim(), country: "Guatemala", city: org.city ?? null, source: "Circulación", org_id: org.id });
+  return { action: "created", festivalId: fest.id };
+}
+
+/** Igual que `syncOrgFestival`, pero nunca falla: guardar una entidad no debe depender del catálogo. */
+export async function syncOrgFestivalSafe(store: Store, org: Org) {
+  try {
+    return await syncOrgFestival(store, org);
+  } catch {
+    return { action: "skipped" } as OrgSyncResult;
+  }
 }

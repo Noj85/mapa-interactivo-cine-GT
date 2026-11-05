@@ -52,6 +52,14 @@ export const blankFest = (): FestDraft => ({ festival_id: null, name: "", year: 
 
 export const isBlankFest = (f: FestDraft) => !f.name.trim() && !f.year.trim() && !f.section.trim() && !f.award.trim() && !f.url.trim();
 
+/** Una casa productora, como se escribe en el formulario. */
+export interface CompanyDraft {
+  name: string;
+  country: string;
+}
+
+export const blankCompany = (country = ""): CompanyDraft => ({ name: "", country });
+
 export interface FilmDraft {
   title: string;
   year: string;
@@ -65,6 +73,7 @@ export interface FilmDraft {
   poster: string | null;
   locs: LocDraft[];
   fests: FestDraft[];
+  companies: CompanyDraft[];
 }
 
 export function filmDraft(film?: Film): FilmDraft {
@@ -94,6 +103,7 @@ export function filmDraft(film?: Film): FilmDraft {
       : film
         ? []
         : [blankLoc()],
+    companies: (film?.companies ?? []).map((c) => ({ name: c.name, country: c.country ?? "" })),
     fests: (film?.festivals ?? []).map((x) => ({
       id: x.id,
       festival_id: x.festival_id,
@@ -135,6 +145,10 @@ export function filmPayload(d: FilmDraft) {
         local_spend: toNum(l.local_spend),
         jobs: toNum(l.jobs),
       })),
+    // en una producción guatemalteca el país de todas las casas es Guatemala
+    companies: d.companies
+      .filter((c) => c.name.trim())
+      .map((c) => ({ name: c.name.trim(), country: d.nationality === "guatemalteca" ? "Guatemala" : c.country.trim() || null })),
     festivals: d.fests
       .filter((x) => x.name.trim())
       .map((x) => ({

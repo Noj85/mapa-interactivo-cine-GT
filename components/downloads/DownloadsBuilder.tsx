@@ -277,7 +277,7 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
 
                 <div className="sm:col-span-2">
                   <label className="label" htmlFor="f-q">Buscar</label>
-                  <input id="f-q" className="field" placeholder="Título, dirección o productora" value={ff.q} onChange={(e) => patchFilm({ q: e.target.value })} />
+                  <input id="f-q" className="field" placeholder="Título, director/a, productor/a o casa productora" value={ff.q} onChange={(e) => patchFilm({ q: e.target.value })} />
                 </div>
                 <label className="flex cursor-pointer items-center gap-2.5 text-sm sm:col-span-2">
                   <input type="checkbox" className="h-4 w-4 accent-[rgb(var(--accent))]" checked={ff.soloCompletas} onChange={(e) => patchFilm({ soloCompletas: e.target.checked })} />

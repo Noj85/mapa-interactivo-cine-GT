@@ -204,7 +204,7 @@ export function FilterPanel(p: Props) {
           label: "Buscar",
           active: ff.q !== "",
           clear: () => pf({ q: "" }),
-          node: <input aria-label="Buscar" className="field" placeholder="Título, dirección o productora" value={ff.q} onChange={(e) => pf({ q: e.target.value })} />,
+          node: <input aria-label="Buscar" className="field" placeholder="Título, director/a, productor/a o casa productora" value={ff.q} onChange={(e) => pf({ q: e.target.value })} />,
         },
       ];
     }

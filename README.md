@@ -66,7 +66,7 @@ El mapa arranca vacío y se llena desde cero: entra a `/admin/agregar` y sube un
 
 ## Dos partes: mapa público y equipo
 
-La app es una sola, con dos áreas separadas. **`/` siempre es el mapa público**, incluso si tienes sesión del equipo. **`/admin` es la única puerta del equipo**: sin sesión muestra el acceso (la URL no cambia, no existe `/login`); con sesión muestra el mismo mapa con borradores, botón «Editar» y la barra de herramientas . El menú del equipo tiene cinco opciones: **Mapa**, **Resumen** (`/admin/resumen`: cifras y lo que falta), **Aportes**, **Agregar datos** (`/admin/agregar`: cargar un archivo, o registrar una producción o entidad a mano, más las cargas recientes) y **Registros** (`/admin/peliculas` y `/admin/entidades`, con pestañas, para revisar, editar y publicar). Los intentos de entrada están limitados por IP y `/admin` no se indexa.
+La app es una sola, con dos áreas separadas. **`/` siempre es el mapa público**, incluso si tienes sesión del equipo. **`/admin` es la única puerta del equipo**: sin sesión muestra el acceso (la URL no cambia, no existe `/login`); con sesión muestra el mismo mapa con borradores, botón «Editar» y la barra de herramientas . El menú del equipo tiene cinco opciones: **Mapa**, **Resumen** (`/admin/resumen`: cifras y lo que falta), **Aportes**, **Agregar datos** (`/admin/agregar`: cargar un archivo, o registrar una producción o entidad a mano, más las cargas recientes) y **Registros** (`/admin/peliculas` y `/admin/entidades`, con pestañas Producciones | Entidades, para revisar, editar y publicar). Aparte, el engranaje **Ajustes** (`/admin/ajustes`, arriba a la derecha, no es una sexta opción del menú) reúne la configuración: hoy el catálogo de **Festivales**; ya se ven, desactivadas y con la etiqueta «Pronto», Categorías y países, Cambiar mi contraseña, Usuarios administradores, Roles y permisos, Vigencia y mensaje de las solicitudes, Respaldo y exportación e Historial de cambios. Los intentos de entrada están limitados por IP y `/admin` no se indexa.
 
 | | Mapa público (`/`, `/descargas`, `/aportar`) | Equipo (`/admin/*`) |
 |---|---|---|
@@ -98,11 +98,25 @@ En **Registros** (`/admin/peliculas` y `/admin/entidades`) cada fila tiene un in
 
 Desde el editor de una producción o entidad, o desde varias filas seleccionadas, el botón **Solicitar información** genera un **enlace privado** (`/completar/<código>`) y una **contraseña** (palabra-palabra-número, se muestra una sola vez) y arma un mensaje listo para copiar y pegar en WhatsApp o correo, que explica que es un contacto directo para una investigación seria del Eje de Investigación de PROCINE / Academia de Cine. El enlace sirve varias veces hasta que venza o lo revoques (panel «Solicitudes» del registro). Quien lo abre escribe la contraseña y ve el formulario con los datos actuales, resaltando lo que falta. Lo que envía llega a `/admin/aportes` con origen **recopilación**; nada se publica hasta que lo apruebes («Aplicar y poner en el mapa»). Los códigos se guardan con hash y las contraseñas con bcrypt, con bloqueo tras 10 intentos fallidos. Requiere `supabase/migrations/0007_info_requests.sql`.
 
+## Director/a, productor/a y casas productoras
+
+«Director/a» es la persona que dirigió la producción y «Productor/a» la persona productora; ninguno es una dirección física. Las **casas productoras** (empresas) son una lista aparte, con su país, y lo que se pide depende de la nacionalidad elegida: en una producción **guatemalteca** solo el nombre (el país es Guatemala); en una **coproducción internacional** o **extranjera**, nombre y país de cada casa, tantas como haga falta (el país sugiere una lista, pero se puede escribir cualquiera). Se ven en la ficha, en las descargas y en la búsqueda, y suman a la completitud como «Casa productora». En archivos importados, las columnas «Productora», «Casa productora» o «Empresa» van a casas productoras (varias separadas por «;», con el país entre paréntesis o en una columna «País de la productora»), y «Productor/a» a la persona. Requiere `supabase/migrations/0009_film_companies.sql`.
+
 ## Festivales y premios
 
-Cada producción puede tener **varias entradas de festival** (festival, año, resultado —selección, premio, mención…—, sección, premio, enlace, país y ciudad), igual que las locaciones. Se ven en la ficha y en las descargas, no en los filtros del mapa, y no cuentan en la completitud. Al escribir el nombre aparecen sugerencias de un **catálogo** de festivales, pero se puede escribir cualquiera a mano: al aprobar un aporte, los festivales nuevos se agregan al catálogo. Administra el catálogo en `/admin/festivales` (buscar, editar, fusionar duplicados).
+Cada producción puede tener **varias entradas de festival** (festival, año, resultado —selección, premio, mención…—, sección, premio, enlace, país y ciudad), igual que las locaciones. Se ven en la ficha y en las descargas, no en los filtros del mapa, y no cuentan en la completitud. Al escribir el nombre aparecen sugerencias de un **catálogo** de festivales, pero se puede escribir cualquiera a mano: al aprobar un aporte, los festivales nuevos se agregan al catálogo. Administra el catálogo en **Ajustes → Festivales**, `/admin/ajustes/festivales` (buscar, editar, fusionar duplicados). El catálogo es una lista de referencia y **no es la capa Circulación**; aun así, cada entrada puede vincularse a una entidad de Circulación con categoría «Festivales» (ver abajo).
 
-Aplica `supabase/migrations/0008_festivals.sql` y luego pulsa **Cargar catálogo base** en `/admin/festivales`: importa `data/festivals.seed.json` (unos 3,300 festivales). Ese archivo se generó con `node scripts/seed-festivals.mjs <csv>` a partir de la «Festival library» de Film Circulation (Zenodo, [zenodo.org/records/7887672](https://zenodo.org/records/7887672)), licencia **CC BY 4.0**; la atribución está en `/creditos`.
+Aplica `supabase/migrations/0008_festivals.sql` y luego pulsa **Cargar catálogo base** en Ajustes → Festivales: importa `data/festivals.seed.json` (unos 3,300 festivales). Ese archivo se generó con `node scripts/seed-festivals.mjs <csv>` a partir de la «Festival library» de Film Circulation (Zenodo, [zenodo.org/records/7887672](https://zenodo.org/records/7887672)), licencia **CC BY 4.0**; la atribución está en `/creditos`.
+
+### Vínculo con Circulación
+
+Con `supabase/migrations/0010_festival_org_link.sql` (después de 0007, 0008 y 0009), una entrada del catálogo puede enlazarse con **una** entidad de Circulación de categoría «Festivales». El vínculo es opcional y no cambia filtros ni completitud del mapa:
+
+- Al guardar (o aprobar, o importar) una entidad con categoría «Festivales», se vincula sola: si el catálogo tiene un festival con su mismo nombre o alias lo enlaza; si no hay nada parecido, crea la entrada (país Guatemala, fuente «Circulación»); si solo hay entradas parecidas, no decide y la deja «sin vincular» para revisar.
+- **Sincronizar con Circulación** (en Ajustes → Festivales) hace lo mismo con las entidades que ya existían y muestra cuántas se vincularon, cuántas se crearon y cuáles quedan por revisar a mano (con botones «Vincular con…» o «Crear entrada nueva»).
+- En la tabla: columna **En el mapa** (entidad vinculada y si está publicada), **Vincular / Desvincular** por fila y filtro Todos | Vinculados | Sin vincular.
+- En el mapa público, el nombre de un festival vinculado en la ficha de una producción abre la entidad (si está publicada), y la ficha de la entidad muestra **Producciones que participaron** (año, resultado y sección).
+- Fusionar festivales conserva el vínculo; eliminar la entidad deja la entrada del catálogo sin vínculo.
 
 ## Filtros del mapa
 
@@ -154,7 +168,7 @@ La página `/descargas` es pública: cualquiera elige entre **Producciones**, **
 | `desde`, `hasta` | año |
 | `presupuesto_min`, `presupuesto_max`, `moneda` | monto y `GTQ` o `USD` (otra moneda se compara a Q 7.70 por dólar); solo salen producciones con presupuesto registrado |
 | `completas=1` | solo producciones con todas las locaciones ubicadas en un municipio |
-| `q` | texto en título, dirección o productora (o nombre y descripción en entidades) |
+| `q` | texto en título, director/a, productor/a o casa productora (o nombre y descripción en entidades) |
 | `categoria`, `iniciativa` | solo para `tipo=circulacion` y `tipo=entidades` |
 | `borradores=1` | incluye borradores; solo con sesión del equipo |
 

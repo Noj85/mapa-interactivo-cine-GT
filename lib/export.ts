@@ -1,4 +1,5 @@
 import { categoriesText } from "@/lib/categories";
+import { companiesText } from "@/lib/companies";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { filmFilterActive, locDepto, locationsMatching, orgFilterActive, type ExportKind, type ExportRows, type FilmFilter, type OrgFilter } from "@/lib/filters";
 import { FESTIVAL_RESULTS, FILM_KINDS, INITIATIVE_TYPES, NATIONALITIES, type Film, type Org } from "@/lib/types";
@@ -105,14 +106,15 @@ export function buildTable(
   return {
     name: "producciones",
     title: "Producciones",
-    header: ["Título", "Año", "Tipo", "Dirección", "Productora", "Nacionalidad", "Presupuesto", "Moneda", "Locaciones", "Departamentos", "Días de rodaje", "Inversión local", "Empleos", "Festivales", "Sinopsis", "Registro completo (%)", "Falta", "Estado"],
-    widths: [34, 7, 14, 26, 26, 14, 14, 8, 10, 28, 10, 14, 9, 10, 70, 12, 30, 11],
+    header: ["Título", "Año", "Tipo", "Director/a", "Productor/a", "Casas productoras", "Nacionalidad", "Presupuesto", "Moneda", "Locaciones", "Departamentos", "Días de rodaje", "Inversión local", "Empleos", "Festivales", "Sinopsis", "Registro completo (%)", "Falta", "Estado"],
+    widths: [34, 7, 14, 26, 26, 40, 14, 14, 8, 10, 28, 10, 14, 9, 10, 70, 12, 30, 11],
     rows: films.map((f) => [
       f.title,
       f.year,
       kindLabel(f.kind),
       f.director,
       f.producer,
+      companiesText(f.companies),
       natLabel(f.nationality),
       f.budget,
       f.currency,

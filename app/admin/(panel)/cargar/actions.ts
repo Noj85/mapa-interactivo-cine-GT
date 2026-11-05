@@ -5,7 +5,7 @@ import { posterFromUrl } from "@/lib/posters";
 import { revalidatePath } from "next/cache";
 import { adminStore, requireSession } from "@/lib/auth";
 import { newId } from "@/lib/data/records";
-import { linkFestivals } from "@/lib/festivals-server";
+import { linkFestivals, syncOrgFestivalSafe } from "@/lib/festivals-server";
 import type { Candidate } from "@/lib/import/types";
 import { filmSchema, orgSchema } from "@/lib/schemas";
 import type { Film, FilmInput, Org, OrgInput } from "@/lib/types";
@@ -42,6 +42,8 @@ function mergeFilm(existing: Film, incoming: FilmInput): FilmInput {
   const fests = existing.festivals.map((f) => ({ ...f }));
   const festKey = (f: { name?: string | null; year?: number | null; award?: string | null }) => `${normalize(f.name ?? "")}|${f.year ?? ""}|${normalize(f.award ?? "")}`;
   for (const nf of incoming.festivals ?? []) if (!fests.some((f) => festKey(f) === festKey(nf))) fests.push({ ...nf } as (typeof fests)[number]);
+  const companies = existing.companies.map((c) => ({ ...c }));
+  for (const nc of incoming.companies ?? []) if (!companies.some((c) => normalize(c.name) === normalize(nc.name ?? ""))) companies.push({ name: nc.name ?? "", country: nc.country ?? null });
   return {
     id: existing.id,
     title: existing.title,
@@ -57,6 +59,7 @@ function mergeFilm(existing: Film, incoming: FilmInput): FilmInput {
     status: existing.status,
     locations: locs,
     festivals: fests,
+    companies,
   };
 }
 
@@ -144,6 +147,7 @@ export async function commitBatchAction(
           { ...input, status: action === "updated" ? input.status : publishIncomplete ? "published" : "draft" },
           { import_id: importId },
         );
+        await syncOrgFestivalSafe(store, saved);
         results.push({ key: c.key, ok: true, action, slug: saved.slug, completeness: saved.completeness, published: saved.status === "published" });
       }
     } catch (e) {

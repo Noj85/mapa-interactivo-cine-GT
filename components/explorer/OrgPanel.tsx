@@ -6,7 +6,8 @@ import { AlertCircle, AtSign, ExternalLink, Mail, MapPin, MessageSquarePlus, Pen
 import Link from "next/link";
 import { INITIATIVE_TYPES, LAYERS } from "@/lib/types";
 import { CompletenessBadge, CompletenessMeter } from "@/components/ui/Badges";
-import { OrgLogo, PanelShell, type PanelCtx } from "./parts";
+import { OrgLogo, PanelShell, SectionTitle, type PanelCtx } from "./parts";
+import { FESTIVAL_RESULTS } from "@/lib/types";
 
 const href = (w: string) => (/^https?:\/\//.test(w) ? w : `https://${w}`);
 
@@ -23,6 +24,15 @@ export default function OrgPanel({ ctx }: { ctx: PanelCtx }) {
   const depto = gaz.depto(org.depto_ine ?? muni?.depto_ine);
   const type = INITIATIVE_TYPES.find((t) => t.id === org.initiative_type)?.label;
   const layer = LAYERS.find((l) => l.id === org.layer)!;
+
+  // Producciones que participaron en este festival: las del mapa cuya participación apunta a una entrada del catálogo vinculada a esta entidad.
+  const festivalIds = new Set(Object.entries(data.festivalOrgs ?? {}).filter(([, orgId]) => orgId === org.id).map(([id]) => id));
+  const rank = (r: string) => FESTIVAL_RESULTS.findIndex((x) => x.id === r);
+  const participations = festivalIds.size
+    ? data.films
+        .flatMap((film) => (film.festivals ?? []).filter((x) => x.festival_id && festivalIds.has(x.festival_id)).map((x) => ({ film, x })))
+        .sort((a, b) => (b.x.year ?? 0) - (a.x.year ?? 0) || rank(a.x.result) - rank(b.x.result) || a.film.title.localeCompare(b.film.title))
+    : [];
 
   return (
     <PanelShell eyebrow={`${layer.label} · ${categoriesText(org)}`} onBack={go.up} onClose={go.clear}>
@@ -108,6 +118,27 @@ export default function OrgPanel({ ctx }: { ctx: PanelCtx }) {
             );
           })()}
       </div>
+      {participations.length > 0 && (
+        <>
+          <SectionTitle aside={`${participations.length}`}>Producciones que participaron</SectionTitle>
+          <ul className="space-y-1.5">
+            {participations.map(({ film, x }) => {
+              const result = FESTIVAL_RESULTS.find((r) => r.id === x.result)?.label;
+              return (
+                <li key={x.id}>
+                  <button className="w-full rounded-2xl border border-line/60 px-3 py-2.5 text-left transition hover:border-accent" onClick={() => go.film(film.slug)}>
+                    <span className="block text-sm text-ink">
+                      {film.title}
+                      {x.year != null && <span className="text-muted"> · {x.year}</span>}
+                    </span>
+                    <span className="block text-xs text-muted">{[result, x.section, x.award].filter(Boolean).join(" · ")}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
       {org.source && <p className="mt-6 text-xs text-muted/70">Fuente: {org.source}</p>}
     </PanelShell>
   );

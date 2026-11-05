@@ -1,7 +1,7 @@
 "use client";
 
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Award, Database, Globe, Inbox, LayoutDashboard, LogOut, Map as MapIcon, PlusCircle } from "lucide-react";
+import { Database, Globe, Inbox, LayoutDashboard, LogOut, Map as MapIcon, PlusCircle, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -22,7 +22,6 @@ const items = [
     icon: Database,
     isActive: (p: string) => (p.startsWith("/admin/peliculas") || p.startsWith("/admin/entidades")) && !isAdd(p),
   },
-  { href: "/admin/festivales", label: "Festivales", icon: Award, isActive: (p: string) => p.startsWith("/admin/festivales") },
 ];
 
 export function AdminNav({ email, pendingSubmissions = 0 }: { email: string; pendingSubmissions?: number }) {
@@ -65,6 +64,15 @@ export function AdminNav({ email, pendingSubmissions = 0 }: { email: string; pen
           })}
         </nav>
         <ThemeToggle />
+        <Link
+          href="/admin/ajustes"
+          aria-label="Ajustes"
+          title="Ajustes"
+          aria-current={path.startsWith("/admin/ajustes") ? "page" : undefined}
+          className={cn("btn-ghost h-9 gap-1.5 px-2.5 text-xs xl:px-3", path.startsWith("/admin/ajustes") && "bg-surface-2 text-ink")}
+        >
+          <Settings className="h-4 w-4" /> <span className="hidden xl:inline">Ajustes</span>
+        </Link>
         <Link href="/" className="btn-ghost h-9 gap-1.5 px-2.5 text-xs xl:px-3" aria-label="Vista pública" title="Vista pública">
           <Globe className="h-4 w-4" /> <span className="hidden xl:inline">Vista pública</span>
         </Link>

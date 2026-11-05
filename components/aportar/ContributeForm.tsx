@@ -67,6 +67,7 @@ export function ContributeForm({
             budget: filmData.budget,
             currency: f.currency,
             synopsis: filmData.synopsis,
+            companies: filmData.companies,
             locations: filmData.locations as never,
           })
         : orgCompleteness({

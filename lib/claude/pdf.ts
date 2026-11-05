@@ -24,8 +24,12 @@ const TOOL = {
             title: str,
             year: { type: "string", description: "Año de estreno o producción, solo el número." },
             kind: { type: "string", description: "ficción, documental, serie, comercial, corto u otro." },
-            director: str,
-            producer: str,
+            director: { type: "string", description: "Persona que dirigió la producción." },
+            producer: { type: "string", description: "Persona productora (no la empresa)." },
+            production_company: {
+              type: "string",
+              description: "Casa(s) productora(s) (empresas). Si hay varias, sepáralas con «;». Si el documento indica el país de una casa, escríbelo entre paréntesis: «Casa Uno (México); Casa Dos (Guatemala)».",
+            },
             nationality: { type: "string", description: "guatemalteca, coproducción o extranjera." },
             budget: { type: "string", description: "Solo el monto, tal como aparece." },
             currency: { type: "string", description: "GTQ o USD." },
@@ -86,6 +90,7 @@ interface RawFilm {
   kind?: string;
   director?: string;
   producer?: string;
+  production_company?: string;
   nationality?: string;
   budget?: string;
   currency?: string;
@@ -172,7 +177,7 @@ const key = (s?: string) =>
     .trim();
 const v = (s?: string) => (s ?? "").trim();
 
-const FILM_HEADERS = ["Título", "Año", "Tipo", "Dirección", "Productora", "Nacionalidad", "Presupuesto", "Moneda", "Sinopsis", "Lugar", "Municipio", "Departamento", "Página del PDF"];
+const FILM_HEADERS = ["Título", "Año", "Tipo", "Director/a", "Productor/a", "Casa productora", "Nacionalidad", "Presupuesto", "Moneda", "Sinopsis", "Lugar", "Municipio", "Departamento", "Página del PDF"];
 const ORG_HEADERS = ["Nombre", "Categoría", "Tipo de iniciativa", "Lugar", "Municipio", "Departamento", "Sitio web", "Instagram", "Contacto", "Descripción", "Página del PDF"];
 
 export interface ClaudePdfResult {
@@ -206,8 +211,9 @@ export async function claudePdf(data: Uint8Array, filename: string): Promise<Cla
         Título: v(f.title),
         Año: v(f.year),
         Tipo: v(f.kind),
-        Dirección: v(f.director),
-        Productora: v(f.producer),
+        "Director/a": v(f.director),
+        "Productor/a": v(f.producer),
+        "Casa productora": v(f.production_company),
         Nacionalidad: v(f.nationality),
         Presupuesto: v(f.budget),
         Moneda: v(f.currency),

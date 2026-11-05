@@ -3,6 +3,7 @@
 import { MapPinOff, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { companyNames } from "@/lib/companies";
 import { unlocatedFilms } from "@/lib/map/features";
 import { normalize } from "@/lib/utils";
 import { Empty, FilmCard, PanelShell, type PanelCtx, SectionTitle } from "./parts";
@@ -18,7 +19,7 @@ export default function UnlocatedPanel({ ctx }: { ctx: PanelCtx }) {
 
   const list = useMemo(() => {
     const nq = normalize(q);
-    return nq ? films.filter((f) => normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""}`).includes(nq)) : films;
+    return nq ? films.filter((f) => normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${companyNames(f.companies).join(" ")}`).includes(nq)) : films;
   }, [films, q]);
 
   return (
@@ -45,7 +46,7 @@ export default function UnlocatedPanel({ ctx }: { ctx: PanelCtx }) {
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             className="field !pl-9"
-            placeholder="Buscar por título, dirección o productora"
+            placeholder="Buscar por título, director/a, productor/a o casa productora"
             value={q}
             onChange={(e) => {
               setQ(e.target.value);

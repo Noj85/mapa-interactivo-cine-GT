@@ -219,7 +219,7 @@ export function RecordsTable({
           <input
             className="field !pl-9"
             type="search"
-            placeholder={isFilm ? "Buscar por título, director, productora o lugar…" : "Buscar por nombre, categoría o lugar…"}
+            placeholder={isFilm ? "Buscar por título, director/a, productor/a, casa productora o lugar…" : "Buscar por nombre, categoría o lugar…"}
             value={q}
             onChange={(e) => {
               setQ(e.target.value);

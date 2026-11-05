@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { adminStore, requireSession } from "@/lib/auth";
-import { linkFestivals } from "@/lib/festivals-server";
+import { linkFestivals, syncOrgFestivalSafe } from "@/lib/festivals-server";
 import { serverGazetteer } from "@/lib/geo/server";
 import { deletePublicImages } from "@/lib/posters";
 import { filmSchema, orgSchema } from "@/lib/schemas";
@@ -36,7 +36,10 @@ export async function saveOrgAction(raw: unknown): Promise<Result> {
   const parsed = orgSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
-    const org = await (await adminStore()).saveOrg(parsed.data as unknown as OrgInput);
+    const store = await adminStore();
+    const org = await store.saveOrg(parsed.data as unknown as OrgInput);
+    // un festival de Circulación queda vinculado con el catálogo (o por revisar)
+    await syncOrgFestivalSafe(store, org);
     refresh();
     return { ok: true, id: org.id };
   } catch (e) {
@@ -220,6 +223,7 @@ export async function approveSubmissionAction(
           : { ...input, logo_url: logo, status: newStatus, source: SOURCE_PUBLIC },
       );
       if (current?.logo_url && logo !== current.logo_url) await deletePublicImages([current.logo_url]);
+      await syncOrgFestivalSafe(store, org);
       recordId = org.id;
     }
 
