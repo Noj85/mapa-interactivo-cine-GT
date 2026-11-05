@@ -2,6 +2,7 @@ import {
   EMPTY_FILM_FILTER,
   EMPTY_ORG_FILTER,
   filmFilterActive,
+  legacyClase,
   filmFilterToParams,
   orgFilterActive,
   orgFilterToParams,
@@ -11,7 +12,7 @@ import {
   type OrgFilter,
 } from "@/lib/filters";
 import type { LayerId, MetricId } from "@/lib/types";
-import { FILM_KINDS, LAYER_METRICS } from "@/lib/types";
+import { LAYER_METRICS } from "@/lib/types";
 
 export interface Place {
   type: "depto" | "muni";
@@ -63,8 +64,8 @@ export function parseView(search: string): ViewState {
   if (layer === "produccion") {
     filmFilter = { ...parseFilmFilter(p), depto: [], muni: [] };
     // enlaces anteriores: ?categoria=ficcion era el tipo de obra
-    const old = p.get("categoria");
-    if (!filmFilter.clase.length && FILM_KINDS.some((k) => k.id === old)) filmFilter = { ...filmFilter, clase: [old as (typeof filmFilter.clase)[number]] };
+    const old = legacyClase([p.get("categoria") ?? ""]);
+    if (!filmFilter.formato.length && !filmFilter.naturaleza.length) filmFilter = { ...filmFilter, formato: old.formato, naturaleza: old.naturaleza };
   } else {
     orgFilter = { ...parseOrgFilter(p), capa: null, depto: [] };
   }

@@ -5,6 +5,7 @@ import { companyNames } from "@/lib/companies";
 import { AnimatePresence, motion } from "framer-motion";
 import { Clapperboard, Landmark, MapPin, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { filmTypeLabel } from "@/lib/film-types";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import type { Dataset } from "@/lib/types";
 import type { Place } from "@/lib/view";
@@ -58,13 +59,13 @@ export function SearchPalette({
       });
     }
     for (const f of data.films) {
-      const hay = normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${companyNames(f.companies).join(" ")}`);
+      const hay = normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${companyNames(f.companies).join(" ")} ${f.genres.join(" ")}`);
       if (hay.includes(nq))
         out.push({
           kind: "film",
           id: `f${f.id}`,
           label: f.title,
-          sub: ["Producción", f.year].filter(Boolean).join(" · "),
+          sub: ["Producción", f.year, filmTypeLabel(f) || null, f.genres.slice(0, 2).join(", ") || null].filter(Boolean).join(" · "),
           slug: f.slug,
         });
     }

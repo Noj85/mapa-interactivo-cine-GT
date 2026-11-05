@@ -334,7 +334,7 @@ export function RecordsTable({
                   />
                 </th>
                 <th className="px-2 py-2.5 font-medium">{isFilm ? "Título" : "Nombre"}</th>
-                <th className="hidden px-4 py-2.5 font-medium md:table-cell">{isFilm ? "Año y tipo" : "Capa y categoría"}</th>
+                <th className="hidden px-4 py-2.5 font-medium md:table-cell">{isFilm ? "Año y formato" : "Capa y categoría"}</th>
                 <th className="hidden px-4 py-2.5 font-medium sm:table-cell">{isFilm ? "Locaciones" : "Lugar"}</th>
                 <th className="px-4 py-2.5 font-medium">Datos</th>
                 <th className="px-4 py-2.5 text-right font-medium">En el mapa</th>

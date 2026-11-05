@@ -1,13 +1,15 @@
 "use client";
 
 import { Check, ChevronDown, Search } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import { cn, normalize } from "@/lib/utils";
 
 export interface Option<T extends string | number> {
   value: T;
   label: string;
   hint?: string;
+  /** Título bajo el que se agrupa (las opciones del mismo grupo deben ir seguidas). */
+  group?: string;
 }
 
 /** Selector múltiple con búsqueda; se maneja con teclado y se cierra con Escape o al hacer clic fuera. */
@@ -81,10 +83,17 @@ export function MultiSelect<T extends string | number>({
             </div>
           )}
           <ul role="listbox" aria-multiselectable aria-label={label} className="max-h-64 overflow-auto py-1">
-            {shown.map((o) => {
+            {shown.map((o, i) => {
               const on = value.includes(o.value);
+              const heading = o.group && o.group !== shown[i - 1]?.group;
               return (
-                <li key={String(o.value)} role="option" aria-selected={on}>
+                <Fragment key={String(o.value)}>
+                  {heading && (
+                    <li role="presentation" className="px-3 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                      {o.group}
+                    </li>
+                  )}
+                <li role="option" aria-selected={on}>
                   <button type="button" onClick={() => toggle(o.value)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-surface-2">
                     <span className={cn("flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border", on ? "border-accent bg-accent text-accent-ink" : "border-line")}>
                       {on && <Check className="h-3 w-3" strokeWidth={3} />}
@@ -93,6 +102,7 @@ export function MultiSelect<T extends string | number>({
                     {o.hint && <span className="text-xs text-muted">{o.hint}</span>}
                   </button>
                 </li>
+                </Fragment>
               );
             })}
             {shown.length === 0 && <li className="px-3 py-3 text-sm text-muted">Sin resultados</li>}

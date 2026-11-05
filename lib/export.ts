@@ -2,7 +2,8 @@ import { categoriesText } from "@/lib/categories";
 import { companiesText } from "@/lib/companies";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { filmFilterActive, locDepto, locationsMatching, orgFilterActive, type ExportKind, type ExportRows, type FilmFilter, type OrgFilter } from "@/lib/filters";
-import { FESTIVAL_RESULTS, FILM_KINDS, INITIATIVE_TYPES, NATIONALITIES, type Film, type Org } from "@/lib/types";
+import { formatLabel, natureLabel } from "@/lib/film-types";
+import { FESTIVAL_RESULTS, INITIATIVE_TYPES, NATIONALITIES, type Film, type Org } from "@/lib/types";
 
 export interface Table {
   /** Nombre corto para el archivo. */
@@ -14,7 +15,8 @@ export interface Table {
   widths: number[];
 }
 
-const kindLabel = (k: string | null) => FILM_KINDS.find((x) => x.id === k)?.label ?? "";
+/** Formato, naturaleza y géneros de una producción, en tres columnas. */
+const typeCells = (f: Film) => [formatLabel(f.format), natureLabel(f.nature), (f.genres ?? []).join("; ")];
 const natLabel = (n: string | null) => NATIONALITIES.find((x) => x.id === n)?.label ?? "";
 const iniLabel = (n: string | null) => INITIATIVE_TYPES.find((x) => x.id === n)?.label ?? "";
 const estado = (s: string) => (s === "published" ? "Publicado" : "Borrador");
@@ -35,15 +37,15 @@ export function buildTable(
     return {
       name: "locaciones",
       title: "Locaciones de rodaje",
-      header: ["Producción", "Año", "Tipo", "Departamento", "Municipio", "Sitio", "Latitud", "Longitud", "Días de rodaje", "Inversión local", "Moneda", "Empleos", "Registro completo (%)", "Estado"],
-      widths: [34, 7, 14, 16, 18, 28, 10, 10, 10, 14, 8, 9, 12, 11],
+      header: ["Producción", "Año", "Formato", "Naturaleza", "Géneros", "Departamento", "Municipio", "Sitio", "Latitud", "Longitud", "Días de rodaje", "Inversión local", "Moneda", "Empleos", "Registro completo (%)", "Estado"],
+      widths: [34, 7, 16, 14, 26, 16, 18, 28, 10, 10, 10, 14, 8, 9, 12, 11],
       rows: films.flatMap((film) => {
         // Si se filtró por lugar, solo salen las locaciones de ese lugar.
         const locs = locationsMatching(film.locations, f);
         return (locs.length ? locs : film.locations.length ? [] : [null]).map((l) => [
           film.title,
           film.year,
-          kindLabel(film.kind),
+          ...typeCells(film),
           depto(l ? locDepto(l) : null),
           muni(l?.muni_ine ?? null),
           l?.site,
@@ -65,11 +67,11 @@ export function buildTable(
     return {
       name: "festivales",
       title: "Festivales y premios",
-      header: ["Producción", "Año de la producción", "Tipo", "Festival", "Año del festival", "País", "Ciudad", "Resultado", "Sección", "Premio", "Enlace", "Estado"],
-      widths: [34, 10, 14, 36, 10, 16, 18, 18, 26, 30, 36, 11],
+      header: ["Producción", "Año de la producción", "Formato", "Naturaleza", "Géneros", "Festival", "Año del festival", "País", "Ciudad", "Resultado", "Sección", "Premio", "Enlace", "Estado"],
+      widths: [34, 10, 16, 14, 26, 36, 10, 16, 18, 18, 26, 30, 36, 11],
       // las producciones sin festivales no aparecen: la hoja es una fila por participación
       rows: films.flatMap((film) =>
-        (film.festivals ?? []).map((x) => [film.title, film.year, kindLabel(film.kind), x.name, x.year, x.country, x.city, resultLabel(x.result), x.section, x.award, x.url, estado(film.status)]),
+        (film.festivals ?? []).map((x) => [film.title, film.year, ...typeCells(film), x.name, x.year, x.country, x.city, resultLabel(x.result), x.section, x.award, x.url, estado(film.status)]),
       ),
     };
   }
@@ -106,12 +108,12 @@ export function buildTable(
   return {
     name: "producciones",
     title: "Producciones",
-    header: ["Título", "Año", "Tipo", "Director/a", "Productor/a", "Casas productoras", "Nacionalidad", "Presupuesto", "Moneda", "Locaciones", "Departamentos", "Días de rodaje", "Inversión local", "Empleos", "Festivales", "Sinopsis", "Registro completo (%)", "Falta", "Estado"],
-    widths: [34, 7, 14, 26, 26, 40, 14, 14, 8, 10, 28, 10, 14, 9, 10, 70, 12, 30, 11],
+    header: ["Título", "Año", "Formato", "Naturaleza", "Géneros", "Director/a", "Productor/a", "Casas productoras", "Nacionalidad", "Presupuesto", "Moneda", "Locaciones", "Departamentos", "Días de rodaje", "Inversión local", "Empleos", "Festivales", "Sinopsis", "Registro completo (%)", "Falta", "Estado"],
+    widths: [34, 7, 16, 14, 26, 26, 26, 40, 14, 14, 8, 10, 28, 10, 14, 9, 10, 70, 12, 30, 11],
     rows: films.map((f) => [
       f.title,
       f.year,
-      kindLabel(f.kind),
+      ...typeCells(f),
       f.director,
       f.producer,
       companiesText(f.companies),
@@ -193,7 +195,8 @@ export const filterSlug = (tipo: ExportKind, f: FilmFilter, o: OrgFilter, gaz: G
     if (!parts.length && orgFilterActive(o)) parts.push("filtrado");
   } else {
     if (f.depto.length === 1) parts.push(slug(gaz.depto(f.depto[0])?.name ?? ""));
-    if (f.clase.length === 1) parts.push(f.clase[0]);
+    if (f.formato.length === 1) parts.push(f.formato[0].replace(/_/g, "-"));
+    if (f.naturaleza.length === 1) parts.push(f.naturaleza[0]);
     if (f.presupuestoMin != null) parts.push(`presupuesto-min-${Math.round(f.presupuestoMin)}`);
     if (!parts.length && filmFilterActive(f)) parts.push("filtrado");
   }

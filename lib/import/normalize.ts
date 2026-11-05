@@ -1,5 +1,6 @@
 import { normalizeCategories } from "@/lib/categories";
-import type { FestivalResult, FilmKind, InitiativeType, Nationality } from "@/lib/types";
+import { parseFormat, parseGenreCell, parseNature, type FilmFormat, type FilmNature } from "@/lib/film-types";
+import type { FestivalResult, InitiativeType, Nationality } from "@/lib/types";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
 import { normalize } from "@/lib/utils";
 
@@ -54,18 +55,32 @@ export function detectCurrency(v: unknown): "GTQ" | "USD" | null {
   return null;
 }
 
-export function normalizeKind(v: unknown, map?: Record<string, string>): FilmKind | null {
+const mapped = (v: unknown, map?: Record<string, string>): string | null => {
   const s = cleanText(v);
   if (!s) return null;
-  const mapped = map?.[s] ?? map?.[normalize(s)];
-  const t = normalize(mapped ?? s);
-  if (/ficci|largometraje|pelicula|long/.test(t) && !/document/.test(t)) return "ficcion";
-  if (/document/.test(t)) return "documental";
-  if (/serie|tv|televis|novela/.test(t)) return "serie";
-  if (/comercial|publicidad|spot|anuncio|campa/.test(t)) return "comercial";
-  if (/corto|short/.test(t)) return "corto";
-  if (["ficcion", "documental", "serie", "comercial", "corto", "otro"].includes(t)) return t as FilmKind;
-  return "otro";
+  const m = map?.[s] ?? map?.[normalize(s)];
+  return m === undefined ? s : m;
+};
+
+/**
+ * Formato de la obra («Largometraje documental» → largometraje). Un valor que no se reconoce es null:
+ * se pregunta en lugar de guardarlo como «Otro».
+ */
+export function normalizeFormat(v: unknown, map?: Record<string, string>): FilmFormat | null {
+  return parseFormat(mapped(v, map));
+}
+
+/** Naturaleza de la obra (ficción, documental, híbrido), también si viene dentro de un texto más largo. */
+export function normalizeNature(v: unknown, map?: Record<string, string>): FilmNature | null {
+  return parseNature(mapped(v, map));
+}
+
+/**
+ * Celda de géneros: separa por « ; , / | », lleva cada uno a la lista estándar (también en inglés) y conserva
+ * los que no lo son. Si la celda trae «documental» o «ficción» eso va a la naturaleza, no a los géneros.
+ */
+export function normalizeGenres(v: unknown, map?: Record<string, string>) {
+  return parseGenreCell(cleanText(v), map);
 }
 
 /** «Ganadora», «Winner», «Official selection»… → resultado del catálogo. Si hay un premio y no se dice el resultado, es premio. */

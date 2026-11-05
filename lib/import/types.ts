@@ -1,4 +1,4 @@
-import type { FilmInput, OrgInput } from "@/lib/types";
+import type { Film, FilmInput, Org, OrgInput } from "@/lib/types";
 
 // ───────────────────────── archivo leído ─────────────────────────
 
@@ -29,7 +29,9 @@ export interface FieldDef {
 export const FILM_FIELDS: FieldDef[] = [
   { id: "title", label: "Título", hint: "Nombre de la producción o proyecto" },
   { id: "year", label: "Año" },
-  { id: "kind", label: "Tipo", hint: "ficción, documental, serie, comercial, corto" },
+  { id: "format", label: "Formato", hint: "largometraje, mediometraje, cortometraje, serie, miniserie, video musical, publicidad, programa de TV, contenido web, videoarte; puede venir junto a la naturaleza («Largometraje documental»)" },
+  { id: "nature", label: "Naturaleza", hint: "ficción, documental, híbrido (aplica a cualquier formato)" },
+  { id: "genres", label: "Géneros", hint: "uno o varios separados por «;» o «,» (drama, comedia, terror, ciencia ficción…); si trae uno que no es estándar, se conserva tal cual" },
   { id: "director", label: "Director/a", hint: "Persona que dirigió la producción" },
   { id: "producer", label: "Productor/a", hint: "Persona productora (no la empresa)" },
   { id: "company", label: "Casa productora", hint: "Empresa productora; varias separadas por «;», con el país entre paréntesis si lo trae" },
@@ -102,6 +104,8 @@ export interface PlanQuestion {
   /** Hoja y campo que afecta, para aplicar la respuesta. */
   sheet?: string;
   field?: string;
+  /** Valor del archivo que se quiere traducir (la respuesta se guarda como equivalencia en «value_maps»). */
+  value?: string;
 }
 
 export interface ImportPlan {
@@ -136,6 +140,8 @@ export interface DuplicateMatch {
   title: string;
   year: number | null;
   score: number;
+  /** Copia del registro que ya existe (con borradores), para mostrar qué se completaría. */
+  record?: Film | Org;
 }
 
 // ───────────────────────── candidatos a publicar ─────────────────────────
@@ -162,6 +168,8 @@ export interface Candidate {
   include: boolean;
   duplicate?: DuplicateMatch;
   decision?: DuplicateDecision;
+  /** Ids de lo que se aceptó actualizar del registro existente (ver `lib/import/diff.ts`); sin ella, lo que viene encendido. */
+  accept?: string[];
 }
 
 export interface ResolveItem {

@@ -1,6 +1,8 @@
+import { FORMATS, parseFormat, parseNature } from "@/lib/film-types";
+import { cleanText } from "./normalize";
 import { normalize } from "@/lib/utils";
 import { guessLayer } from "./normalize";
-import type { ImportPlan, ParsedFile, ParsedSheet, SheetPlan } from "./types";
+import type { ImportPlan, ParsedFile, ParsedSheet, PlanQuestion, SheetPlan } from "./types";
 
 type Syn = [field: string, patterns: RegExp[]];
 
@@ -13,7 +15,9 @@ const FILM_SYN: Syn[] = [
   ["festival", [/^(festival|festivales|festival(es)? (de seleccion|donde participo|y premios?)|selecciones|festival name)$/]],
   ["title", [/^(titulo|title|nombre( de la)?( pelicula| produccion| proyecto| obra)?|pelicula|produccion|proyecto|obra)$/]],
   ["year", [/^(ano|year|anio|ano de (estreno|produccion|rodaje|lanzamiento)|estreno|fecha)$/]],
-  ["kind", [/^(tipo|genero|formato|categoria|type)( de (produccion|obra|proyecto))?$/]],
+  ["format", [/^(formato|tipo|categoria|type|format|clasificacion)( de (la )?(produccion|obra|proyecto|pelicula|contenido))?$/]],
+  ["nature", [/^(naturaleza|clase|nature|ficcion o documental|documental o ficcion|ficcion documental)( de (la )?(produccion|obra|proyecto|pelicula))?$/]],
+  ["genres", [/^(genero|generos|genre|genres|subgenero|subgeneros|genero(s)? (cinematografico|principal|de la (obra|pelicula)))$/]],
   ["director", [/^(direccion|director|directora|director a|dirigida por|directed by|realizacion|realizador|realizadora)$/]],
   ["poster", [/^(poster|poster url|poster enlace|afiche|afiche url|cartel|portada|miniatura|thumbnail)$/]],
   ["company", [/^(casas? productoras?|productoras?|empresas? productoras?|empresas?|production compan(y|ies)|produccion por)$/]],
@@ -55,6 +59,9 @@ const FILM_LOOSE: Syn[] = [
   ["festival", [/\bfestival/, /\bselecciones?\b/]],
   ["title", [/\b(titulo|pelicula|proyecto|obra|nombre)\b/]],
   ["year", [/\b(ano|anio|year|estreno)\b/]],
+  ["format", [/\b(formato|format)\b/, /\btipo de (obra|produccion|contenido)\b/]],
+  ["nature", [/naturaleza|\bnature\b/]],
+  ["genres", [/\bgeneros?\b/, /\bgenres?\b/]],
   ["director", [/\bdirec/, /realiza/]],
   ["poster", [/\bposter\b/, /\bafiche\b/, /\bcartel\b/, /thumbnail|miniatura/]],
   ["company", [/\bcasas? productoras?/, /production compan/, /\bproductoras?\b/]],
@@ -104,7 +111,47 @@ function mapColumns(headers: string[], syn: Syn[], loose: Syn[]) {
   return { columns, confidence };
 }
 
-function planSheet(sheet: ParsedSheet): SheetPlan {
+/**
+ * Una columna puede alimentar más de un campo: «Largometraje documental» trae el formato y la naturaleza.
+ * Si los valores de una de las dos columnas dicen también lo de la otra, se asigna la misma columna a las dos.
+ */
+function shareColumns(m: { columns: Record<string, string>; confidence: Record<string, number> }, sheet: ParsedSheet) {
+  const { columns, confidence } = m;
+  const some = (h: string, test: (v: string) => unknown) => sheet.rows.some((r) => !!r[h] && !!test(r[h]));
+  if (columns.format && !columns.nature && some(columns.format, parseNature)) {
+    columns.nature = columns.format;
+    confidence.nature = Math.min(confidence.format ?? 0.6, 0.6);
+  }
+  if (columns.nature && !columns.format && some(columns.nature, parseFormat)) {
+    columns.format = columns.nature;
+    confidence.format = Math.min(confidence.nature ?? 0.6, 0.6);
+  }
+}
+
+/** Valores de la columna de formato que no se reconocen (y que tampoco son una naturaleza): se preguntan, no se guardan como «Otro». */
+function unknownFormatQuestions(sp: SheetPlan, sheet: ParsedSheet): PlanQuestion[] {
+  const col = sp.columns.format;
+  if (!col) return [];
+  const seen = new Map<string, number>();
+  for (const r of sheet.rows) {
+    const v = cleanText(r[col]);
+    if (!v || parseFormat(v) || parseNature(v)) continue;
+    seen.set(v, (seen.get(v) ?? 0) + 1);
+  }
+  return [...seen.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([v, n]) => ({
+      id: `format-${sp.sheet}-${v}`,
+      question: `En la columna «${col}» aparece «${v}» (${n} ${n === 1 ? "vez" : "veces"}). ¿Qué formato es?`,
+      options: [...FORMATS.map((f) => f.label), "Dejarlo sin formato"],
+      sheet: sp.sheet,
+      field: "format",
+      value: v,
+    }));
+}
+
+function planSheet(sheet: ParsedSheet, fromPdf = false): SheetPlan {
   const film = mapColumns(sheet.headers, FILM_SYN, FILM_LOOSE);
   const org = mapColumns(sheet.headers, ORG_SYN, ORG_LOOSE);
 
@@ -113,10 +160,13 @@ function planSheet(sheet: ParsedSheet): SheetPlan {
 
   const isFilm = filmScore >= 3 && filmScore >= orgScore;
   if (isFilm) {
+    shareColumns(film, sheet);
     // Si el título se repite en varias filas, hay una fila por locación.
     const col = film.columns.title;
-    const seen = new Set(sheet.rows.map((r) => normalize(r[col] ?? "")).filter(Boolean));
-    const grain = seen.size < sheet.rows.length * 0.75 ? "row_per_location" : "row_per_film";
+    const titles = sheet.rows.map((r) => normalize(r[col] ?? "")).filter(Boolean);
+    const seen = new Set(titles);
+    // en un PDF leído por Claude, un lugar o un festival de más es otra fila con el mismo título: basta con que alguno se repita
+    const grain = seen.size < sheet.rows.length * 0.75 || (fromPdf && seen.size < titles.length) ? "row_per_location" : "row_per_film";
     return {
       sheet: sheet.name,
       entity: "film",
@@ -143,14 +193,19 @@ function planSheet(sheet: ParsedSheet): SheetPlan {
 
 /** Análisis sin conexión: reconoce encabezados comunes en español e inglés. */
 export function heuristicPlan(file: ParsedFile): ImportPlan {
-  const sheets = file.sheets.map(planSheet);
+  const sheets = file.sheets.map((s) => planSheet(s, file.pdf?.engine === "claude"));
   const films = sheets.filter((s) => s.entity === "film").length;
   const orgs = sheets.filter((s) => s.entity === "org").length;
   return {
     sheets,
     engine: "heuristic",
     summary: `Reconocimos ${films} hoja(s) de producciones y ${orgs} de entidades por los nombres de las columnas. Revisa que cada columna esté bien asignada.`,
-    questions: sheets
+    questions: [
+      ...sheets.flatMap((sp) => {
+        const sheet = file.sheets.find((s) => s.name === sp.sheet);
+        return sp.entity === "film" && sheet ? unknownFormatQuestions(sp, sheet) : [];
+      }),
+      ...sheets
       .filter((s) => s.entity === "org" && !s.layerGuessed)
       .map((s) => ({
         id: `layer-${s.sheet}`,
@@ -159,5 +214,6 @@ export function heuristicPlan(file: ParsedFile): ImportPlan {
         sheet: s.sheet,
         field: "layer",
       })),
+    ],
   };
 }

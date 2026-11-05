@@ -1,6 +1,7 @@
 import { contactFromFields, contactParts } from "@/lib/contact";
 import { orgCategories } from "@/lib/categories";
-import type { FestivalResult, Film, FilmKind, InitiativeType, Nationality, Org } from "@/lib/types";
+import type { FilmFormat, FilmNature } from "@/lib/film-types";
+import type { FestivalResult, Film, InitiativeType, Nationality, Org } from "@/lib/types";
 
 /**
  * Borradores de formulario: todo como texto, igual que lo escribe la persona.
@@ -63,7 +64,9 @@ export const blankCompany = (country = ""): CompanyDraft => ({ name: "", country
 export interface FilmDraft {
   title: string;
   year: string;
-  kind: FilmKind | "";
+  format: FilmFormat | "";
+  nature: FilmNature | "";
+  genres: string[];
   nationality: Nationality | "";
   director: string;
   producer: string;
@@ -80,7 +83,9 @@ export function filmDraft(film?: Film): FilmDraft {
   return {
     title: film?.title ?? "",
     year: s(film?.year),
-    kind: film?.kind ?? "",
+    format: film?.format ?? "",
+    nature: film?.nature ?? "",
+    genres: film?.genres ?? [],
     nationality: film?.nationality ?? "",
     director: film?.director ?? "",
     producer: film?.producer ?? "",
@@ -124,7 +129,9 @@ export function filmPayload(d: FilmDraft) {
   return {
     title: d.title,
     year: toNum(d.year),
-    kind: d.kind || null,
+    format: d.format || null,
+    nature: d.nature || null,
+    genres: d.genres,
     nationality: d.nationality || null,
     director: d.director || null,
     producer: d.producer || null,

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { MultiSelect } from "@/components/ui/MultiSelect";
 import { EMPTY_FILM_FILTER, EMPTY_ORG_FILTER, ORG_CATEGORIES, type FilmFilter, type OrgFilter } from "@/lib/filters";
-import { FILM_KINDS, INITIATIVE_TYPES, LAYER_METRICS, METRICS, NATIONALITIES, type LayerId, type MetricId } from "@/lib/types";
+import { FORMATS, genreOptions, NATURES } from "@/lib/film-types";
+import { INITIATIVE_TYPES, LAYER_METRICS, METRICS, NATIONALITIES, type LayerId, type MetricId } from "@/lib/types";
 import { cn, fmtInt } from "@/lib/utils";
 import { activeFilterCount } from "@/lib/view";
 
@@ -19,6 +20,8 @@ interface Props {
   total: number;
   /** Categorías que de verdad existen en los datos (además de las conocidas). */
   extraCategories: string[];
+  /** Géneros propios que existen en los datos de producción. */
+  extraGenres: string[];
   onFilm(f: FilmFilter): void;
   onOrg(f: OrgFilter): void;
   onMetric(m: MetricId): void;
@@ -125,14 +128,28 @@ export function FilterPanel(p: Props) {
     if (isFilm) {
       return [
         {
-          id: "clase",
-          label: "Tipo de obra",
+          id: "formato",
+          label: "Formato",
           ownLabel: true,
-          active: ff.clase.length > 0,
-          clear: () => pf({ clase: [] }),
-          node: (
-            <MultiSelect label="Tipo de obra" placeholder="Todos" value={ff.clase} onChange={(clase) => pf({ clase })} options={FILM_KINDS.map((k) => ({ value: k.id, label: k.label }))} />
-          ),
+          active: ff.formato.length > 0,
+          clear: () => pf({ formato: [] }),
+          node: <MultiSelect label="Formato" placeholder="Todos" value={ff.formato} onChange={(formato) => pf({ formato })} options={FORMATS.map((k) => ({ value: k.id, label: k.label }))} />,
+        },
+        {
+          id: "naturaleza",
+          label: "Naturaleza",
+          ownLabel: true,
+          active: ff.naturaleza.length > 0,
+          clear: () => pf({ naturaleza: [] }),
+          node: <MultiSelect label="Naturaleza" placeholder="Cualquiera" value={ff.naturaleza} onChange={(naturaleza) => pf({ naturaleza })} options={NATURES.map((k) => ({ value: k.id, label: k.label }))} />,
+        },
+        {
+          id: "genero",
+          label: "Género",
+          ownLabel: true,
+          active: ff.genero.length > 0,
+          clear: () => pf({ genero: [] }),
+          node: <MultiSelect label="Género" placeholder="Todos" value={ff.genero} onChange={(genero) => pf({ genero })} options={genreOptions(p.extraGenres)} searchable />,
         },
         {
           id: "nacionalidad",
@@ -235,7 +252,7 @@ export function FilterPanel(p: Props) {
       },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFilm, layer, ff, of, p.extraCategories]);
+  }, [isFilm, layer, ff, of, p.extraCategories, p.extraGenres]);
 
   const shownFields = fields.filter((f) => f.active || added.includes(f.id));
   const available = fields.filter((f) => !shownFields.includes(f));

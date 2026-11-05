@@ -33,7 +33,9 @@ export function FilmEditor({ film }: { film?: Film }) {
       filmCompleteness({
         title: d.title,
         year: data.year,
-        kind: data.kind,
+        format: data.format,
+        nature: data.nature,
+        genres: data.genres,
         director: data.director,
         producer: data.producer,
         nationality: data.nationality,

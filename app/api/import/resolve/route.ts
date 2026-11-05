@@ -70,6 +70,14 @@ export async function POST(req: Request) {
     ...orgs.map((o) => ({ id: o.id, title: o.name, year: null, type: "org" as const })),
   ]);
 
+  // cada coincidencia lleva una copia del registro existente: el navegador calcula con ella qué se completaría
+  const filmById = new Map(films.map((f) => [f.id, f]));
+  const orgById = new Map(orgs.map((o) => [o.id, o]));
+  for (const [key, d] of Object.entries(duplicates)) {
+    const item = items.find((i) => i.key === key);
+    d.record = (item?.type === "org" ? orgById.get(d.id) : filmById.get(d.id)) ?? undefined;
+  }
+
   const res: ResolveResponse = { places: places_out, duplicates, engine };
   return NextResponse.json(res);
 }

@@ -19,7 +19,10 @@ export const runtime = "nodejs";
  *  Filtros de producciones:
  *    depto=7,1            códigos INE de departamento (al menos una locación ahí)
  *    muni=101             códigos INE de municipio
- *    clase=ficcion,corto  tipo de obra
+ *    formato_obra=largometraje,cortometraje  formato de la obra
+ *    naturaleza=ficcion,documental,hibrido
+ *    genero=Drama,Terror  (basta con uno)
+ *    clase=ficcion,corto  (enlaces anteriores: se convierte a formato y naturaleza)
  *    nacionalidad=guatemalteca,coproduccion
  *    desde=2010&hasta=2024
  *    presupuesto_min=500000&presupuesto_max=2000000&moneda=GTQ|USD

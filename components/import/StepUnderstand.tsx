@@ -2,6 +2,7 @@
 
 import { ArrowRight, Bot, ChevronDown, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { useState } from "react";
+import { FORMATS } from "@/lib/film-types";
 import { FILM_FIELDS, ORG_FIELDS, type ImportPlan, type ParsedFile, type SheetPlan } from "@/lib/import/types";
 import { cn } from "@/lib/utils";
 
@@ -72,6 +73,13 @@ export function StepUnderstand({
     const q = plan.questions.find((x) => x.id === qid);
     if (!q?.sheet || !q.field) return;
     if (q.field === "layer" && (value === "circulacion" || value === "industria")) update(q.sheet, { layer: value });
+    // «¿Qué formato es "Telefilme"?»: la respuesta queda como equivalencia de ese valor del archivo
+    if (q.value && q.field === "format") {
+      const id = FORMATS.find((f) => f.label === value)?.id ?? "";
+      const sp = plan.sheets.find((s) => s.sheet === q.sheet);
+      if (sp) update(q.sheet, { value_maps: { ...sp.value_maps, format: { ...sp.value_maps?.format, [q.value]: id } } });
+      return;
+    }
     const sheet = file.sheets.find((s) => s.name === q.sheet);
     if (sheet?.headers.includes(value)) setColumn(q.sheet, q.field, value);
   };
@@ -184,6 +192,9 @@ export function StepUnderstand({
           const mapped = fields.filter((f) => sp.columns[f.id]);
           const unmapped = fields.filter((f) => !sp.columns[f.id]);
           const open = sp.entity !== "ignore";
+          // columnas del archivo que ningún campo usa (la «Página del PDF» es solo una referencia)
+          const used = new Set(Object.values(sp.columns));
+          const leftover = sheet.headers.filter((h) => !used.has(h) && h !== "Página del PDF" && sheet.rows.some((r) => (r[h] ?? "").trim() !== ""));
           return (
             <section key={sp.sheet} className={cn("rounded-xl border bg-surface p-5", open ? "border-line" : "border-line/60 opacity-70")}>
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -233,6 +244,17 @@ export function StepUnderstand({
                       </div>
                     ))}
                   </div>
+                  {leftover.length > 0 && (
+                    <div className="mt-3 rounded-2xl border border-warn/30 bg-warn/5 px-4 py-2.5 text-xs leading-relaxed">
+                      <p className="font-medium text-warn">
+                        {leftover.length === 1 ? "1 columna del archivo no se va a usar" : `${leftover.length} columnas del archivo no se van a usar`}
+                      </p>
+                      <p className="mt-0.5 text-muted">
+                        {leftover.slice(0, 12).map((h) => `«${h}»`).join(", ")}
+                        {leftover.length > 12 ? `… y ${leftover.length - 12} más` : ""}. Si alguna trae datos que registramos (formato, género, festival, lugar…), asígnala en «Campos sin columna».
+                      </p>
+                    </div>
+                  )}
                   {unmapped.length > 0 && (
                     <details className="group mt-3">
                       <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs text-muted hover:text-ink">

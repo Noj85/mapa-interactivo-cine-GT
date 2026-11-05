@@ -2,7 +2,8 @@
 
 import { AlertCircle, Award, ExternalLink, MapPin, MessageSquarePlus, Pencil } from "lucide-react";
 import Link from "next/link";
-import { FESTIVAL_RESULTS, FILM_KINDS, NATIONALITIES } from "@/lib/types";
+import { filmTypeLabel } from "@/lib/film-types";
+import { FESTIVAL_RESULTS, NATIONALITIES } from "@/lib/types";
 import { fmtInt, fmtMoney } from "@/lib/utils";
 import { CompletenessBadge, CompletenessMeter } from "@/components/ui/Badges";
 import { PanelShell, type PanelCtx, SectionTitle, Stat } from "./parts";
@@ -17,7 +18,7 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
       </PanelShell>
     );
 
-  const kind = FILM_KINDS.find((k) => k.id === film.kind)?.label;
+  const kind = filmTypeLabel(film);
   const nat = NATIONALITIES.find((n) => n.id === film.nationality)?.label;
   const days = film.locations.reduce((s, l) => s + (l.days ?? 0), 0);
   const spend = film.locations.reduce((s, l) => s + (l.local_spend ?? 0), 0);
@@ -38,6 +39,13 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
       )}
       <h2 className="font-display text-[32px] leading-[1.05] tracking-tight text-ink">{film.title}</h2>
       <div className="mt-1.5 text-sm text-muted">{meta || "Datos básicos pendientes"}</div>
+      {film.genres.length > 0 && (
+        <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Géneros">
+          {film.genres.map((g) => (
+            <li key={g} className="chip">{g}</li>
+          ))}
+        </ul>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         <CompletenessBadge pct={film.completeness} missing={film.missing_fields} />
         {film.status === "draft" && <span className="chip">Borrador</span>}

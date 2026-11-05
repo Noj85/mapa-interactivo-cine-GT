@@ -5,12 +5,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Check, FileSpreadsheet, Loader2, Sparkles, Upload } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
+import { planFilmUpdate, planOrgUpdate } from "@/lib/import/diff";
 import { distinctValues } from "@/lib/import/distinct";
 import { parseFile } from "@/lib/import/parse";
 import { buildQuestions, type Question } from "@/lib/import/questions";
 import { buildCandidates, collectPlaceTexts } from "@/lib/import/transform";
 import type { Candidate, ImportPlan, ParsedFile, PlaceResolution, ResolveResponse } from "@/lib/import/types";
 import type { PdfResponse } from "@/app/api/import/pdf/route";
+import type { Film, Org } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { StepQuestions } from "./StepQuestions";
 import { StepReview } from "./StepReview";
@@ -149,9 +151,14 @@ export function ImportWizard() {
       const r = (await res.json()) as ResolveResponse;
       setEngine(r.engine);
       setPlaces(r.places);
-      const cands = buildCandidates(file, plan, r.places, { gaz: g.gaz, muni: g.muni }).map((c) =>
-        r.duplicates[c.key] ? { ...c, duplicate: r.duplicates[c.key], decision: "update" as const } : c,
-      );
+      const cands = buildCandidates(file, plan, r.places, { gaz: g.gaz, muni: g.muni }).map((c) => {
+        const dup = r.duplicates[c.key];
+        if (!dup) return c;
+        // si el archivo no trae nada nuevo para el registro que ya existe, se omite de entrada
+        const rec = dup.record;
+        const news = !rec ? 1 : c.type === "film" && c.film ? planFilmUpdate(rec as Film, c.film).news : c.org ? planOrgUpdate(rec as Org, c.org).news : 1;
+        return { ...c, duplicate: dup, decision: news > 0 ? ("update" as const) : ("skip" as const) };
+      });
       setCandidates(cands);
       setStep("review");
     } catch (e) {

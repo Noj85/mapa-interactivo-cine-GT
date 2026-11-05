@@ -1,7 +1,9 @@
 "use client";
 
-import { FILM_KINDS, NATIONALITIES, type FilmKind, type Nationality } from "@/lib/types";
+import { FORMATS, NATURES, type FilmFormat, type FilmNature } from "@/lib/film-types";
+import { NATIONALITIES, type Nationality } from "@/lib/types";
 import { CompaniesEditor } from "./CompaniesEditor";
+import { GenresEditor } from "./GenresEditor";
 import type { FilmDraft } from "./drafts";
 
 /** Campos de una producción. Los usa el editor del equipo y el formulario público. */
@@ -12,16 +14,25 @@ export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange:
         <label className="label" htmlFor="f-title">Título *</label>
         <input id="f-title" className="field text-base" maxLength={300} value={d.title} onChange={(e) => onChange({ title: e.target.value })} />
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label className="label" htmlFor="f-year">Año</label>
           <input id="f-year" className="field" inputMode="numeric" value={d.year} onChange={(e) => onChange({ year: e.target.value })} />
         </div>
         <div>
-          <label className="label" htmlFor="f-kind">Tipo</label>
-          <select id="f-kind" className="field" value={d.kind} onChange={(e) => onChange({ kind: e.target.value as FilmKind | "" })}>
+          <label className="label" htmlFor="f-format">Formato</label>
+          <select id="f-format" className="field" value={d.format} onChange={(e) => onChange({ format: e.target.value as FilmFormat | "" })}>
             <option value="">Sin definir</option>
-            {FILM_KINDS.map((k) => (
+            {FORMATS.map((k) => (
+              <option key={k.id} value={k.id}>{k.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label" htmlFor="f-nature">Naturaleza</label>
+          <select id="f-nature" className="field" value={d.nature} onChange={(e) => onChange({ nature: e.target.value as FilmNature | "" })}>
+            <option value="">Sin definir</option>
+            {NATURES.map((k) => (
               <option key={k.id} value={k.id}>{k.label}</option>
             ))}
           </select>
@@ -36,6 +47,7 @@ export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange:
           </select>
         </div>
       </div>
+      <GenresEditor genres={d.genres} onChange={(genres) => onChange({ genres })} />
       <CompaniesEditor companies={d.companies} nationality={d.nationality} onChange={(companies) => onChange({ companies })} />
       <div className="grid gap-4 sm:grid-cols-2">
         <div>

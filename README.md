@@ -27,7 +27,7 @@ Copia `.env.example` a `.env.local` (o configúralas en Vercel).
 ## Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. En el editor SQL ejecuta, **en orden**, las seis migraciones de `supabase/migrations/`:
+2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0011`, ver cada sección) de `supabase/migrations/`:
    - `0001_init.sql`: tablas, políticas RLS y perfiles.
    - `0002_posters.sql`: campo del póster y bucket público `posters` en Storage.
    - `0003_submissions.sql`: aportes del público.
@@ -59,6 +59,20 @@ Además de CSV y Excel, el asistente acepta **PDF** (catálogos, directorios, li
 - **Sin clave**: lectura básica de dos maquetaciones: *fichas* (un nombre en letra grande y datos con etiquetas que se repiten, como un directorio de servicios) y *tablas* con fila de encabezados. Si no reconoce ninguna, lo dice y sugiere Excel o activar Claude.
 - Los PDF escaneados (solo imagen) no tienen texto: la lectura básica no los entiende.
 
+
+### Formato, naturaleza y géneros al importar
+
+La columna «Tipo», «Formato» o «Categoría» va a formato; «Naturaleza» o «Clase», a naturaleza; y «Género» o «Géneros», a géneros (ya no al tipo de obra). Una misma columna puede alimentar varios campos: un «Tipo» con «Largometraje documental» llena formato y naturaleza, y una columna de géneros que trae «Documental» o «Ficción» pone eso en la naturaleza. Los géneros se separan por `;`, `,`, `/` o `|`, se traducen a la lista estándar (también del inglés: sci-fi, horror, thriller…) y los que no están se conservan como propios. Un formato que no se reconoce no se guarda como «Otro»: se pregunta («¿Qué formato es “Telefilme”?»). En el paso «Lo que entendimos» un aviso lista las columnas del archivo que no se van a usar. En los PDF, Claude también entrega los festivales y los lugares de rodaje como listas (cada uno extra es otra fila con el mismo título) y el país de la casa productora.
+
+### Actualizar producciones que ya existen
+
+Si el archivo trae una producción o entidad parecida a una guardada, la revisión muestra **«Qué se actualizaría»** y no cambia nada sin que lo veas:
+
+- **Completa**: campos que estaban vacíos y el archivo llena (la moneda viaja con el presupuesto; el póster solo si no había; una locación sin municipio se completa en vez de duplicarse).
+- **Agrega**: locaciones, festivales, casas productoras y géneros nuevos.
+- **Ya tiene otro valor**: nunca se cambia solo; aparece «actual → archivo» con la casilla «Usar el del archivo» apagada.
+
+Cada elemento tiene su casilla. Una celda vacía nunca borra nada, y el título y el estado no cambian. Si el archivo no trae nada nuevo, la coincidencia queda en «Omitir» y, aunque se fuerce, el registro no se guarda. Al confirmar, el servidor vuelve a leer el registro y recalcula lo que cambia (solo toma del navegador la lista de casillas marcadas). El resumen final dice «N nuevos · N actualizados · N sin cambios» y qué campos se completaron.
 
 ### Primera carga
 
@@ -98,6 +112,18 @@ En **Registros** (`/admin/peliculas` y `/admin/entidades`) cada fila tiene un in
 
 Desde el editor de una producción o entidad, o desde varias filas seleccionadas, el botón **Solicitar información** genera un **enlace privado** (`/completar/<código>`) y una **clave** de 5 caracteres alfanuméricos (sin 0/o ni 1/l/i, se muestra una sola vez) y arma un mensaje corto y cordial, listo para copiar y pegar en WhatsApp o correo, que presenta a PROCINE (proyecto de fortalecimiento del sector cinematográfico) y a la Academia de Cine de Guatemala (que lo ejecuta). El mensaje no incluye la dirección del mapa, solo el enlace privado. El enlace sirve varias veces hasta que venza o lo revoques (panel «Solicitudes» del registro). Quien lo abre escribe la clave y ve el formulario con los datos actuales, resaltando lo que falta. Lo que envía llega a `/admin/aportes` con origen **recopilación**; nada se publica hasta que lo apruebes («Aplicar y poner en el mapa»). Los códigos se guardan con hash y las claves con bcrypt, con bloqueo tras 10 intentos fallidos. Requiere `supabase/migrations/0007_info_requests.sql`.
 
+## Formato, naturaleza y géneros
+
+Cada producción se describe con tres datos distintos:
+
+- **Formato** (uno): largometraje, mediometraje, cortometraje, serie, miniserie, video musical, publicidad / comercial, programa de TV, contenido web / digital, videoarte u otro.
+- **Naturaleza** (una, opcional, aplica a cualquier formato): ficción, documental o híbrido.
+- **Géneros** (varios, hasta 8): los estándar de festivales (acción, aventura, animación, biográfico, ciencia ficción, comedia, crimen, drama, experimental, familiar, fantasía, guerra, histórico, misterio, musical, noir, romance, suspenso / thriller, terror, western, deportes, música, coming of age, road movie) y **géneros propios** que se escriben a mano (cada uno hasta 40 caracteres, sin repetir aunque cambie la tilde o la mayúscula).
+
+La ficha y las tarjetas muestran la etiqueta combinada («Largometraje documental», «Cortometraje de ficción», «Serie») y los géneros como etiquetas. En el filtro del mapa y de `/descargas` hay tres filtros (formato, naturaleza y género; el género acepta cualquiera de los elegidos y agrupa bajo «Otros» los propios que existan). Las descargas traen tres columnas: «Formato», «Naturaleza» y «Géneros» (separados por «; »). La completitud cuenta **Formato** y **Naturaleza**; los géneros no.
+
+Requiere `supabase/migrations/0011_film_format_genres.sql` (después de 0009 y 0010): agrega `format`, `nature` y `genres`, convierte el antiguo «tipo» (ficción → naturaleza ficción; documental → naturaleza documental; corto → formato cortometraje; serie → formato serie; comercial → formato publicidad; otro → sin formato) y deja la columna `kind` sin uso ni restricción. **Sin esta migración, guardar producciones falla.** Después conviene revisar en `/admin/peliculas` las que quedaron sin formato (filtro «Sin formato (por revisar)»). El modo local (`.data/db.json`) y los aportes guardados antes del cambio se convierten solos al leerlos.
+
 ## Director/a, productor/a y casas productoras
 
 «Director/a» es la persona que dirigió la producción y «Productor/a» la persona productora; ninguno es una dirección física. Las **casas productoras** (empresas) son una lista aparte, con su país, y lo que se pide depende de la nacionalidad elegida: en una producción **guatemalteca** solo el nombre (el país es Guatemala); en una **coproducción internacional** o **extranjera**, nombre y país de cada casa, tantas como haga falta (el país sugiere una lista, pero se puede escribir cualquiera). Se ven en la ficha, en las descargas y en la búsqueda, y suman a la completitud como «Casa productora». En archivos importados, las columnas «Productora», «Casa productora» o «Empresa» van a casas productoras (varias separadas por «;», con el país entre paréntesis o en una columna «País de la productora»), y «Productor/a» a la persona. Requiere `supabase/migrations/0009_film_companies.sql`.
@@ -124,10 +150,10 @@ En el mapa, el desplegable «Todo el país» (debajo de las capas) acerca la cá
 
 Junto al departamento hay un botón **«Filtros»** que abre un panel compacto. Sin filtros el mapa no muestra nada más; los filtros se **añaden a la carta** («+ Añadir filtro») y se quitan con la «×»:
 
-- **Producción:** tipo de obra, nacionalidad, año, presupuesto (con moneda), días de rodaje, inversión local, empleos, «solo con todas las locaciones ubicadas» y búsqueda por texto.
+- **Producción:** formato, naturaleza, género, nacionalidad, año, presupuesto (con moneda), días de rodaje, inversión local, empleos, «solo con todas las locaciones ubicadas» y búsqueda por texto.
 - **Circulación e Industria:** categoría (varias), naturaleza y búsqueda por texto.
 - **Medir por** (solo Producción): producciones, días de rodaje, inversión local o empleos; cambia los colores y la leyenda.
-- Los filtros se aplican al mapa, la leyenda y los paneles, y viven en la URL con los mismos parámetros que `/descargas` (`clase`, `desde`, `presupuesto_min`, `dias_min`, `categoria`…, más `metrica`), así que «Copiar enlace de esta vista» y «Descargar estos datos» llevan exactamente lo que se ve. Los enlaces anteriores con `?categoria=` siguen funcionando.
+- Los filtros se aplican al mapa, la leyenda y los paneles, y viven en la URL con los mismos parámetros que `/descargas` (`formato_obra`, `naturaleza`, `genero`, `desde`, `presupuesto_min`, `dias_min`, `categoria`…, más `metrica`), así que «Copiar enlace de esta vista» y «Descargar estos datos» llevan exactamente lo que se ve. Los enlaces anteriores con `?categoria=` o `?clase=` (el antiguo «tipo de obra») siguen funcionando: se convierten a formato y naturaleza.
 
 ## Pósters
 
@@ -163,7 +189,10 @@ La página `/descargas` es pública: cualquiera elige entre **Producciones**, **
 | `filas` | solo en producciones: `producciones` (por defecto) o `locaciones` (una fila por lugar de rodaje) |
 | `formato` | `csv` (por defecto), `xlsx` (con hoja «Léeme» que lista los filtros aplicados) |
 | `depto`, `muni` | códigos INE separados por coma (basta con que una locación esté ahí) |
-| `clase` | `ficcion`, `documental`, `serie`, `comercial`, `corto`, `otro` |
+| `formato_obra` | `largometraje`, `mediometraje`, `cortometraje`, `serie`, `miniserie`, `video_musical`, `publicidad`, `programa_tv`, `web`, `videoarte`, `otro` (el parámetro `formato` es el tipo de archivo: csv o xlsx) |
+| `naturaleza` | `ficcion`, `documental`, `hibrido` |
+| `genero` | nombres separados por coma (`Drama,Terror`); basta con que la producción tenga uno. Sirven los estándar y los propios que existan en los datos |
+| `clase` | enlaces anteriores: `ficcion`, `documental`, `serie`, `comercial`, `corto`, `otro`; se convierten a formato y naturaleza |
 | `nacionalidad` | `guatemalteca`, `coproduccion`, `extranjera` |
 | `desde`, `hasta` | año |
 | `presupuesto_min`, `presupuesto_max`, `moneda` | monto y `GTQ` o `USD` (otra moneda se compara a Q 7.70 por dólar); solo salen producciones con presupuesto registrado |
@@ -172,7 +201,7 @@ La página `/descargas` es pública: cualquiera elige entre **Producciones**, **
 | `categoria`, `iniciativa` | solo para `tipo=circulacion` y `tipo=entidades` |
 | `borradores=1` | incluye borradores; solo con sesión del equipo |
 
-Los enlaces anteriores (`tipo=peliculas`, `tipo=locaciones`, `tipo=entidades&capa=circulacion`) siguen funcionando; `tipo=entidades` ahora trae solo la industria. Sin sesión sale únicamente lo publicado. En el mapa, el panel de cada lugar y la vista general tienen un botón «Descargar» que abre esta página con los filtros ya puestos, y la fila de categorías también filtra la capa de Producción por tipo de obra.
+Los enlaces anteriores (`tipo=peliculas`, `tipo=locaciones`, `tipo=entidades&capa=circulacion`) siguen funcionando; `tipo=entidades` ahora trae solo la industria. Sin sesión sale únicamente lo publicado. En el mapa, el panel de cada lugar y la vista general tienen un botón «Descargar» que abre esta página con los filtros ya puestos, y la fila de categorías también filtra la capa de Producción por formato y naturaleza.
 
 ## Identidad visual
 

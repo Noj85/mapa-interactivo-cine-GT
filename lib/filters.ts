@@ -1,10 +1,13 @@
 import { orgCategories } from "@/lib/categories";
 import { companyNames } from "@/lib/companies";
-import { CIRC_CATEGORIES, FILM_KINDS, IND_CATEGORIES, INITIATIVE_TYPES, NATIONALITIES, type Film, type FilmKind, type InitiativeType, type Nationality, type Org } from "@/lib/types";
+import { cleanGenres, FORMATS, formatLabel, legacyKind, NATURES, natureLabel, type FilmFormat, type FilmNature } from "@/lib/film-types";
+import { CIRC_CATEGORIES, IND_CATEGORIES, INITIATIVE_TYPES, NATIONALITIES, type Film, type InitiativeType, type Nationality, type Org } from "@/lib/types";
+import { normalize } from "@/lib/utils";
 
 /**
  * Filtros de descarga. Se leen de la URL, de modo que un enlace como
  *   /api/export?tipo=producciones&depto=7&presupuesto_min=500000&formato=xlsx
+ * («formato» es el tipo de archivo; el formato de la obra va en «formato_obra», la naturaleza en «naturaleza» y los géneros en «genero»).
  * funciona igual desde la página de descargas, un correo o un script.
  */
 
@@ -22,7 +25,12 @@ export interface FilmFilter {
   /** Códigos INE de departamento: basta con que una locación esté ahí. */
   depto: number[];
   muni: number[];
-  clase: FilmKind[];
+  /** Largometraje, cortometraje, serie… (una producción cumple si es de alguno). */
+  formato: FilmFormat[];
+  /** Ficción, documental o híbrido. */
+  naturaleza: FilmNature[];
+  /** Géneros por su nombre: basta con que tenga uno de ellos. */
+  genero: string[];
   nacionalidad: Nationality[];
   desde: number | null;
   hasta: number | null;
@@ -52,7 +60,9 @@ export interface OrgFilter {
 export const EMPTY_FILM_FILTER: FilmFilter = {
   depto: [],
   muni: [],
-  clase: [],
+  formato: [],
+  naturaleza: [],
+  genero: [],
   nacionalidad: [],
   desde: null,
   hasta: null,
@@ -107,11 +117,31 @@ export function parseExportRequest(p: URLSearchParams): { tipo: ExportKind; fila
   return { tipo: "producciones", filas: filas === "locaciones" || filas === "festivales" ? filas : "producciones" };
 }
 
+/**
+ * Enlaces anteriores: `clase` (o `categoria` en el mapa) traía el antiguo «tipo de obra»
+ * (ficcion, documental, serie, comercial, corto, otro). Se convierte a formato y naturaleza.
+ */
+export function legacyClase(values: string[]): { formato: FilmFormat[]; naturaleza: FilmNature[] } {
+  const formato: FilmFormat[] = [];
+  const naturaleza: FilmNature[] = [];
+  for (const v of values) {
+    const l = legacyKind(v);
+    if (l.format && !formato.includes(l.format)) formato.push(l.format);
+    if (l.nature && !naturaleza.includes(l.nature)) naturaleza.push(l.nature);
+  }
+  return { formato, naturaleza };
+}
+
 export function parseFilmFilter(p: URLSearchParams): FilmFilter {
+  const old = legacyClase(list(p, "clase"));
+  const formato = pick(list(p, "formato_obra"), FORMATS);
+  const naturaleza = pick(list(p, "naturaleza"), NATURES);
   return {
     depto: nums(p, "depto"),
     muni: nums(p, "muni"),
-    clase: pick(list(p, "clase"), FILM_KINDS),
+    formato: formato.length ? formato : old.formato,
+    naturaleza: naturaleza.length ? naturaleza : old.naturaleza,
+    genero: cleanGenres(list(p, "genero")),
     nacionalidad: pick(list(p, "nacionalidad"), NATIONALITIES),
     desde: num(p, "desde"),
     hasta: num(p, "hasta"),
@@ -143,7 +173,9 @@ export function parseOrgFilter(p: URLSearchParams): OrgFilter {
 export function filmFilterToParams(f: FilmFilter, into = new URLSearchParams()) {
   if (f.depto.length) into.set("depto", f.depto.join(","));
   if (f.muni.length) into.set("muni", f.muni.join(","));
-  if (f.clase.length) into.set("clase", f.clase.join(","));
+  if (f.formato.length) into.set("formato_obra", f.formato.join(","));
+  if (f.naturaleza.length) into.set("naturaleza", f.naturaleza.join(","));
+  if (f.genero.length) into.set("genero", f.genero.join(","));
   if (f.nacionalidad.length) into.set("nacionalidad", f.nacionalidad.join(","));
   if (f.desde != null) into.set("desde", String(f.desde));
   if (f.hasta != null) into.set("hasta", String(f.hasta));
@@ -189,7 +221,12 @@ export function budgetIn(film: Pick<Film, "budget" | "currency">, to: BudgetCurr
 }
 
 export function filmMatches(f: Film, flt: FilmFilter): boolean {
-  if (flt.clase.length && (!f.kind || !flt.clase.includes(f.kind))) return false;
+  if (flt.formato.length && (!f.format || !flt.formato.includes(f.format))) return false;
+  if (flt.naturaleza.length && (!f.nature || !flt.naturaleza.includes(f.nature))) return false;
+  if (flt.genero.length) {
+    const have = new Set(f.genres.map(normalize));
+    if (!flt.genero.some((g) => have.has(normalize(g)))) return false;
+  }
   if (flt.nacionalidad.length && (!f.nationality || !flt.nacionalidad.includes(f.nationality))) return false;
   if (flt.desde != null && (f.year == null || f.year < flt.desde)) return false;
   if (flt.hasta != null && (f.year == null || f.year > flt.hasta)) return false;
@@ -253,7 +290,9 @@ export function describeFilmFilter(f: FilmFilter, deptoName: (code: number) => s
   const out: string[] = [];
   if (f.depto.length) out.push(`Departamento: ${f.depto.map(deptoName).join(", ")}`);
   if (f.muni.length) out.push(`Municipio: ${f.muni.map(muniName).join(", ")}`);
-  if (f.clase.length) out.push(`Tipo: ${f.clase.map((c) => FILM_KINDS.find((k) => k.id === c)?.label ?? c).join(", ")}`);
+  if (f.formato.length) out.push(`Formato: ${f.formato.map((c) => formatLabel(c) || c).join(", ")}`);
+  if (f.naturaleza.length) out.push(`Naturaleza: ${f.naturaleza.map((c) => natureLabel(c) || c).join(", ")}`);
+  if (f.genero.length) out.push(`Género: ${f.genero.join(", ")}`);
   if (f.nacionalidad.length) out.push(`Nacionalidad: ${f.nacionalidad.map((c) => NATIONALITIES.find((k) => k.id === c)?.label ?? c).join(", ")}`);
   if (f.desde != null || f.hasta != null) out.push(`Año: ${f.desde ?? "…"} a ${f.hasta ?? "…"}`);
   if (f.presupuestoMin != null && f.presupuestoMax != null) out.push(`Presupuesto entre ${money(f.presupuestoMin, f.moneda)} y ${money(f.presupuestoMax, f.moneda)}`);

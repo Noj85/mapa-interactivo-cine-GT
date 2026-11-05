@@ -1,7 +1,8 @@
 import { filmCompleteness, orgCompleteness } from "@/lib/completeness";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
-import { CIRC_CATEGORIES, FILM_KINDS, IND_CATEGORIES, type FilmKind } from "@/lib/types";
-import { normalizeKind } from "./normalize";
+import { FORMATS, NATURES } from "@/lib/film-types";
+import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
+import { normalizeFormat, normalizeNature } from "./normalize";
 import type { Candidate, PlaceResolution } from "./types";
 
 export type QStatus = "open" | "answered" | "deferred";
@@ -28,10 +29,16 @@ const MAX_QUESTIONS = 24;
 const FILM_BULK: { field: string; label: string; placeholder: string; options?: { value: string; label: string }[] }[] = [
   { field: "year", label: "el año", placeholder: "Por ejemplo 2023" },
   {
-    field: "kind",
-    label: "el tipo de producción",
+    field: "format",
+    label: "el formato (largometraje, cortometraje, serie…)",
     placeholder: "",
-    options: FILM_KINDS.map((k) => ({ value: k.id, label: k.label })),
+    options: FORMATS.map((k) => ({ value: k.id, label: k.label })),
+  },
+  {
+    field: "nature",
+    label: "la naturaleza (ficción, documental o híbrido)",
+    placeholder: "",
+    options: NATURES.map((k) => ({ value: k.id, label: k.label })),
   },
   {
     field: "nationality",
@@ -234,7 +241,8 @@ export function applyAnswer(
       if (f === "year") {
         const y = Number(answer.replace(/\D/g, "").slice(0, 4));
         if (y >= 1890 && y <= 2100) o.year = y;
-      } else if (f === "kind") o.kind = normalizeKind(answer) as FilmKind | null;
+      } else if (f === "format") o.format = normalizeFormat(answer);
+      else if (f === "nature") o.nature = normalizeNature(answer);
       else o[f] = answer;
     } else if (next.org) {
       (next.org as unknown as Record<string, unknown>)[f] = answer;
@@ -253,7 +261,9 @@ export function candidateStatus(c: Candidate) {
     return filmCompleteness({
       ...c.film,
       year: c.film.year ?? null,
-      kind: c.film.kind ?? null,
+      format: c.film.format ?? null,
+      nature: c.film.nature ?? null,
+      genres: c.film.genres ?? [],
       director: c.film.director ?? null,
       producer: c.film.producer ?? null,
       nationality: c.film.nationality ?? null,

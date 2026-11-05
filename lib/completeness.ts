@@ -38,7 +38,8 @@ export function filmCompleteness(
   check(f.locations.length > 0 && f.locations.some(hasAnchor), "Locaciones", 3);
   check(f.locations.length === 0 || f.locations.every((l) => l.muni_ine != null || (l.lat != null && l.lng != null)), "Municipio por confirmar", 2);
   check(f.year != null, "Año");
-  check(!!f.kind, "Tipo");
+  check(!!f.format, "Formato");
+  check(!!f.nature, "Naturaleza");
   check(!!f.nationality, "Nacionalidad");
   check((f.companies ?? []).some((c) => !!c.name?.trim()), "Casa productora");
   check(!!f.producer, "Productor/a");

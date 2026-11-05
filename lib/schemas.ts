@@ -3,6 +3,15 @@ import { z } from "zod";
 import { MAX_CATEGORIES, normalizeCategories } from "@/lib/categories";
 import { isOwnImageUrl } from "@/lib/poster-url";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
+import { cleanGenres, FORMATS, NATURES } from "@/lib/film-types";
+
+const FORMAT_VALUES = FORMATS.map((f) => f.id) as [string, ...string[]];
+const NATURE_VALUES = NATURES.map((n) => n.id) as [string, ...string[]];
+/** Géneros: estándar o propios; sin repetidos y con el máximo permitido. */
+const genresSchema = z
+  .array(z.string().max(120))
+  .max(40)
+  .transform((list) => cleanGenres(list.map((g) => clean(g))));
 
 const optStr = z
   .string()
@@ -85,7 +94,9 @@ export const filmSchema = z.object({
   id: z.string().optional(),
   title: z.string().trim().min(1, "El título es obligatorio").max(300),
   year: optNum,
-  kind: z.enum(["ficcion", "documental", "serie", "comercial", "corto", "otro"]).nullish(),
+  format: z.enum(FORMAT_VALUES).nullish(),
+  nature: z.enum(NATURE_VALUES).nullish(),
+  genres: genresSchema.optional(),
   director: optStr,
   producer: optStr,
   nationality: z.enum(["guatemalteca", "coproduccion", "extranjera"]).nullish(),
@@ -210,7 +221,9 @@ const pubCompany = z.object({
 export const publicFilmSchema = z.object({
   title: z.string().trim().min(1, "El título es obligatorio").max(300).transform(clean),
   year: optNum,
-  kind: z.enum(["ficcion", "documental", "serie", "comercial", "corto", "otro"]).nullish(),
+  format: z.enum(FORMAT_VALUES).nullish(),
+  nature: z.enum(NATURE_VALUES).nullish(),
+  genres: genresSchema.optional(),
   director: pubStr(300),
   producer: pubStr(300),
   nationality: z.enum(["guatemalteca", "coproduccion", "extranjera"]).nullish(),

@@ -13,8 +13,10 @@ import {
   type DeferredQuestion,
 } from "@/app/admin/(panel)/cargar/actions";
 import type { GeoBundle } from "@/lib/geo/load";
+import { planFilmUpdate, planOrgUpdate } from "@/lib/import/diff";
 import { applyAnswer, candidateStatus, type Question } from "@/lib/import/questions";
 import type { Candidate, ImportPlan, PlaceResolution } from "@/lib/import/types";
+import type { Film, Org } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const BATCH = 20;
@@ -98,7 +100,16 @@ export function StepQuestions({
       nowhere: live.filter(
         (c) => c.type === "film" && !(c.film?.locations ?? []).some((l) => l.muni_ine || l.depto_ine || (l.lat != null && l.lng != null)),
       ).length,
-      updates: live.filter((c) => c.duplicate && c.decision === "update").length,
+      // registros que ya existían y a los que el archivo sí les completa o agrega algo
+      updates: live.filter((c) => {
+        if (!c.duplicate || c.decision !== "update") return false;
+        const rec = c.duplicate.record;
+        if (!rec) return true;
+        const plan = c.type === "film" && c.film ? planFilmUpdate(rec as Film, c.film) : c.org ? planOrgUpdate(rec as Org, c.org) : null;
+        if (!plan) return true;
+        const on = new Set(c.accept ?? plan.items.filter((i) => i.defaultOn).map((i) => i.id));
+        return plan.items.some((i) => on.has(i.id));
+      }).length,
       deferred: questions.filter((q) => q.status === "deferred").length,
     };
   }, [live, questions]);
@@ -111,7 +122,8 @@ export function StepQuestions({
     try {
       const importId = await createImportAction(filename, { engine: plan.engine, rows: live.length });
       for (let i = 0; i < live.length; i += BATCH) {
-        const chunk = live.slice(i, i + BATCH);
+        // la copia del registro existente solo sirve para la vista previa: el servidor lo vuelve a leer
+        const chunk = live.slice(i, i + BATCH).map((c) => (c.duplicate ? { ...c, duplicate: { ...c.duplicate, record: undefined } } : c));
         const r = await commitBatchAction(importId, filename, chunk, publishIncomplete);
         all.push(...r);
         setProgress({ done: Math.min(i + BATCH, live.length), total: live.length });
@@ -144,6 +156,7 @@ export function StepQuestions({
           engine: plan.engine,
           created: all.filter((r) => r.action === "created").length,
           updated: all.filter((r) => r.action === "updated").length,
+          unchanged: all.filter((r) => r.action === "unchanged").length,
           failed: all.filter((r) => r.action === "failed").length,
           pending_questions: deferred.length,
         },
@@ -254,6 +267,10 @@ export function StepQuestions({
   if (phase === "done") {
     const count = (a: BatchResult["action"]) => results.filter((r) => r.action === a).length;
     const failed = results.filter((r) => r.action === "failed");
+    // qué campos se completaron en los registros existentes, sumados
+    const totals = new Map<string, number>();
+    for (const r of results) for (const f of r.filled ?? []) totals.set(f.replace(/ \((\d+)\)$/, ""), (totals.get(f.replace(/ \((\d+)\)$/, "")) ?? 0) + Number(f.match(/\((\d+)\)$/)?.[1] ?? 1));
+    const filledTotals = [...totals].sort((a, b) => b[1] - a[1]);
     return (
       <div className="mx-auto max-w-xl text-center">
         <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-ok/15 text-ok">
@@ -261,10 +278,15 @@ export function StepQuestions({
         </span>
         <h2 className="mt-5 font-display text-3xl tracking-tight">Listo, información cargada</h2>
         <p className="mt-2 text-sm text-muted">
-          {count("created")} nuevos · {count("updated")} actualizados
+          {count("created")} nuevos · {count("updated")} actualizados · {count("unchanged")} sin cambios
           {failed.length > 0 && <> · <span className="text-danger">{failed.length} con error</span></>}
           {summary.deferred > 0 && <> · {summary.deferred} {summary.deferred === 1 ? "pregunta pendiente" : "preguntas pendientes"}</>}
         </p>
+        {filledTotals.length > 0 && (
+          <p className="mx-auto mt-3 max-w-md text-xs leading-relaxed text-muted">
+            <span className="font-medium text-ink">Se completó en los existentes:</span> {filledTotals.map(([k, n]) => `${k} (${n})`).join(", ")}.
+          </p>
+        )}
         {failed.length > 0 && (
           <ul className="mx-auto mt-4 max-w-md space-y-1 rounded-2xl border border-danger/30 bg-danger/5 p-4 text-left text-xs text-danger">
             {failed.slice(0, 6).map((f) => (
@@ -313,7 +335,7 @@ export function StepQuestions({
             {summary.nowhere === 1 ? "1 producción no tiene" : `${summary.nowhere} producciones no tienen`} lugar de rodaje: se muestran en la zona «Sin ubicación», fuera del territorio, hasta que agregues sus locaciones.
           </li>
         )}
-        {summary.updates > 0 && <li>{summary.updates} completan registros que ya existían (no se pisa nada).</li>}
+        {summary.updates > 0 && <li>{summary.updates} completan registros que ya existían: solo lo vacío o lo que tú aceptaste, sin pisar nada más.</li>}
         {summary.deferred > 0 && (
           <li>
             {summary.deferred === 1 ? "1 pregunta queda pendiente" : `${summary.deferred} preguntas quedan pendientes`} para después.

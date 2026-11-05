@@ -5,7 +5,8 @@ import { companyNames } from "@/lib/companies";
 import { isUnlocated } from "@/lib/map/features";
 import { posterThumb } from "@/lib/poster-url";
 import { requestState } from "@/lib/request-state";
-import { FILM_KINDS, LAYERS, type Film, type InfoRequest, type Org } from "@/lib/types";
+import { filmTypeLabel } from "@/lib/film-types";
+import { LAYERS, type Film, type InfoRequest, type Org } from "@/lib/types";
 import { normalize } from "@/lib/utils";
 import { orgCategories } from "@/lib/categories";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
@@ -20,13 +21,13 @@ export function openRequestCounts(requests: InfoRequest[]) {
 export function filmRows(films: Film[], gaz: Gazetteer, open: Record<string, number>): RecordRow[] {
   return films.map((f) => {
     const places = f.locations.map((l) => gaz.muni(l.muni_ine)?.name ?? gaz.depto(l.depto_ine)?.name ?? l.site ?? "").filter(Boolean);
-    const kind = FILM_KINDS.find((k) => k.id === f.kind)?.label ?? "";
+    const kind = filmTypeLabel(f);
     return {
       id: f.id,
       name: f.title,
       meta: [f.year, kind].filter(Boolean).join(" · "),
       place: f.locations.length ? `${f.locations.length} ${f.locations.length === 1 ? "locación" : "locaciones"}` : "Sin locaciones",
-      types: f.kind ? [f.kind] : [],
+      types: [f.format ?? "sin_formato"],
       status: f.status,
       completeness: f.completeness,
       missing: f.missing_fields,
@@ -35,7 +36,7 @@ export function filmRows(films: Film[], gaz: Gazetteer, open: Record<string, num
       noFestivals: f.festivals.length === 0,
       openRequests: open[f.id] ?? 0,
       thumb: posterThumb(f.poster_url) ?? null,
-      search: normalize([f.title, f.director, f.producer, f.year, kind, ...places, ...f.festivals.map((x) => x.name), ...companyNames(f.companies)].filter(Boolean).join(" ")),
+      search: normalize([f.title, f.director, f.producer, f.year, kind, ...f.genres, ...places, ...f.festivals.map((x) => x.name), ...companyNames(f.companies)].filter(Boolean).join(" ")),
     };
   });
 }

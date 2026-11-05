@@ -7,16 +7,35 @@ import { useMemo, useState } from "react";
 import { PlaceSelect } from "@/components/records/PlaceSelect";
 import { CompletenessBadge } from "@/components/ui/Badges";
 import type { GeoBundle } from "@/lib/geo/load";
+import { planFilmUpdate, planOrgUpdate, type PlaceNames, type UpdateGroup, type UpdateItem, type UpdatePlan } from "@/lib/import/diff";
 import { candidatesToDataset } from "@/lib/import/preview";
 import { candidateStatus, setCandidateLocation } from "@/lib/import/questions";
 import type { Candidate, DuplicateDecision, ResolveResponse } from "@/lib/import/types";
-import { CIRC_CATEGORIES, IND_CATEGORIES, LAYERS, type LayerId } from "@/lib/types";
+import { CIRC_CATEGORIES, IND_CATEGORIES, LAYERS, type Film, type LayerId, type Org } from "@/lib/types";
 import type { ViewState } from "@/lib/view";
 import { cn } from "@/lib/utils";
 
 const MapCanvas = dynamic(() => import("@/components/map/MapCanvas"), { ssr: false });
 
 const PAGE = 40;
+
+const GROUP_TITLE: Record<UpdateGroup, string> = {
+  fill: "Completa (estaba vacío)",
+  add: "Agrega",
+  conflict: "Ya tiene otro valor",
+};
+
+/** Qué traería el archivo para un registro que ya existe; null si no hay con qué comparar. */
+function updatePlan(c: Candidate, names: PlaceNames): UpdatePlan | null {
+  const rec = c.duplicate?.record;
+  if (!rec) return null;
+  if (c.type === "film" && c.film) return planFilmUpdate(rec as Film, c.film, names);
+  if (c.type === "org" && c.org) return planOrgUpdate(rec as Org, c.org, names);
+  return null;
+}
+
+/** Lo que se acepta de un plan: la lista que eligió la persona o, sin elegir, lo que viene encendido. */
+const accepted = (c: Candidate, plan: UpdatePlan) => new Set(c.accept ?? plan.items.filter((i) => i.defaultOn).map((i) => i.id));
 type Filter = "all" | "doubts" | "dups";
 
 /** Cambia la categoría principal sin perder las demás que ya traía la fila. */
@@ -46,16 +65,19 @@ export function StepReview({
   const patch = (key: string, fn: (c: Candidate) => Candidate) =>
     onCandidates(candidates.map((c) => (c.key === key ? fn(c) : c)));
 
+  const names = useMemo<PlaceNames>(() => ({ muni: (code) => geo.gaz.muni(code)?.name ?? "", depto: (code) => geo.gaz.depto(code)?.name ?? "" }), [geo]);
+
   const stats = useMemo(() => {
     const live = candidates.filter((c) => c.include && c.decision !== "skip");
     return {
+      withNew: live.filter((c) => c.duplicate && c.decision === "update" && (updatePlan(c, names)?.news ?? 0) > 0).length,
       total: candidates.length,
       live: live.length,
       doubts: candidates.filter((c) => c.issues.length > 0).length,
       dups: candidates.filter((c) => c.duplicate).length,
       incomplete: live.filter((c) => candidateStatus(c).completeness < 100).length,
     };
-  }, [candidates]);
+  }, [candidates, names]);
 
   const shown = useMemo(() => {
     if (filter === "doubts") return candidates.filter((c) => c.issues.length > 0);
@@ -91,6 +113,7 @@ export function StepReview({
         <span className="text-muted"><b className="text-warn">{stats.doubts}</b> con dudas de lugar</span>
         <span className="text-muted"><b className="text-warn">{stats.incomplete}</b> incompletos</span>
         {stats.dups > 0 && <span className="text-muted"><b className="text-accent">{stats.dups}</b> posibles duplicados</span>}
+        {stats.dups > 0 && <span className="text-muted"><b className="text-accent">{stats.withNew}</b> existentes con datos nuevos</span>}
         <span className="ml-auto text-xs text-muted">{engine === "claude" ? "Lugares ubicados con ayuda de Claude" : "Lugares ubicados con la lista oficial"}</span>
       </div>
 
@@ -241,6 +264,7 @@ export function StepReview({
                           </select>
                         </div>
                       )}
+                      {c.duplicate && (c.decision ?? "update") === "update" && <UpdatePreview c={c} plan={updatePlan(c, names)} onAccept={(accept) => patch(c.key, (x) => ({ ...x, accept }))} />}
                       {c.issues
                         .filter((i) => i.level === "doubt" && !c.placeTexts.length)
                         .slice(0, 1)
@@ -303,6 +327,55 @@ export function StepReview({
           Continuar <ArrowRight className="h-4 w-4" />
         </button>
       </div>
+    </div>
+  );
+}
+
+/** «Qué se actualizaría»: lo que el archivo completa o agrega en el registro que ya existe, con casilla para cada cosa. */
+function UpdatePreview({ c, plan, onAccept }: { c: Candidate; plan: UpdatePlan | null; onAccept(ids: string[]): void }) {
+  if (!plan) return <p className="mt-2 text-xs text-muted">No pudimos comparar con el registro existente: se completarán solo los campos vacíos.</p>;
+  if (plan.items.length === 0)
+    return <p className="mt-2 rounded-xl border border-line px-3 py-2 text-xs text-muted">El archivo no trae nada nuevo para este registro: no se va a cambiar.</p>;
+  const on = accepted(c, plan);
+  const toggle = (it: UpdateItem) => {
+    const next = new Set(on);
+    if (next.has(it.id)) next.delete(it.id);
+    else next.add(it.id);
+    onAccept([...next]);
+  };
+  const groups: UpdateGroup[] = ["fill", "add", "conflict"];
+  return (
+    <div className="mt-2 rounded-xl border border-line px-3 py-2.5 text-xs">
+      <p className="font-medium text-ink">Qué se actualizaría</p>
+      {groups.map((g) => {
+        const items = plan.items.filter((i) => i.group === g);
+        if (!items.length) return null;
+        return (
+          <div key={g} className="mt-2">
+            <p className={cn("text-[10px] font-semibold uppercase tracking-[0.12em]", g === "conflict" ? "text-warn" : "text-muted")}>{GROUP_TITLE[g]}</p>
+            <ul className="mt-1 space-y-1">
+              {items.map((it) => (
+                <li key={it.id}>
+                  <label className="flex cursor-pointer items-start gap-2">
+                    <input type="checkbox" className="mt-0.5 accent-[rgb(var(--accent))]" checked={on.has(it.id)} onChange={() => toggle(it)} />
+                    <span className="min-w-0 flex-1">
+                      <span className="text-muted">{it.label}: </span>
+                      {g === "conflict" ? (
+                        <>
+                          <span className="text-muted line-through decoration-muted/50">{it.current}</span> <span aria-hidden>→</span> <span className="text-ink">{it.incoming}</span>
+                          <span className="ml-1.5 text-[11px] text-muted">Usar el del archivo</span>
+                        </>
+                      ) : (
+                        <span className="text-ink">{it.incoming}</span>
+                      )}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
     </div>
   );
 }

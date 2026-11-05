@@ -27,7 +27,8 @@ import {
   type FilmFilter,
   type OrgFilter,
 } from "@/lib/filters";
-import { FILM_KINDS, INITIATIVE_TYPES, NATIONALITIES, type Film, type Org } from "@/lib/types";
+import { customGenres, filmTypeLabel, FORMATS, genreOptions, NATURES } from "@/lib/film-types";
+import { INITIATIVE_TYPES, NATIONALITIES, type Film, type Org } from "@/lib/types";
 import { cn, fmtInt } from "@/lib/utils";
 
 interface Props {
@@ -56,6 +57,7 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
   const [of, setOf] = useState<OrgFilter>(() => parseOrgFilter(init));
   const [copied, setCopied] = useState(false);
 
+  const extraGenres = useMemo(() => customGenres(films), [films]);
   const deptoName = (c: number) => names[`depto:${c}`] ?? String(c);
   const muniName = (c: number) => names[`muni:${c}`] ?? String(c);
 
@@ -128,8 +130,10 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
             { label: "Formación", apply: () => setOf({ ...EMPTY_ORG_FILTER, categoria: ["Formación"] }) },
           ]
         : [
-            { label: "Ficción", apply: () => setFf({ ...EMPTY_FILM_FILTER, clase: ["ficcion"] }) },
-            { label: "Documentales", apply: () => setFf({ ...EMPTY_FILM_FILTER, clase: ["documental"] }) },
+            { label: "Ficción", apply: () => setFf({ ...EMPTY_FILM_FILTER, naturaleza: ["ficcion"] }) },
+            { label: "Documentales", apply: () => setFf({ ...EMPTY_FILM_FILTER, naturaleza: ["documental"] }) },
+            { label: "Largometrajes", apply: () => setFf({ ...EMPTY_FILM_FILTER, formato: ["largometraje"] }) },
+            { label: "Cortometrajes", apply: () => setFf({ ...EMPTY_FILM_FILTER, formato: ["cortometraje"] }) },
             { label: "Guatemaltecas desde 2010", apply: () => setFf({ ...EMPTY_FILM_FILTER, nacionalidad: ["guatemalteca"], desde: 2010 }) },
             { label: "Con presupuesto declarado", apply: () => setFf({ ...EMPTY_FILM_FILTER, presupuestoMin: 1 }) },
           ];
@@ -237,13 +241,9 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
                   ))}
                 </div>
                 <MultiSelect label="Departamento de rodaje" placeholder="Todo el país" value={ff.depto} onChange={(depto) => patchFilm({ depto })} options={deptoOptions} searchable />
-                <MultiSelect
-                  label="Tipo de obra"
-                  placeholder="Todos"
-                  value={ff.clase}
-                  onChange={(clase) => patchFilm({ clase })}
-                  options={FILM_KINDS.map((k) => ({ value: k.id, label: k.label }))}
-                />
+                <MultiSelect label="Formato" placeholder="Todos" value={ff.formato} onChange={(formato) => patchFilm({ formato })} options={FORMATS.map((k) => ({ value: k.id, label: k.label }))} />
+                <MultiSelect label="Naturaleza" placeholder="Cualquiera" value={ff.naturaleza} onChange={(naturaleza) => patchFilm({ naturaleza })} options={NATURES.map((k) => ({ value: k.id, label: k.label }))} />
+                <MultiSelect label="Género" placeholder="Todos" value={ff.genero} onChange={(genero) => patchFilm({ genero })} options={genreOptions(extraGenres)} searchable />
                 <MultiSelect
                   label="Nacionalidad"
                   placeholder="Cualquiera"
@@ -310,7 +310,7 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
                       <li key={f.id} className="flex items-baseline justify-between gap-4 px-4 py-2.5 text-sm">
                         <span className="min-w-0 truncate font-medium">{f.title}</span>
                         <span className="shrink-0 text-xs text-muted">
-                          {[f.year, FILM_KINDS.find((k) => k.id === f.kind)?.label, f.budget != null ? `${f.currency === "USD" ? "US$" : "Q"} ${fmtInt(f.budget)}` : null].filter(Boolean).join(" · ")}
+                          {[f.year, filmTypeLabel(f), f.budget != null ? `${f.currency === "USD" ? "US$" : "Q"} ${fmtInt(f.budget)}` : null].filter(Boolean).join(" · ")}
                         </span>
                       </li>
                     ))}

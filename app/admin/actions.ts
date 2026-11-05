@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { adminStore, requireSession } from "@/lib/auth";
+import { cleanGenres, parseFormat, parseNature, splitGenreText } from "@/lib/film-types";
 import { linkFestivals, syncOrgFestivalSafe } from "@/lib/festivals-server";
 import { serverGazetteer } from "@/lib/geo/server";
 import { deletePublicImages } from "@/lib/posters";
@@ -118,7 +119,7 @@ export async function deleteOrgAction(id: string): Promise<Result> {
   }
 }
 
-const FILM_FIELDS = new Set(["year", "kind", "director", "producer", "nationality", "budget", "synopsis"]);
+const FILM_FIELDS = new Set(["year", "director", "producer", "nationality", "budget", "synopsis"]);
 const ORG_FIELDS = new Set(["initiative_type", "web", "instagram", "contact", "description", "city"]);
 
 /** Guarda la respuesta y, si es posible, la aplica al registro correspondiente. */
@@ -147,6 +148,14 @@ export async function answerQuestionAction(id: string, answer: string | null, st
               if (target) Object.assign(target, loc);
               else input.locations = [...input.locations, loc];
             }
+          } else if (q.field === "format" || q.field === "nature" || q.field === "kind") {
+            // «kind» es el campo de las preguntas guardadas antes del cambio
+            const f = parseFormat(answer);
+            const n = parseNature(answer);
+            if (f && q.field !== "nature") input.format = f;
+            if (n && q.field !== "format") input.nature = n;
+          } else if (q.field === "genres") {
+            input.genres = cleanGenres([...(film.genres ?? []), ...splitGenreText(answer)]);
           } else if (FILM_FIELDS.has(q.field)) {
             (input as unknown as Record<string, unknown>)[q.field] = answer;
           }

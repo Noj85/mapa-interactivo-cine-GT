@@ -1,5 +1,6 @@
 "use client";
 
+import { customGenres } from "@/lib/film-types";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
 import { filmFilterActive, filterFilms, orgFilterActive, orgMatches } from "@/lib/filters";
 import { AnimatePresence, motion } from "framer-motion";
@@ -143,6 +144,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
     for (const o of data.orgs) if (o.layer === view.layer) for (const c of o.categories ?? []) if (!known.includes(c)) out.add(c);
     return [...out];
   }, [data.orgs, view.layer]);
+  const extraGenres = useMemo(() => customGenres(data.films), [data.films]);
   const aggs = useMemo(() => aggregate(shown, view.layer), [shown, view.layer]);
   const hasSelection = !!(view.place || view.film || view.org || view.noloc);
   const desktop = vw.w >= 900;
@@ -260,6 +262,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
             count={layerCount}
             total={layerTotal}
             extraCategories={extraCategories}
+            extraGenres={extraGenres}
             onFilm={(filmFilter) => commit({ ...view, filmFilter, film: null, org: null, noloc: false })}
             onOrg={(orgFilter) => commit({ ...view, orgFilter, film: null, org: null, noloc: false })}
             onMetric={(metric) => commit({ ...view, metric })}

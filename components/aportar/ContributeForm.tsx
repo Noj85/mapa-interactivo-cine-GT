@@ -60,7 +60,9 @@ export function ContributeForm({
         ? filmCompleteness({
             title: f.title,
             year: filmData.year,
-            kind: filmData.kind,
+            format: filmData.format,
+            nature: filmData.nature,
+            genres: filmData.genres,
             director: filmData.director,
             producer: filmData.producer,
             nationality: filmData.nationality,

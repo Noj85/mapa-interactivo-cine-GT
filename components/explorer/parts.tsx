@@ -7,7 +7,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Aggregates } from "@/lib/aggregate";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
-import { FILM_KINDS, type Dataset, type Film, type LayerId, type Org } from "@/lib/types";
+import { filmTypeLabel } from "@/lib/film-types";
+import type { Dataset, Film, LayerId, Org } from "@/lib/types";
 import type { Place, ViewState } from "@/lib/view";
 import { cn } from "@/lib/utils";
 import { CompletenessBadge } from "@/components/ui/Badges";
@@ -129,7 +130,7 @@ export function FilmCard({
   hereDepto?: number;
   onClick: () => void;
 }) {
-  const kind = FILM_KINDS.find((k) => k.id === film.kind)?.label;
+  const kind = filmTypeLabel(film);
   const here = film.locations.filter((l) =>
     hereMuni != null ? l.muni_ine === hereMuni : hereDepto != null ? (l.depto_ine ?? 0) === hereDepto : false,
   );
@@ -163,6 +164,10 @@ export function FilmCard({
           {film.locations.length > 1 && (
             <span className="chip !py-0 text-[11px]">{film.locations.length} locaciones</span>
           )}
+          {film.genres.slice(0, 2).map((g) => (
+            <span key={g} className="chip !py-0 text-[11px]">{g}</span>
+          ))}
+          {film.genres.length > 2 && <span className="text-[11px] text-muted">+{film.genres.length - 2}</span>}
           <CompletenessBadge pct={film.completeness} missing={film.missing_fields} compact />
         </span>
       </span>

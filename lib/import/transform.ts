@@ -1,4 +1,5 @@
 import { formatContact, parseContact } from "@/lib/contact";
+import { cleanGenres } from "@/lib/film-types";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import type { PolyCollection } from "@/lib/geo/load";
 import { municipalityAt } from "@/lib/geo/pip";
@@ -10,8 +11,10 @@ import {
   normalizeCategoryList,
   normalizeFestivalResult,
   normalizeInitiative,
+  normalizeFormat,
+  normalizeGenres,
   normalizeInstagram,
-  normalizeKind,
+  normalizeNature,
   normalizeNationality,
   normalizeWeb,
   parseCoord,
@@ -161,10 +164,16 @@ const addCompanies = (list: Company[], add: Company[]) => {
 function filmFields(row: Row, plan: SheetPlan): Omit<FilmInput, "locations" | "festivals" | "companies"> {
   const vm = plan.value_maps ?? {};
   const budgetRaw = val(row, plan, "budget");
+  // una misma columna puede traer formato y naturaleza («Largometraje documental»), y la de géneros puede traer la naturaleza
+  const fmtCell = val(row, plan, "format");
+  const natCell = val(row, plan, "nature");
+  const gen = normalizeGenres(val(row, plan, "genres"), vm.genres);
   return {
     title: cleanText(val(row, plan, "title")) ?? "",
     year: parseYear(val(row, plan, "year")),
-    kind: normalizeKind(val(row, plan, "kind"), vm.kind),
+    format: normalizeFormat(fmtCell, vm.format) ?? normalizeFormat(natCell, vm.format) ?? gen.format,
+    nature: normalizeNature(natCell, vm.nature) ?? normalizeNature(fmtCell, vm.nature) ?? gen.nature,
+    genres: gen.genres,
     director: cleanText(val(row, plan, "director")),
     producer: cleanText(val(row, plan, "producer")),
     nationality: normalizeNationality(val(row, plan, "nationality"), vm.nationality),
@@ -177,7 +186,10 @@ function filmFields(row: Row, plan: SheetPlan): Omit<FilmInput, "locations" | "f
 
 const merge = <T extends object>(a: T, b: T): T => {
   const out = { ...a } as Record<string, unknown>;
-  for (const [k, v] of Object.entries(b)) if ((out[k] === null || out[k] === undefined || out[k] === "") && v != null && v !== "") out[k] = v;
+  for (const [k, v] of Object.entries(b)) {
+    if (k === "genres") out[k] = cleanGenres([...((out[k] as string[]) ?? []), ...((v as string[]) ?? [])]);
+    else if ((out[k] === null || out[k] === undefined || out[k] === "") && v != null && v !== "") out[k] = v;
+  }
   return out as T;
 };
 

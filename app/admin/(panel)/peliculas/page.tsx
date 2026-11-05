@@ -6,7 +6,7 @@ import { RecordsTabs } from "@/components/admin/RecordsTabs";
 import { openRequestCounts, filmRows } from "@/lib/admin-rows";
 import { adminStore } from "@/lib/auth";
 import { serverGazetteer } from "@/lib/geo/server";
-import { FILM_KINDS } from "@/lib/types";
+import { FORMATS } from "@/lib/film-types";
 
 export default async function FilmsPage() {
   const store = await adminStore();
@@ -37,8 +37,8 @@ export default async function FilmsPage() {
           <RecordsTable
             kind="film"
             rows={filmRows(films, gaz, openRequestCounts(requests))}
-            typeLabel="Tipo"
-            typeOptions={FILM_KINDS.map((k) => ({ value: k.id, label: k.label }))}
+            typeLabel="Formato"
+            typeOptions={[...FORMATS.map((k) => ({ value: k.id, label: k.label })), { value: "sin_formato", label: "Sin formato (por revisar)" }]}
           />
         </Suspense>
       )}

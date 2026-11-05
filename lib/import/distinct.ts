@@ -17,6 +17,14 @@ const MAX_COLUMNS = 40;
  */
 export function distinctValues(sheet: ParsedSheet): Record<string, DistinctValue[]> {
   const out: Record<string, DistinctValue[]> = {};
+  const listLike = (counts: Map<string, number>, filled: number) => {
+    if (!filled || counts.size > MAX_VALUES) return false;
+    // una columna de títulos o de nombres no es una lista: casi cada valor es único
+    if (counts.size > 12 && counts.size > filled * 0.5) return false;
+    if (counts.size === filled && filled > 8) return false;
+    return true;
+  };
+  const sorted = (counts: Map<string, number>) => [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([v, n]) => ({ v, n }));
   for (const h of sheet.headers) {
     if (Object.keys(out).length >= MAX_COLUMNS) break;
     const counts = new Map<string, number>();
@@ -27,11 +35,26 @@ export function distinctValues(sheet: ParsedSheet): Record<string, DistinctValue
       filled++;
       counts.set(v, (counts.get(v) ?? 0) + 1);
     }
-    if (!filled || counts.size > MAX_VALUES) continue;
-    // una columna de títulos o de nombres no es una lista: casi cada valor es único
-    if (counts.size > 12 && counts.size > filled * 0.5) continue;
-    if (counts.size === filled && filled > 8) continue;
-    out[h] = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([v, n]) => ({ v, n }));
+    if (listLike(counts, filled)) {
+      out[h] = sorted(counts);
+      continue;
+    }
+    // Celdas con varios valores («Drama; Comedia, Terror»): cada una combinación es casi única, pero cada valor suelto se repite.
+    const tokens = new Map<string, number>();
+    let tokenTotal = 0;
+    let multi = 0;
+    for (const r of sheet.rows) {
+      const cell = (r[h] ?? "").trim();
+      if (!cell || cell.length > 160) continue;
+      const parts = cell.split(/[;,/|\n]+/).map((x) => x.trim()).filter(Boolean);
+      if (parts.length > 1) multi++;
+      for (const t of parts) {
+        if (t.length > 60) continue;
+        tokenTotal++;
+        tokens.set(t, (tokens.get(t) ?? 0) + 1);
+      }
+    }
+    if (multi >= 2 && tokens.size >= 2 && listLike(tokens, tokenTotal)) out[h] = sorted(tokens);
   }
   return out;
 }

@@ -4,6 +4,7 @@ import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeCategories, orgCategories } from "@/lib/categories";
 import { buildFilm, buildOrg, newId, uniqueSlug } from "@/lib/data/records";
+import { cleanGenres, isFormat, isNature, legacyKind, upgradeFilmPayload } from "@/lib/film-types";
 import { festivalSearchKey } from "@/lib/festivals";
 import { normalize } from "@/lib/utils";
 import { hashPassword, hashToken, normPassword, verifyPassword } from "@/lib/info-requests";
@@ -147,12 +148,26 @@ interface LocalDb {
 
 const DB_PATH = path.join(process.cwd(), ".data", "db.json");
 
+/** Producción guardada: completa lo que falte y convierte el antiguo «kind» en formato y naturaleza. */
+function readFilm(f: any): Film {
+  const { kind, ...rest } = f;
+  const legacy = f.format === undefined && f.nature === undefined ? legacyKind(kind) : { format: null, nature: null };
+  return {
+    ...rest,
+    format: isFormat(f.format) ? f.format : legacy.format,
+    nature: isNature(f.nature) ? f.nature : legacy.nature,
+    genres: cleanGenres(f.genres),
+    festivals: f.festivals ?? [],
+    companies: f.companies ?? [],
+  } as Film;
+}
+
 async function readDb(): Promise<LocalDb> {
   try {
     const raw = await fs.readFile(DB_PATH, "utf8");
     const j = JSON.parse(raw) as Partial<LocalDb>;
     return {
-      films: (j.films ?? []).map((f) => ({ ...f, festivals: f.festivals ?? [], companies: f.companies ?? [] })),
+      films: (j.films ?? []).map(readFilm),
       orgs: (j.orgs ?? []).map((o) => ({ ...o, categories: orgCategories(o) })),
       imports: j.imports ?? [],
       questions: j.questions ?? [],
@@ -161,6 +176,7 @@ async function readDb(): Promise<LocalDb> {
         origin: s.origin ?? "publico",
         request_id: s.request_id ?? null,
         submitter: s.submitter ?? null,
+        payload: s.kind === "film" ? upgradeFilmPayload(s.payload) : s.payload,
       })),
       festivals: (j.festivals ?? []).map((f) => ({ ...f, org_id: f.org_id ?? null })),
       info_requests: j.info_requests ?? [],
@@ -576,6 +592,7 @@ const rowToSubmission = (r: any): Submission => ({
   origin: r.origin ?? "publico",
   request_id: r.request_id ?? null,
   submitter: r.submitter ?? null,
+  payload: r.kind === "film" ? upgradeFilmPayload(r.payload) : r.payload,
 });
 
 const rowToFilm = (r: any): Film => ({
@@ -583,7 +600,9 @@ const rowToFilm = (r: any): Film => ({
   slug: r.slug,
   title: r.title,
   year: r.year,
-  kind: r.kind,
+  format: isFormat(r.format) ? r.format : legacyKind(r.kind).format,
+  nature: isNature(r.nature) ? r.nature : legacyKind(r.kind).nature,
+  genres: Array.isArray(r.genres) ? r.genres.map(String) : [],
   director: r.director,
   producer: r.producer,
   nationality: r.nationality,
@@ -670,7 +689,9 @@ export class SupabaseStore implements Store {
         slug: film.slug,
         title: film.title,
         year: film.year,
-        kind: film.kind,
+        format: film.format,
+        nature: film.nature,
+        genres: film.genres,
         director: film.director,
         producer: film.producer,
         companies: film.companies,

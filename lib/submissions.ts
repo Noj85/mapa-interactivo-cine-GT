@@ -2,7 +2,8 @@ import { orgCategories } from "@/lib/categories";
 import { companiesText } from "@/lib/companies";
 import { describeFestival, sortFestivals } from "@/lib/festivals";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
-import { FILM_KINDS, INITIATIVE_TYPES, LAYERS, NATIONALITIES, type Film, type FilmInput, type Org, type OrgInput, type Submission } from "@/lib/types";
+import { formatLabel, natureLabel } from "@/lib/film-types";
+import { INITIATIVE_TYPES, LAYERS, NATIONALITIES, type Film, type FilmInput, type Org, type OrgInput, type Submission } from "@/lib/types";
 import { fmtInt, fmtMoney } from "@/lib/utils";
 
 export interface DiffRow {
@@ -47,13 +48,17 @@ export function diffSubmission(sub: Submission, current: Film | Org | null, gaz:
   if (sub.kind === "film") {
     const p = sub.payload as FilmInput;
     const c = (current as Film | null) ?? null;
-    const kind = (k: string | null | undefined) => FILM_KINDS.find((x) => x.id === k)?.label ?? null;
+    const fmt = (k: string | null | undefined) => formatLabel(k) || null;
+    const natu = (k: string | null | undefined) => natureLabel(k) || null;
+    const gens = (g: string[] | undefined) => (g && g.length ? g.join(", ") : null);
     const nat = (k: string | null | undefined) => NATIONALITIES.find((x) => x.id === k)?.label ?? null;
     const money = (v: number | null | undefined, cur?: string) => (v == null ? null : `${cur === "USD" ? "US$" : "Q"} ${fmtInt(v)}`);
     const rows = [
       row("Título", c?.title ?? null, p.title, isNew),
       row("Año", c?.year != null ? String(c.year) : null, p.year != null ? String(p.year) : null, isNew),
-      row("Tipo", kind(c?.kind), kind(p.kind), isNew),
+      row("Formato", fmt(c?.format), fmt(p.format), isNew),
+      row("Naturaleza", natu(c?.nature), natu(p.nature), isNew),
+      row("Géneros", gens(c?.genres), gens(p.genres), isNew),
       row("Nacionalidad", nat(c?.nationality), nat(p.nationality), isNew),
       row("Casas productoras", c ? companiesText(c.companies, "\n") || null : null, companiesText(p.companies, "\n") || null, isNew),
       row("Director/a", c?.director ?? null, p.director ?? null, isNew),

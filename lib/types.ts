@@ -1,3 +1,4 @@
+import type { FilmFormat, FilmNature } from "@/lib/film-types";
 export type LayerId = "produccion" | "circulacion" | "industria";
 
 export type MetricId = "films" | "days" | "spend" | "jobs" | "orgs";
@@ -75,7 +76,12 @@ export interface Film {
   slug: string;
   title: string;
   year: number | null;
-  kind: FilmKind | null;
+  /** Largometraje, cortometraje, serie, video musical… */
+  format: FilmFormat | null;
+  /** Ficción, documental o híbrido. */
+  nature: FilmNature | null;
+  /** Géneros estándar o propios (por su nombre). */
+  genres: string[];
   director: string | null;
   producer: string | null;
   nationality: Nationality | null;
@@ -94,7 +100,6 @@ export interface Film {
   companies: FilmCompany[];
 }
 
-export type FilmKind = "ficcion" | "documental" | "serie" | "comercial" | "corto" | "otro";
 export type Nationality = "guatemalteca" | "coproduccion" | "extranjera";
 
 export type InitiativeType = "publica" | "privada" | "comunitaria" | "transnacional";
@@ -146,15 +151,6 @@ export interface GazetteerEntry {
   bbox: [number, number, number, number];
   aliases: string[];
 }
-
-export const FILM_KINDS: { id: FilmKind; label: string }[] = [
-  { id: "ficcion", label: "Ficción" },
-  { id: "documental", label: "Documental" },
-  { id: "serie", label: "Serie" },
-  { id: "comercial", label: "Comercial / publicidad" },
-  { id: "corto", label: "Cortometraje" },
-  { id: "otro", label: "Otro" },
-];
 
 export const NATIONALITIES: { id: Nationality; label: string }[] = [
   { id: "guatemalteca", label: "Guatemalteca" },
@@ -252,7 +248,9 @@ export interface FilmInput {
   id?: string;
   title: string;
   year?: number | null;
-  kind?: FilmKind | null;
+  format?: FilmFormat | null;
+  nature?: FilmNature | null;
+  genres?: string[];
   director?: string | null;
   producer?: string | null;
   nationality?: Nationality | null;
