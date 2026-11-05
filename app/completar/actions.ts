@@ -10,11 +10,11 @@ import type { FilmInput, InfoRequest, OrgInput, Film, Org } from "@/lib/types";
 type Reason = "not_found" | "bad_password" | "expired" | "revoked" | "locked";
 
 const MESSAGES: Record<Reason, string> = {
-  not_found: "Este enlace no es válido o ya no existe. Revisa que esté completo o pide uno nuevo al equipo de PROCINE.",
-  bad_password: "La contraseña no es correcta. Revisa el mensaje que recibiste (no importa si usas mayúsculas).",
-  expired: "Este enlace venció. Pide uno nuevo al equipo de PROCINE.",
-  revoked: "Este enlace ya no está disponible. Pide uno nuevo al equipo de PROCINE.",
-  locked: "Hubo demasiados intentos con contraseña incorrecta y el enlace se bloqueó por seguridad. Pide uno nuevo al equipo de PROCINE.",
+  not_found: "Este enlace no es válido o ya no existe. Revisa que esté completo o pide uno nuevo al equipo de PROCINE y la Academia.",
+  bad_password: "La clave no es correcta. Revisa el mensaje que recibiste (no importa si usas mayúsculas).",
+  expired: "Este enlace venció. Pide uno nuevo al equipo de PROCINE y la Academia.",
+  revoked: "Este enlace ya no está disponible. Pide uno nuevo al equipo de PROCINE y la Academia.",
+  locked: "Hubo demasiados intentos con clave incorrecta y el enlace se bloqueó por seguridad. Pide uno nuevo al equipo de PROCINE y la Academia.",
 };
 
 const clientIp = async () => ((await headers()).get("x-forwarded-for") ?? "").split(",")[0].trim() || "local";
@@ -23,7 +23,7 @@ export type OpenResult =
   | { ok: true; request: InfoRequest; film?: Film; org?: Org }
   | { ok: false; error: string };
 
-/** Abre el enlace privado con su contraseña y devuelve el registro (aunque esté oculto del mapa). */
+/** Abre el enlace privado con su clave y devuelve el registro (aunque esté oculto del mapa). */
 export async function openRequestAction(token: string, password: string): Promise<OpenResult> {
   if (typeof token !== "string" || token.length < 16 || token.length > 100 || typeof password !== "string" || !password.trim() || password.length > 100) {
     return { ok: false, error: MESSAGES.not_found };

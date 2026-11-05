@@ -28,14 +28,11 @@ export function AdminNav({ email, pendingSubmissions = 0 }: { email: string; pen
   const path = usePathname();
   return (
     <header className="sticky top-0 z-30 border-b border-line border-t-2 border-t-accent bg-bg/95 backdrop-blur-xl">
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4">
-        <Link href="/admin" className="mr-3 flex shrink-0 items-center" aria-label="Consola de administración, inicio" title="Consola de administración">
-          <span className="hidden whitespace-nowrap text-xs font-semibold uppercase tracking-[0.14em] text-ink sm:block">
-            <span className="hidden xl:inline">Consola de administración</span>
-            <span className="xl:hidden">Administración</span>
-          </span>
+      <div className="flex h-14 w-full items-center gap-2 px-4 lg:px-6">
+        <Link href="/admin" className="mr-3 hidden shrink-0 items-center xl:flex" aria-label="Consola de administración, inicio" title="Consola de administración">
+          <span className="hidden whitespace-nowrap text-xs font-semibold uppercase tracking-[0.14em] text-ink xl:block">Consola de administración</span>
         </Link>
-        <nav className="flex flex-1 items-center gap-0.5 overflow-x-auto">
+        <nav className="flex min-w-0 flex-1 items-center gap-0.5">
           {items.map((it) => {
             const active = it.isActive(path);
             return (
@@ -50,7 +47,7 @@ export function AdminNav({ email, pendingSubmissions = 0 }: { email: string; pen
                 )}
               >
                 <it.icon className="h-4 w-4" aria-hidden />
-                <span className="hidden md:inline">{it.label}</span>
+                <span className="hidden lg:inline">{it.label}</span>
                 {"badge" in it && it.badge && pendingSubmissions > 0 && (
                   <span
                     className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-semibold text-accent-ink"
@@ -76,7 +73,7 @@ export function AdminNav({ email, pendingSubmissions = 0 }: { email: string; pen
         <Link href="/" className="btn-ghost h-9 gap-1.5 px-2.5 text-xs xl:px-3" aria-label="Vista pública" title="Vista pública">
           <Globe className="h-4 w-4" /> <span className="hidden xl:inline">Vista pública</span>
         </Link>
-        <span className="hidden text-xs text-muted lg:block">{email}</span>
+        <span className="hidden max-w-[16rem] truncate text-xs text-muted 2xl:block">{email}</span>
         <form action={logoutAction}>
           <button className="btn-ghost h-9 w-9 !p-0" aria-label="Salir" title="Salir">
             <LogOut className="h-4 w-4" />

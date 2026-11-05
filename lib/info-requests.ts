@@ -5,21 +5,18 @@ import type { SubmissionKind } from "@/lib/types";
 /** Días de vigencia que se ofrecen al crear una solicitud. */
 export const REQUEST_DAYS = [15, 30, 60] as const;
 export const DEFAULT_REQUEST_DAYS = 30;
-const WORDS = [
-  "cine", "luz", "lente", "guion", "toma", "escena", "corte", "plano", "foco", "volcan", "lago", "selva", "maiz",
-  "jade", "quetzal", "ceiba", "cacao", "tinta", "marimba", "luna", "rio", "monte", "nube", "brisa", "fuego",
-  "tierra", "pino", "roble", "cobre", "plata", "alba", "ocaso", "trigo", "colibri", "tucan", "jaguar", "venado",
-  "iguana", "tortuga", "lirio", "orquidea", "girasol", "bambu", "coral", "perla", "onda", "faro", "ancla",
-  "velero", "puente", "torre", "arco", "camino", "sendero", "aurora", "bruma", "cumbre", "valle", "llano", "cielo",
-];
 
 /** Enlace secreto: 24 bytes aleatorios en base64url (imposible de adivinar). */
 export const generateToken = () => randomBytes(24).toString("base64url");
 
-/** Contraseña fácil de dictar: «cine-selva-4821». */
+/** Letras y números sin caracteres que se confunden al dictar o copiar (sin 0/o ni 1/l/i). */
+const KEY_CHARS = "abcdefghjkmnpqrstuvwxyz23456789";
+
+/** Clave corta de 5 caracteres alfanuméricos, fácil de dictar: «k7m3x». Se compara sin distinguir mayúsculas. */
 export function generatePassword() {
-  const w = () => WORDS[randomInt(WORDS.length)];
-  return `${w()}-${w()}-${randomInt(1000, 10000)}`;
+  let key = "";
+  for (let n = 0; n < 5; n++) key += KEY_CHARS[randomInt(KEY_CHARS.length)];
+  return key;
 }
 
 /** El enlace nunca se guarda: solo su huella. */
@@ -51,8 +48,8 @@ export interface RequestMessageInput {
   kind: SubmissionKind;
   title: string;
   year?: number | null;
-  siteUrl: string;
   link: string;
+  /** La clave de acceso (5 caracteres). */
   password: string;
   expiresAt: string;
   missing: string[];
@@ -61,7 +58,8 @@ export interface RequestMessageInput {
 
 /**
  * Mensaje listo para pegar en WhatsApp o en un correo. Texto plano, sin formato propio de WhatsApp,
- * para que se vea igual en los dos. Deja claro quién escribe y que no es un mensaje al azar.
+ * para que se vea igual en los dos. Breve y cordial; deja claro quién escribe (PROCINE, proyecto que
+ * ejecuta la Academia) y no incluye la dirección del mapa: solo el enlace privado.
  */
 export function buildRequestMessage(i: RequestMessageInput): { subject: string; body: string } {
   const isFilm = i.kind === "film";
@@ -71,21 +69,22 @@ export function buildRequestMessage(i: RequestMessageInput): { subject: string; 
   const missing = i.missing.length
     ? `Nos falta o necesitamos confirmar: ${i.missing.join(", ")}.`
     : "Le pedimos revisar la información que tenemos y completar lo que haga falta.";
-  const subject = `Solicitud de información: ${label} · Mapa del Cine de Guatemala`;
+  const subject = `Solicitud de información: ${label} · PROCINE`;
   const body = [
     greeting,
     "",
-    `Le escribimos del Eje de Investigación de PROCINE y la Academia de Cine de Guatemala. Estamos documentando la producción audiovisual del país en el Mapa del Cine de Guatemala (${i.siteUrl}), una herramienta pública de consulta, y queremos incluir correctamente ${what} ${label}.`,
+    `Le escribimos desde PROCINE, proyecto de fortalecimiento del sector cinematográfico de Guatemala que ejecuta la Academia de Cine de Guatemala. Como parte de su eje de investigación estamos documentando el cine nacional en el Mapa del Cine de Guatemala, y queremos incluir correctamente ${what} ${label}.`,
     "",
-    `Este mensaje es un contacto directo para un trabajo de investigación: le pedimos su ayuda para completar o corregir la información. ${missing}`,
+    missing,
     "",
+    "¿Nos ayuda a completarla? Es solo un formulario breve:",
     `Enlace privado: ${i.link}`,
-    `Contraseña: ${i.password}`,
+    `Clave: ${i.password}`,
     "",
-    `Es solo para ${what} ${label} y es válido hasta el ${dateEs(i.expiresAt)}. El equipo de PROCINE revisa toda la información antes de publicarla. Si tiene dudas, puede responder a este mensaje.`,
+    `Es solo para ${what} ${label} y es válido hasta el ${dateEs(i.expiresAt)}. Revisamos toda la información antes de publicarla. Si tiene dudas, puede responder a este mensaje.`,
     "",
-    "Muchas gracias por su apoyo.",
-    "Eje de Investigación · PROCINE / Academia de Cine de Guatemala",
+    "Muchas gracias.",
+    "PROCINE · Academia de Cine de Guatemala",
   ].join("\n");
   return { subject, body };
 }

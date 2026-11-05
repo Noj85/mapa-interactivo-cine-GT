@@ -23,8 +23,8 @@ async function copy(text: string) {
 }
 
 /**
- * Genera el enlace privado + contraseña de uno o varios registros y deja el mensaje listo para
- * WhatsApp o correo. La contraseña solo se ve en esta pantalla.
+ * Genera el enlace privado + clave de uno o varios registros y deja el mensaje listo para
+ * WhatsApp o correo. La clave solo se ve en esta pantalla.
  */
 export function RequestInfoDialog({ kind, targets, onClose }: { kind: SubmissionKind; targets: RequestTarget[]; onClose: () => void }) {
   const router = useRouter();
@@ -71,9 +71,9 @@ export function RequestInfoDialog({ kind, targets, onClose }: { kind: Submission
             <h2 className="font-display text-xl">Solicitar información</h2>
             <p className="mt-0.5 text-sm text-muted">
               {single ? (
-                <>Un enlace privado con contraseña para completar {isFilm ? "la producción" : "la entidad"} <b className="font-medium text-ink">«{targets[0].title}»</b>.</>
+                <>Un enlace privado con clave para completar {isFilm ? "la producción" : "la entidad"} <b className="font-medium text-ink">«{targets[0].title}»</b>.</>
               ) : (
-                <>Un enlace privado y una contraseña distintos para cada uno de los {targets.length} registros.</>
+                <>Un enlace privado y una clave distintos para cada uno de los {targets.length} registros.</>
               )}
             </p>
           </div>
@@ -126,7 +126,7 @@ export function RequestInfoDialog({ kind, targets, onClose }: { kind: Submission
         ) : (
           <div className="space-y-5">
             <p className="rounded-xl border border-warn/40 bg-warn/5 px-3 py-2 text-xs leading-relaxed text-warn">
-              La contraseña solo se muestra ahora. Copia el mensaje antes de cerrar; si lo pierdes, genera otra solicitud.
+              La clave solo se muestra ahora. Copia el mensaje antes de cerrar; si lo pierdes, genera otra solicitud.
             </p>
             {items.map((it, i) => {
               const body = bodies[i] ?? it.body;

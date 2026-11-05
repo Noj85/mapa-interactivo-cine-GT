@@ -58,7 +58,6 @@ export async function createInfoRequestsAction(
         kind,
         title,
         year: "year" in rec ? rec.year : null,
-        siteUrl: base,
         link,
         password,
         expiresAt: expires_at,

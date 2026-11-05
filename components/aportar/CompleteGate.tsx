@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { openRequestAction, type OpenResult } from "@/app/completar/actions";
 import { ContributeForm } from "@/components/aportar/ContributeForm";
 
-/** Pantalla de contraseña del enlace privado; con la contraseña correcta muestra el formulario ya precargado. */
+/** Pantalla de clave del enlace privado; con la clave correcta muestra el formulario ya precargado. */
 export function CompleteGate({ token }: { token: string }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export function CompleteGate({ token }: { token: string }) {
     const title = opened.film?.title ?? opened.org?.name ?? "";
     return (
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Eje de Investigación · PROCINE y Academia de Cine</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">PROCINE · Academia de Cine de Guatemala</p>
         <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight sm:text-[44px]">Completar información</h1>
         <p className="mt-3 max-w-3xl text-[15px] leading-relaxed text-muted">
           Gracias por ayudarnos a documentar el cine de Guatemala. Revisa los datos de <b className="text-ink">{title}</b>, corrige lo que esté mal y agrega lo que falte. Este espacio es privado para {opened.film ? "esta producción" : "esta entidad"}.
@@ -47,18 +47,19 @@ export function CompleteGate({ token }: { token: string }) {
         </span>
         <h1 className="mt-4 font-display text-3xl tracking-tight">Enlace privado</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-muted">
-          El Eje de Investigación de PROCINE y la Academia de Cine de Guatemala te compartió este enlace para completar información para el Mapa del Cine de Guatemala. Escribe la contraseña que viene en el mensaje.
+          PROCINE, proyecto que ejecuta la Academia de Cine de Guatemala, te compartió este enlace para completar información para el Mapa del Cine de Guatemala. Escribe la clave de 5 caracteres que viene en el mensaje.
         </p>
         <form onSubmit={open} className="mt-5 space-y-3">
           <div>
-            <label className="label" htmlFor="rq-pass">Contraseña</label>
+            <label className="label" htmlFor="rq-pass">Clave</label>
             <input
               id="rq-pass"
               className="field text-base"
               autoComplete="off"
               autoCapitalize="none"
               spellCheck={false}
-              placeholder="ejemplo: cine-selva-4821"
+              placeholder="5 caracteres, ej.: k7m3x"
+              maxLength={20}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoFocus
