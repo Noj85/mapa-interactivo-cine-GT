@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { adminStore, requireSession } from "@/lib/auth";
+import { linkFestivals } from "@/lib/festivals-server";
 import { serverGazetteer } from "@/lib/geo/server";
 import { deletePublicImages } from "@/lib/posters";
 import { filmSchema, orgSchema } from "@/lib/schemas";
@@ -19,7 +20,10 @@ export async function saveFilmAction(raw: unknown): Promise<Result> {
   const parsed = filmSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
-    const film = await (await adminStore()).saveFilm(parsed.data as unknown as FilmInput);
+    const store = await adminStore();
+    const data = parsed.data as unknown as FilmInput;
+    data.festivals = await linkFestivals(store, data.festivals);
+    const film = await store.saveFilm(data);
     refresh();
     return { ok: true, id: film.id };
   } catch (e) {
@@ -56,20 +60,34 @@ export async function setPosterAction(filmId: string, url: string | null): Promi
   }
 }
 
-/** Publica todas las producciones en borrador que ya tienen título (las que no tienen lugar salen en «Sin ubicación»). */
-export async function publishDraftFilmsAction(): Promise<{ ok: true; published: number } | { ok: false; error: string }> {
+/** Publica (en el mapa) u oculta varios registros a la vez. */
+export async function setRecordsStatusAction(
+  kind: "film" | "org",
+  ids: string[],
+  status: RecordStatus,
+): Promise<{ ok: true; count: number; skipped: number } | { ok: false; error: string }> {
   await requireSession();
+  let list = [...new Set(ids)].filter((x) => typeof x === "string" && x.length > 0 && x.length <= 80).slice(0, 2000);
+  if (!list.length) return { ok: false, error: "No hay registros seleccionados" };
+  if (status !== "published" && status !== "draft") return { ok: false, error: "Estado no válido" };
   try {
     const store = await adminStore();
-    const drafts = (await store.listFilms({ drafts: true })).filter((f) => f.status === "draft" && f.title.trim());
-    let published = 0;
-    for (const film of drafts) {
-      await store.saveFilm({ ...film, locations: film.locations, status: "published" });
-      published++;
+    const before = list.length;
+    if (status === "published" && kind === "org") {
+      // una entidad necesita categoría y lugar para poder mostrarse en el mapa
+      const ok = new Set(
+        (await store.listOrgs({ drafts: true }))
+          .filter((o) => o.category && (o.depto_ine != null || o.muni_ine != null || (o.lat != null && o.lng != null)))
+          .map((o) => o.id),
+      );
+      list = list.filter((id) => ok.has(id));
     }
+    if (list.length) await store.setRecordsStatus(kind, list, status);
     refresh();
     revalidatePath("/admin/peliculas");
-    return { ok: true, published };
+    revalidatePath("/admin/entidades");
+    revalidatePath("/admin/resumen");
+    return { ok: true, count: list.length, skipped: before - list.length };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
@@ -156,8 +174,8 @@ const SOURCE_PUBLIC = "Aporte del público";
 
 /**
  * Aprueba un aporte: crea el registro (nuevo) o aplica la corrección sobre el existente.
- * `publish` solo aplica a registros nuevos; una corrección conserva el estado, y el póster o logo actuales
- * salvo que el aporte traiga una imagen nueva.
+ * `publish` en un registro nuevo lo publica o lo deja oculto; en una corrección, `publish` además lo muestra en el mapa
+ * (si no, conserva su estado). El póster o logo actuales se conservan salvo que el aporte traiga una imagen nueva.
  */
 export async function approveSubmissionAction(
   id: string,
@@ -176,13 +194,15 @@ export async function approveSubmissionAction(
       const parsed = filmSchema.safeParse(sub.payload);
       if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
       const input = parsed.data as unknown as FilmInput;
+      // los festivales nuevos del aporte entran al catálogo (o se unen a uno que ya existe)
+      input.festivals = await linkFestivals(store, input.festivals);
       const current = sub.target_id ? await store.getFilm(sub.target_id) : null;
       if (sub.target_id && !current) return { ok: false, error: "El registro a corregir ya no existe" };
       // el póster del aporte solo reemplaza al actual si trae uno nuevo
       const poster = input.poster_url || current?.poster_url || null;
       const film = await store.saveFilm(
         current
-          ? { ...input, id: current.id, poster_url: poster, status: current.status, source: undefined }
+          ? { ...input, id: current.id, poster_url: poster, status: opts.publish ? "published" : current.status, source: undefined }
           : { ...input, poster_url: poster, status: newStatus, source: SOURCE_PUBLIC },
       );
       if (current?.poster_url && poster !== current.poster_url) await deletePublicImages([current.poster_url]);
@@ -196,7 +216,7 @@ export async function approveSubmissionAction(
       const logo = input.logo_url || current?.logo_url || null;
       const org = await store.saveOrg(
         current
-          ? { ...input, id: current.id, logo_url: logo, status: current.status, source: current.source }
+          ? { ...input, id: current.id, logo_url: logo, status: opts.publish ? "published" : current.status, source: current.source }
           : { ...input, logo_url: logo, status: newStatus, source: SOURCE_PUBLIC },
       );
       if (current?.logo_url && logo !== current.logo_url) await deletePublicImages([current.logo_url]);

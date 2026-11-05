@@ -1,8 +1,8 @@
 "use client";
 
-import { AlertCircle, MapPin, MessageSquarePlus, Pencil } from "lucide-react";
+import { AlertCircle, Award, ExternalLink, MapPin, MessageSquarePlus, Pencil } from "lucide-react";
 import Link from "next/link";
-import { FILM_KINDS, NATIONALITIES } from "@/lib/types";
+import { FESTIVAL_RESULTS, FILM_KINDS, NATIONALITIES } from "@/lib/types";
 import { fmtInt, fmtMoney } from "@/lib/utils";
 import { CompletenessBadge, CompletenessMeter } from "@/components/ui/Badges";
 import { PanelShell, type PanelCtx, SectionTitle, Stat } from "./parts";
@@ -24,6 +24,9 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
   const jobs = film.locations.reduce((s, l) => s + (l.jobs ?? 0), 0);
   const known = (k: "days" | "local_spend" | "jobs") => film.locations.some((l) => l[k] != null);
   const meta = [film.year, kind, nat].filter(Boolean).join(" · ");
+  // Lo más reciente primero; los premios antes que las selecciones dentro de un mismo año.
+  const rank = (r: string) => FESTIVAL_RESULTS.findIndex((x) => x.id === r);
+  const fests = [...(film.festivals ?? [])].sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || rank(a.result) - rank(b.result));
 
   return (
     <PanelShell eyebrow="Producción" onBack={go.up} onClose={go.clear}>
@@ -138,6 +141,40 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
         })}
         {film.locations.length === 0 && <li className="text-sm text-muted">Sin lugar de rodaje registrado: aparece en la zona «Sin ubicación», fuera del territorio.</li>}
       </ol>
+
+      {fests.length > 0 && (
+        <>
+          <SectionTitle aside={`${fests.length}`}>Festivales y premios</SectionTitle>
+          <ul className="space-y-1.5">
+            {fests.map((x) => {
+              const result = FESTIVAL_RESULTS.find((r) => r.id === x.result)?.label;
+              const where = [x.city, x.country].filter(Boolean).join(", ");
+              return (
+                <li key={x.id} className="flex items-start gap-3 rounded-2xl border border-line/60 px-3 py-2.5">
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 text-accent">
+                    <Award className="h-3.5 w-3.5" aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm text-ink">
+                      {x.url && /^https?:\/\//i.test(x.url) ? (
+                        <a href={x.url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 hover:text-accent hover:underline">
+                          {x.name}
+                          <ExternalLink className="h-3 w-3 shrink-0" aria-label="Abre en otra pestaña" />
+                        </a>
+                      ) : (
+                        x.name
+                      )}
+                      {x.year != null && <span className="text-muted"> · {x.year}</span>}
+                    </span>
+                    <span className="block text-xs text-muted">{[result, x.section, x.award].filter(Boolean).join(" · ")}</span>
+                    {where && <span className="block text-xs text-muted/80">{where}</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
     </PanelShell>
   );
 }

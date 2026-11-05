@@ -1,6 +1,6 @@
 import { filmCompleteness, orgCompleteness } from "@/lib/completeness";
 import { normalizeCategories } from "@/lib/categories";
-import type { Film, FilmInput, FilmLocation, Org, OrgInput } from "@/lib/types";
+import { FESTIVAL_RESULTS, type Film, type FilmFestival, type FilmInput, type FilmLocation, type Org, type OrgInput } from "@/lib/types";
 import { slugify } from "@/lib/utils";
 
 const num = (v: unknown): number | null => {
@@ -29,8 +29,26 @@ export function uniqueSlug(base: string, taken: Set<string>, year?: number | nul
   return s;
 }
 
-export function buildFilm(input: FilmInput, opts: { id?: string; slug: string }): Film {
+const FESTIVAL_RESULT_IDS = new Set(FESTIVAL_RESULTS.map((r) => r.id));
+
+export function buildFilm(input: FilmInput, opts: { id?: string; slug: string; existing?: Film | null }): Film {
   const id = input.id ?? opts.id ?? newId();
+  // Sin `festivals` en la entrada se conservan los que ya tenía (p. ej. al publicar o cambiar el póster).
+  const festivals: FilmFestival[] = (input.festivals ?? opts.existing?.festivals ?? [])
+    .filter((f) => str(f.name))
+    .map((f, i) => ({
+      id: f.id ?? `${id}-fest-${i}`,
+      film_id: id,
+      festival_id: str(f.festival_id),
+      name: str(f.name)!,
+      year: num(f.year),
+      country: str(f.country),
+      city: str(f.city),
+      result: f.result && FESTIVAL_RESULT_IDS.has(f.result) ? f.result : "seleccion",
+      section: str(f.section),
+      award: str(f.award),
+      url: str(f.url),
+    }));
   const locations: FilmLocation[] = (input.locations ?? []).map((l, i) => {
     const muni = num(l.muni_ine);
     const depto = num(l.depto_ine) ?? (muni != null ? Math.floor(muni / 100) : null);
@@ -66,6 +84,7 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string })
     id,
     slug: opts.slug,
     ...base,
+    festivals,
     // Sin el mínimo (título) nunca se publica. Sin lugar de rodaje sale en «Sin ubicación».
     status: c.publishable && input.status === "published" ? "published" : "draft",
     completeness: c.completeness,

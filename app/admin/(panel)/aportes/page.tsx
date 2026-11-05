@@ -1,7 +1,7 @@
 import { ArrowRight, Clapperboard, Inbox, Landmark } from "lucide-react";
 import Link from "next/link";
 import { adminStore } from "@/lib/auth";
-import type { SubmissionStatus } from "@/lib/types";
+import type { SubmissionOrigin, SubmissionStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const TABS: { id: SubmissionStatus; label: string }[] = [
@@ -10,25 +10,35 @@ const TABS: { id: SubmissionStatus; label: string }[] = [
   { id: "rejected", label: "Rechazados" },
 ];
 
-export default async function AportesPage({ searchParams }: { searchParams: Promise<{ estado?: string }> }) {
-  const { estado } = await searchParams;
+const ORIGINS: { id: "todos" | SubmissionOrigin; label: string }[] = [
+  { id: "todos", label: "Todos" },
+  { id: "publico", label: "Del público" },
+  { id: "recopilacion", label: "Recopilación" },
+];
+
+export default async function AportesPage({ searchParams }: { searchParams: Promise<{ estado?: string; origen?: string }> }) {
+  const { estado, origen } = await searchParams;
   const status = (TABS.find((t) => t.id === estado)?.id ?? "pending") as SubmissionStatus;
-  const all = await (await adminStore()).listSubmissions();
+  const origin = ORIGINS.find((o) => o.id === origen)?.id ?? "todos";
+  const everything = await (await adminStore()).listSubmissions();
+  const all = origin === "todos" ? everything : everything.filter((x) => x.origin === origin);
   const count = (s: SubmissionStatus) => all.filter((x) => x.status === s).length;
   const list = all.filter((x) => x.status === status);
+  const href = (e: SubmissionStatus, o: string) => `/admin/aportes?estado=${e}${o !== "todos" ? `&origen=${o}` : ""}`;
 
   return (
     <div>
-      <h1 className="font-display text-4xl tracking-tight">Aportes del público</h1>
+      <h1 className="font-display text-4xl tracking-tight">Aportes</h1>
       <p className="mt-1 max-w-2xl text-sm text-muted">
-        Propuestas enviadas desde el mapa. No se publican hasta que las revises: puedes aprobarlas tal cual, editarlas antes o rechazarlas.
+        Propuestas del público y datos que envió el equipo de una producción desde un enlace de recopilación. No se publican hasta que las revises: puedes aprobarlas tal cual, editarlas antes o rechazarlas.
       </p>
 
-      <div className="mt-6 inline-flex rounded-2xl border border-line bg-surface p-1" role="tablist">
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="inline-flex rounded-2xl border border-line bg-surface p-1" role="tablist">
         {TABS.map((t) => (
           <Link
             key={t.id}
-            href={`/admin/aportes?estado=${t.id}`}
+            href={href(t.id, origin)}
             role="tab"
             aria-selected={status === t.id}
             className={cn("rounded-xl px-4 py-1.5 text-sm transition-colors", status === t.id ? "bg-surface-2 text-ink" : "text-muted hover:text-ink")}
@@ -36,6 +46,19 @@ export default async function AportesPage({ searchParams }: { searchParams: Prom
             {t.label} <span className="ml-1 text-xs text-muted">{count(t.id)}</span>
           </Link>
         ))}
+      </div>
+      <div className="inline-flex rounded-2xl border border-line bg-surface p-1" role="group" aria-label="Origen del aporte">
+        {ORIGINS.map((o) => (
+          <Link
+            key={o.id}
+            href={href(status, o.id)}
+            aria-pressed={origin === o.id}
+            className={cn("rounded-xl px-3 py-1.5 text-xs transition-colors", origin === o.id ? "bg-surface-2 text-ink" : "text-muted hover:text-ink")}
+          >
+            {o.label}
+          </Link>
+        ))}
+      </div>
       </div>
 
       {list.length === 0 ? (
@@ -52,11 +75,14 @@ export default async function AportesPage({ searchParams }: { searchParams: Prom
                   {x.kind === "film" ? <Clapperboard className="h-4 w-4" /> : <Landmark className="h-4 w-4" />}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-display text-[15px]">{x.label}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="truncate font-display text-[15px]">{x.label}</span>
+                    {x.origin === "recopilacion" && <span className="chip !py-0 text-[11px] text-accent">Recopilación</span>}
+                  </span>
                   <span className="block truncate text-xs text-muted">
                     {x.target_id ? "Corrección" : "Registro nuevo"} · {x.kind === "film" ? "Producción" : "Entidad"} ·{" "}
                     {new Date(x.created_at).toLocaleString("es-GT", { dateStyle: "medium", timeStyle: "short" })}
-                    {x.contact ? ` · ${x.contact}` : ""}
+                    {x.submitter ? ` · ${x.submitter}` : x.contact ? ` · ${x.contact}` : ""}
                   </span>
                 </span>
                 <ArrowRight className="h-4 w-4 text-muted transition-transform group-hover:translate-x-0.5" />

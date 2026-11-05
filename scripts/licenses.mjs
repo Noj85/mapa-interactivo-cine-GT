@@ -84,6 +84,10 @@ const SERVICES = [
     text: "Geometrías de departamentos y municipios y códigos INE, a partir del repositorio abierto https://github.com/minfin-bi/mapas del Ministerio de Finanzas Públicas de Guatemala. Procesadas con scripts/geo/build.mjs.",
   },
   {
+    name: "Catálogo base de festivales (Festival library, Zenodo)",
+    text: "Nombres, países y ciudades de festivales de cine, a partir de la «Festival library» del proyecto Film Circulation, bajo licencia CC BY 4.0. Se limpió, tradujo y deduplicó con scripts/seed-festivals.mjs. https://zenodo.org/records/7887672 — https://creativecommons.org/licenses/by/4.0/",
+  },
+  {
     name: "Anthropic API",
     text: "Servicio externo de IA utilizado para analizar archivos cargados por el equipo editorial. No se incluye código ni modelos de Anthropic en este repositorio (solo su SDK, listado arriba). https://www.anthropic.com/legal",
   },

@@ -5,6 +5,7 @@ import { posterFromUrl } from "@/lib/posters";
 import { revalidatePath } from "next/cache";
 import { adminStore, requireSession } from "@/lib/auth";
 import { newId } from "@/lib/data/records";
+import { linkFestivals } from "@/lib/festivals-server";
 import type { Candidate } from "@/lib/import/types";
 import { filmSchema, orgSchema } from "@/lib/schemas";
 import type { Film, FilmInput, Org, OrgInput } from "@/lib/types";
@@ -38,6 +39,9 @@ function mergeFilm(existing: Film, incoming: FilmInput): FilmInput {
     );
     if (!dup) locs.push({ ...nl } as (typeof locs)[number]);
   }
+  const fests = existing.festivals.map((f) => ({ ...f }));
+  const festKey = (f: { name?: string | null; year?: number | null; award?: string | null }) => `${normalize(f.name ?? "")}|${f.year ?? ""}|${normalize(f.award ?? "")}`;
+  for (const nf of incoming.festivals ?? []) if (!fests.some((f) => festKey(f) === festKey(nf))) fests.push({ ...nf } as (typeof fests)[number]);
   return {
     id: existing.id,
     title: existing.title,
@@ -52,6 +56,7 @@ function mergeFilm(existing: Film, incoming: FilmInput): FilmInput {
     poster_url: keep(existing.poster_url, incoming.poster_url),
     status: existing.status,
     locations: locs,
+    festivals: fests,
   };
 }
 
@@ -117,6 +122,8 @@ export async function commitBatchAction(
             action = "updated";
           }
         }
+        // los festivales nuevos entran al catálogo (o se unen a uno que ya existe)
+        input.festivals = await linkFestivals(store, input.festivals);
         const saved = await store.saveFilm(
           { ...input, status: action === "updated" ? input.status : publishIncomplete || filmComplete(input) ? "published" : "draft" },
           { import_id: importId },

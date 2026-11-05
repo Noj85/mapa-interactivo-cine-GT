@@ -117,7 +117,8 @@ Recibes la estructura de un archivo CSV/XLSX con formato libre y debes decidir c
 
 Reglas:
 - Cada hoja representa producciones audiovisuales, también llamadas películas ("film"), entidades del ecosistema ("org") o nada útil ("ignore").
-- Producción: "row_per_film" = una fila por producción (película); "row_per_location" = el título se repite y cada fila es una locación distinta.
+- Producción: "row_per_film" = una fila por producción (película); "row_per_location" = el título se repite y cada fila es una locación distinta (o un festival distinto).
+- Festivales de una producción: si hay columnas con festivales de selección o premios, mapea "festival" (nombre del festival), y si existen "festival_year", "festival_result" (selección, nominación, premio, mención), "festival_section", "festival_award" y "festival_url". Si cada festival está en una fila distinta del mismo título, usa "row_per_location". Una columna solo con un año de estreno NO es "festival_year".
 - Entidades: "circulacion" (festivales, salas, cineclubs, centros culturales, exhibición, medios, crítica, formación en circulación) o "industria" (productoras, postproducción, renta de equipo, formación, servicios, patrimonio).
 - En "columns" usa SIEMPRE el encabezado exacto del archivo. Si una columna no corresponde a ningún campo, no la incluyas. No inventes columnas.
 - Si hay una sola columna con el lugar completo (ej. "Panajachel, Sololá" o "Antigua; Flores"), mapea "place". Si hay columnas separadas, mapea "muni" y "depto".

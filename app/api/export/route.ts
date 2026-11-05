@@ -12,7 +12,7 @@ export const runtime = "nodejs";
  * Descarga de datos, abierta a cualquier persona (solo lo publicado).
  *
  *  tipo       producciones (por defecto) | circulacion | entidades (la capa de industria)
- *  filas      solo en producciones: producciones (por defecto) | locaciones (una fila por lugar de rodaje)
+ *  filas      solo en producciones: producciones (por defecto) | locaciones (una fila por lugar de rodaje) | festivales (una fila por participación)
  *             Los enlaces anteriores siguen funcionando: tipo=peliculas, tipo=locaciones y tipo=entidades&capa=circulacion.
  *  formato    csv (por defecto) | xlsx
  *

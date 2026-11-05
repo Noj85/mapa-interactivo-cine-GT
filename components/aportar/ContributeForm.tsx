@@ -3,7 +3,9 @@
 import { CheckCircle2, Clapperboard, Landmark, Loader2, Send } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
+import { submitCollectedAction } from "@/app/completar/actions";
 import { filmDraft, filmPayload, orgContactErrors, orgDraft, orgPayload, type FilmDraft, type OrgDraft } from "@/components/records/drafts";
+import { FestivalsEditor } from "@/components/records/FestivalsEditor";
 import { FilmFields } from "@/components/records/FilmFields";
 import { ImageField } from "@/components/records/ImageField";
 import { LocationsEditor } from "@/components/records/LocationsEditor";
@@ -20,7 +22,18 @@ type Kind = "film" | "org";
  * Es la misma interfaz que usa el equipo en el panel (mismos campos, locaciones, póster y logo);
  * solo cambia lo de abajo: no hay publicar ni eliminar, y todo queda pendiente de revisión.
  */
-export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: Org; initialKind?: Kind }) {
+export function ContributeForm({
+  film,
+  org,
+  initialKind,
+  collect,
+}: {
+  film?: Film;
+  org?: Org;
+  initialKind?: Kind;
+  /** Enlace privado de una solicitud de información: el aporte llega como «recopilación». */
+  collect?: { token: string; password: string };
+}) {
   const correcting = !!(film || org);
   const [kind, setKind] = useState<Kind>(film ? "film" : org ? "org" : (initialKind ?? "film"));
   const opened = useRef(Date.now());
@@ -34,6 +47,7 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
 
   // ---- comunes
   const [note, setNote] = useState("");
+  const [submitter, setSubmitter] = useState("");
   const [email, setEmail] = useState("");
   const [trap, setTrap] = useState("");
 
@@ -71,15 +85,18 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
     [kind, f.title, f.currency, filmData, o.name, o.categories, o.depto_ine, o.muni_ine, o.lat, o.lng, orgData],
   );
 
-  const sourceOk = note.trim().length >= 8;
+  // con enlace de recopilación la fuente es el propio equipo; la nota es opcional
+  const sourceOk = collect ? true : note.trim().length >= 8;
+  const submitterOk = !collect || submitter.trim().length >= 3;
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const contactOk = kind === "film" || orgContactErrors(o).ok;
   const recordOk = kind === "film" ? f.title.trim().length > 0 : o.name.trim().length > 0 && o.categories.length > 0;
-  const ready = recordOk && contactOk && sourceOk && emailOk;
+  const ready = recordOk && contactOk && sourceOk && emailOk && submitterOk;
   const missingNow = [
     !recordOk ? (kind === "film" ? "el título" : "el nombre y al menos una categoría") : null,
     !contactOk ? "corregir el teléfono o correo de la entidad" : null,
     !sourceOk ? "la fuente" : null,
+    !submitterOk ? "tu nombre y rol" : null,
     !emailOk ? "tu correo" : null,
   ].filter(Boolean);
 
@@ -90,8 +107,26 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
       // las locaciones no llevan id: el equipo las reconstruye al revisar
       const data =
         kind === "film"
-          ? { ...filmData, locations: filmData.locations.map(({ id: _id, ...l }) => l) }
+          ? {
+              ...filmData,
+              locations: filmData.locations.map(({ id: _id, ...l }) => l),
+              festivals: filmData.festivals.map(({ id: _fid, ...x }) => x),
+            }
           : orgData;
+      if (collect) {
+        const r = await submitCollectedAction({
+          token: collect.token,
+          password: collect.password,
+          data,
+          note: note.trim() || `Información aportada por el equipo de ${kind === "film" ? "la producción" : "la entidad"} (${submitter.trim()}), mediante enlace de recopilación.`,
+          contact: email.trim(),
+          submitter: submitter.trim(),
+        });
+        if (!r.ok) throw new Error(r.error);
+        setStatus("done");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       const res = await fetch("/api/aportes", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -121,11 +156,19 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
         <CheckCircle2 className="mx-auto h-10 w-10 text-ok" />
         <h2 className="mt-4 font-display text-3xl tracking-tight">¡Gracias por aportar!</h2>
         <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-muted">
-          Tu aporte quedó pendiente. El equipo de la Academia lo verificará antes de que aparezca en el mapa; la revisión y aprobación puede tomar hasta tres días hábiles. Si necesitamos aclarar algo, te escribiremos a <b>{email.trim()}</b>.
+          {collect
+            ? <>Recibimos la información. El equipo de PROCINE y la Academia la revisará antes de publicarla. Si necesitamos aclarar algo, te escribiremos a <b>{email.trim()}</b>.</>
+            : <>Tu aporte quedó pendiente. El equipo de la Academia lo verificará antes de que aparezca en el mapa; la revisión y aprobación puede tomar hasta tres días hábiles. Si necesitamos aclarar algo, te escribiremos a <b>{email.trim()}</b>.</>}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <Link href="/" className="btn-primary">Volver al mapa</Link>
-          <button className="btn-outline" onClick={() => window.location.assign("/aportar")}>Enviar otro aporte</button>
+          {collect ? (
+            <button className="btn-primary" onClick={() => setStatus("idle")}>Seguir editando</button>
+          ) : (
+            <>
+              <Link href="/" className="btn-primary">Volver al mapa</Link>
+              <button className="btn-outline" onClick={() => window.location.assign("/aportar")}>Enviar otro aporte</button>
+            </>
+          )}
         </div>
       </div>
     );
@@ -152,9 +195,20 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
         </div>
       )}
 
-      {correcting && (
+      {correcting && !collect && (
         <div className="rounded-2xl border border-accent/30 bg-accent/5 px-4 py-3 text-sm">
           Estás sugiriendo una corrección para <b>{film?.title ?? org?.name}</b>. Cambia lo que esté mal o complétalo; no se modifica nada hasta que el equipo lo revise.
+        </div>
+      )}
+      {collect && (
+        <div className="rounded-2xl border border-accent/30 bg-accent/5 px-4 py-3 text-sm leading-relaxed">
+          Estás completando la información de <b>{film?.title ?? org?.name}</b> para el Mapa del Cine de Guatemala.
+          {(film?.missing_fields ?? org?.missing_fields ?? []).length > 0 && (
+            <>
+              {" "}Nos falta o necesitamos confirmar: <b>{(film?.missing_fields ?? org?.missing_fields ?? []).join(", ")}</b>. Si algún dato no lo sabes, déjalo en blanco.
+            </>
+          )}{" "}
+          Nada se publica hasta que el equipo de PROCINE lo revise.
         </div>
       )}
 
@@ -164,6 +218,7 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
             <>
               <FilmFields draft={f} onChange={setFilm} />
               <LocationsEditor locs={f.locs} onChange={(locs) => setFilm({ locs })} />
+              <FestivalsEditor fests={f.fests} onChange={(fests) => setFilm({ fests })} />
             </>
           ) : (
             <OrgFields draft={o} onChange={setOrg} />
@@ -195,17 +250,28 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
       <section className="space-y-4 rounded-2xl border border-line bg-surface p-4">
         <div className="grid gap-4 md:grid-cols-[3fr_2fr]">
           <div>
-            <label className="label" htmlFor="c-note">Fuente de la información *</label>
-            <textarea
-              id="c-note"
-              className="field min-h-20"
-              required
-              aria-required
-              placeholder="Un enlace, el catálogo donde la viste, o cómo lo sabes. El equipo la usa para verificar el dato."
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              maxLength={1500}
-            />
+            {collect ? (
+              <>
+                <label className="label" htmlFor="c-submitter">Tu nombre y rol en {kind === "film" ? "la producción" : "la entidad"} *</label>
+                <input id="c-submitter" className="field" required aria-required maxLength={200} placeholder="Ej. Ana López, productora" value={submitter} onChange={(e) => setSubmitter(e.target.value)} />
+                <label className="label mt-4" htmlFor="c-note">Notas o fuentes (opcional)</label>
+                <textarea id="c-note" className="field min-h-16" maxLength={1500} placeholder="Un enlace, un catálogo o algo que ayude a verificar los datos." value={note} onChange={(e) => setNote(e.target.value)} />
+              </>
+            ) : (
+              <>
+                <label className="label" htmlFor="c-note">Fuente de la información *</label>
+                <textarea
+                  id="c-note"
+                  className="field min-h-20"
+                  required
+                  aria-required
+                  placeholder="Un enlace, el catálogo donde la viste, o cómo lo sabes. El equipo la usa para verificar el dato."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  maxLength={1500}
+                />
+              </>
+            )}
           </div>
           <div>
             <label className="label" htmlFor="c-mail">Tu correo *</label>

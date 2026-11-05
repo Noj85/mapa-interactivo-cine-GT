@@ -62,6 +62,7 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
   const layer = kindLayer(tipo);
   const isOrgs = tipo !== "producciones";
   const byLocation = !isOrgs && filas === "locaciones";
+  const byFestival = !isOrgs && filas === "festivales";
   // las categorías de circulación y de industria no se comparten: al cambiar de una a otra se limpia la categoría
   const setTipo = (t: ExportKind) => {
     if (t !== tipo && t !== "producciones" && isOrgs) setOf((f) => ({ ...f, categoria: [] }));
@@ -76,9 +77,10 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
     [filmsHit, ff],
   );
 
-  const count = isOrgs ? orgsHit.length : byLocation ? locCount : filmsHit.length;
+  const festCount = useMemo(() => filmsHit.reduce((n, f) => n + (f.festivals?.length ?? 0), 0), [filmsHit]);
+  const count = isOrgs ? orgsHit.length : byLocation ? locCount : byFestival ? festCount : filmsHit.length;
   const total = isOrgs ? orgs.filter((o) => o.layer === layer).length : films.length;
-  const noun = isOrgs ? ["entidad", "entidades"] : byLocation ? ["locación", "locaciones"] : ["producción", "producciones"];
+  const noun = isOrgs ? ["entidad", "entidades"] : byLocation ? ["locación", "locaciones"] : byFestival ? ["participación en festivales", "participaciones en festivales"] : ["producción", "producciones"];
 
   const query = useMemo(() => {
     const p = new URLSearchParams();
@@ -86,11 +88,11 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
     if (formato !== "csv") p.set("formato", formato);
     if (isOrgs) orgFilterToParams({ ...of, capa: null }, p);
     else {
-      if (byLocation) p.set("filas", "locaciones");
+      if (byLocation || byFestival) p.set("filas", filas);
       filmFilterToParams(ff, p);
     }
     return p.toString();
-  }, [tipo, isOrgs, byLocation, formato, ff, of]);
+  }, [tipo, isOrgs, byLocation, byFestival, filas, formato, ff, of]);
 
   // La dirección de la página refleja los filtros: se puede copiar y compartir.
   useEffect(() => {
@@ -219,6 +221,7 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
                     [
                       ["producciones", "Una fila por producción"],
                       ["locaciones", "Una fila por locación"],
+                      ["festivales", "Una fila por festival"],
                     ] as const
                   ).map(([id, label]) => (
                     <button

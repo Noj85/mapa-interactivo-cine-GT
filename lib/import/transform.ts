@@ -8,6 +8,7 @@ import {
   cleanText,
   detectCurrency,
   normalizeCategoryList,
+  normalizeFestivalResult,
   normalizeInitiative,
   normalizeInstagram,
   normalizeKind,
@@ -113,7 +114,27 @@ const posterLink = (v: string | null | undefined) => {
   return /^https?:\/\/\S+$/i.test(s) ? s : null;
 };
 
-function filmFields(row: Row, plan: SheetPlan): Omit<FilmInput, "locations"> {
+type Fest = NonNullable<FilmInput["festivals"]>[number];
+
+/** La participación en un festival que describe la fila, si la fila trae un festival. */
+function festivalOf(row: Row, plan: SheetPlan): Fest | null {
+  const name = cleanText(val(row, plan, "festival"));
+  if (!name) return null;
+  const award = cleanText(val(row, plan, "festival_award"));
+  const url = cleanText(val(row, plan, "festival_url"));
+  return {
+    name,
+    year: parseYear(val(row, plan, "festival_year")),
+    result: normalizeFestivalResult(val(row, plan, "festival_result"), award, plan.value_maps?.festival_result),
+    section: cleanText(val(row, plan, "festival_section")),
+    award,
+    url: url && /^https?:\/\/\S+$/i.test(url) ? url : null,
+  };
+}
+
+const festKey = (f: Fest) => `${normalize(f.name ?? "")}|${f.year ?? ""}|${normalize(f.award ?? "")}|${normalize(f.section ?? "")}`;
+
+function filmFields(row: Row, plan: SheetPlan): Omit<FilmInput, "locations" | "festivals"> {
   const vm = plan.value_maps ?? {};
   const budgetRaw = val(row, plan, "budget");
   return {
@@ -139,6 +160,7 @@ const merge = <T extends object>(a: T, b: T): T => {
 function filmCandidates(sheet: ParsedSheet, plan: SheetPlan, places: Record<string, PlaceResolution>, geo: Geo): Candidate[] {
   const map = new Map<string, Candidate>();
   const order: string[] = [];
+  const seenLocs = new Map<Candidate, Set<string>>();
 
   sheet.rows.forEach((row, i) => {
     const base = filmFields(row, plan);
@@ -152,7 +174,7 @@ function filmCandidates(sheet: ParsedSheet, plan: SheetPlan, places: Record<stri
       cand = {
         key,
         type: "film",
-        film: { ...base, locations: [], status: "published", source: undefined },
+        film: { ...base, locations: [], festivals: [], status: "published", source: undefined },
         placeTexts: [],
         rows: [],
         issues: [],
@@ -161,9 +183,12 @@ function filmCandidates(sheet: ParsedSheet, plan: SheetPlan, places: Record<stri
       map.set(key, cand);
       order.push(key);
     } else {
-      cand.film = { ...merge(cand.film!, base as FilmInput), locations: cand.film!.locations };
+      cand.film = { ...merge(cand.film!, base as FilmInput), locations: cand.film!.locations, festivals: cand.film!.festivals };
     }
     cand.rows.push(`${sheet.name}!${i + 2}`);
+
+    const fest = festivalOf(row, plan);
+    if (fest && !cand.film!.festivals!.some((x) => festKey(x) === festKey(fest))) cand.film!.festivals!.push(fest);
 
     const qs = placeQueries(row, plan);
     const days = parseNumber(val(row, plan, "days"));
@@ -181,6 +206,13 @@ function filmCandidates(sheet: ParsedSheet, plan: SheetPlan, places: Record<stri
         loc.jobs = jobs;
       }
       if (!q && loc.muni_ine == null && loc.depto_ine == null && loc.lat == null) return; // fila sin lugar
+      // si la producción se repite una fila por festival, el mismo lugar no se duplica
+      if (plan.columns.festival && plan.grain === "row_per_location") {
+        const sig = `${q?.query ?? ""}|${q?.site ?? ""}|${loc.days ?? ""}|${loc.local_spend ?? ""}|${loc.jobs ?? ""}`;
+        const seen = (seenLocs.get(cand!) ?? seenLocs.set(cand!, new Set()).get(cand!))!;
+        if (seen.has(sig)) return;
+        seen.add(sig);
+      }
       if (q) cand!.placeTexts.push(q.query);
       cand!.film!.locations.push(loc);
       if (issue) cand!.issues.push({ ...issue, field: `location:${cand!.film!.locations.length - 1}` });

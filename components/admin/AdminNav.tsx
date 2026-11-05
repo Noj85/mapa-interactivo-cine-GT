@@ -1,7 +1,7 @@
 "use client";
 
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Database, Globe, Inbox, LayoutDashboard, LogOut, Map as MapIcon, PlusCircle } from "lucide-react";
+import { Award, Database, Globe, Inbox, LayoutDashboard, LogOut, Map as MapIcon, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ const items = [
     icon: Database,
     isActive: (p: string) => (p.startsWith("/admin/peliculas") || p.startsWith("/admin/entidades")) && !isAdd(p),
   },
+  { href: "/admin/festivales", label: "Festivales", icon: Award, isActive: (p: string) => p.startsWith("/admin/festivales") },
 ];
 
 export function AdminNav({ email, pendingSubmissions = 0 }: { email: string; pendingSubmissions?: number }) {

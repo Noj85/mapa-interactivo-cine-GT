@@ -1,12 +1,12 @@
 "use client";
 
-import { Check, Loader2, Pencil, X } from "lucide-react";
+import { Check, Eye, Loader2, Pencil, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { approveSubmissionAction, rejectSubmissionAction } from "@/app/admin/actions";
 
 /** Acciones del equipo sobre un aporte pendiente. */
-export function SubmissionReview({ id, isCorrection }: { id: string; isCorrection: boolean }) {
+export function SubmissionReview({ id, isCorrection, hidden }: { id: string; isCorrection: boolean; /** El registro corregido hoy está oculto del mapa. */ hidden?: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +45,11 @@ export function SubmissionReview({ id, isCorrection }: { id: string; isCorrectio
             <button className="btn-primary" disabled={pending} onClick={() => approve(false, false)}>
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Aplicar corrección
             </button>
+            {hidden && (
+              <button className="btn-outline" disabled={pending} onClick={() => approve(true, false)}>
+                <Eye className="h-4 w-4" /> Aplicar y poner en el mapa
+              </button>
+            )}
             <button className="btn-outline" disabled={pending} onClick={() => approve(false, true)}>
               <Pencil className="h-4 w-4" /> Aplicar y editar
             </button>

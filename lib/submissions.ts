@@ -1,4 +1,5 @@
 import { orgCategories } from "@/lib/categories";
+import { describeFestival, sortFestivals } from "@/lib/festivals";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { FILM_KINDS, INITIATIVE_TYPES, LAYERS, NATIONALITIES, type Film, type FilmInput, type Org, type OrgInput, type Submission } from "@/lib/types";
 import { fmtInt, fmtMoney } from "@/lib/utils";
@@ -29,6 +30,9 @@ function locText(l: Loc, gaz: Gazetteer) {
 
 const locsText = (list: Loc[], gaz: Gazetteer) => (list.length ? list.map((l) => locText(l, gaz)).join("\n") : null);
 
+const festsText = (list: Parameters<typeof describeFestival>[0][]) =>
+  list.length ? sortFestivals(list).map(describeFestival).join("\n") : null;
+
 const row = (label: string, before: string | null, after: string | null, isNew: boolean): DiffRow => ({
   label,
   before: isNew ? null : dash(before),
@@ -45,7 +49,7 @@ export function diffSubmission(sub: Submission, current: Film | Org | null, gaz:
     const kind = (k: string | null | undefined) => FILM_KINDS.find((x) => x.id === k)?.label ?? null;
     const nat = (k: string | null | undefined) => NATIONALITIES.find((x) => x.id === k)?.label ?? null;
     const money = (v: number | null | undefined, cur?: string) => (v == null ? null : `${cur === "USD" ? "US$" : "Q"} ${fmtInt(v)}`);
-    return [
+    const rows = [
       row("Título", c?.title ?? null, p.title, isNew),
       row("Año", c?.year != null ? String(c.year) : null, p.year != null ? String(p.year) : null, isNew),
       row("Tipo", kind(c?.kind), kind(p.kind), isNew),
@@ -56,6 +60,12 @@ export function diffSubmission(sub: Submission, current: Film | Org | null, gaz:
       row("Sinopsis", c?.synopsis ?? null, p.synopsis ?? null, isNew),
       row("Locaciones", c ? locsText(c.locations, gaz) : null, locsText(p.locations ?? [], gaz), isNew),
     ];
+    // los aportes anteriores a los festivales no los traen: no se muestran como «vaciar»
+    if (p.festivals !== undefined) {
+      const mine = p.festivals.filter((x) => x.name).map((x) => ({ name: x.name!, year: x.year ?? null, result: x.result ?? "seleccion", award: x.award ?? null, section: x.section ?? null }));
+      rows.push(row("Festivales y premios", c ? festsText(c.festivals) : null, festsText(mine), isNew));
+    }
+    return rows;
   }
   const p = sub.payload as OrgInput;
   const c = (current as Org | null) ?? null;

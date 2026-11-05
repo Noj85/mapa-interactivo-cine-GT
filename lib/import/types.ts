@@ -46,6 +46,12 @@ export const FILM_FIELDS: FieldDef[] = [
   { id: "days", label: "Días de rodaje" },
   { id: "local_spend", label: "Inversión local" },
   { id: "jobs", label: "Empleos" },
+  { id: "festival", label: "Festival", hint: "Festival donde fue seleccionada o premiada; una fila por festival repite el título" },
+  { id: "festival_year", label: "Año del festival" },
+  { id: "festival_result", label: "Resultado en el festival", hint: "selección, nominación, premio, mención" },
+  { id: "festival_section", label: "Sección del festival" },
+  { id: "festival_award", label: "Premio" },
+  { id: "festival_url", label: "Enlace del festival o premio" },
 ];
 
 export const ORG_FIELDS: FieldDef[] = [
@@ -74,7 +80,7 @@ export interface SheetPlan {
   layer?: "circulacion" | "industria";
   /** La capa se dedujo de las categorías del archivo (no hace falta preguntar). */
   layerGuessed?: boolean;
-  /** Producciones: una fila por producción o una fila por locación (producción repetida). */
+  /** Producciones: una fila por producción o una fila por locación o festival (producción repetida). */
   grain: "row_per_film" | "row_per_location";
   /** campo destino -> encabezado de columna */
   columns: Record<string, string>;

@@ -1,5 +1,5 @@
 import { normalizeCategories } from "@/lib/categories";
-import type { FilmKind, InitiativeType, Nationality } from "@/lib/types";
+import type { FestivalResult, FilmKind, InitiativeType, Nationality } from "@/lib/types";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
 import { normalize } from "@/lib/utils";
 
@@ -66,6 +66,19 @@ export function normalizeKind(v: unknown, map?: Record<string, string>): FilmKin
   if (/corto|short/.test(t)) return "corto";
   if (["ficcion", "documental", "serie", "comercial", "corto", "otro"].includes(t)) return t as FilmKind;
   return "otro";
+}
+
+/** «Ganadora», «Winner», «Official selection»… → resultado del catálogo. Si hay un premio y no se dice el resultado, es premio. */
+export function normalizeFestivalResult(v: unknown, award: string | null, map?: Record<string, string>): FestivalResult {
+  const s = cleanText(v);
+  const t = normalize(map?.[s ?? ""] ?? s ?? "");
+  if (/nomin/.test(t)) return "nominacion";
+  if (/mencion|mention|honorable/.test(t)) return "mencion";
+  if (/premi|gan[oa]\b|winner|won\b|award/.test(t)) return "premio";
+  if (/proyecc|screening|special|fuera de|gala|homenaje|retrospectiva/.test(t)) return "proyeccion";
+  if (/selec|official|compet|oficial|invitad/.test(t)) return "seleccion";
+  if (["premio", "nominacion", "mencion", "seleccion", "proyeccion"].includes(t)) return t as FestivalResult;
+  return award ? "premio" : "seleccion";
 }
 
 export function normalizeNationality(v: unknown, map?: Record<string, string>): Nationality | null {

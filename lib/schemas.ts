@@ -51,6 +51,31 @@ export const locationSchema = z.object({
   confidence: z.number().min(0).max(1).nullish(),
 });
 
+const festivalResult = z.enum(["seleccion", "nominacion", "premio", "mencion", "proyeccion"]);
+
+export const festivalEntrySchema = z.object({
+  id: z.string().optional(),
+  festival_id: z.string().max(80).nullish(),
+  name: z.string().trim().min(1, "Escribe el nombre del festival").max(300),
+  year: optNum,
+  country: optStr,
+  city: optStr,
+  result: festivalResult.default("seleccion"),
+  section: optStr,
+  award: optStr,
+  url: optStr,
+});
+
+/** Un festival del catálogo (alta o edición en el admin). */
+export const festivalSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().trim().min(1, "El nombre es obligatorio").max(300),
+  aliases: z.array(z.string().trim().max(300)).max(30).default([]),
+  country: optStr,
+  city: optStr,
+  founded: optNum,
+});
+
 export const filmSchema = z.object({
   id: z.string().optional(),
   title: z.string().trim().min(1, "El título es obligatorio").max(300),
@@ -66,6 +91,8 @@ export const filmSchema = z.object({
   status: z.enum(["draft", "published"]).default("draft"),
   source: optStr,
   locations: z.array(locationSchema).max(60).default([]),
+  /** Sin este campo se conservan los festivales actuales. */
+  festivals: z.array(festivalEntrySchema).max(80).optional(),
 });
 
 export const ALL_ORG_CATEGORIES = [...CIRC_CATEGORIES, ...IND_CATEGORIES] as const;
@@ -155,6 +182,18 @@ const pubLocation = z.object({
   jobs: optNum,
 });
 
+const pubFestival = z.object({
+  festival_id: z.string().max(80).nullish(),
+  name: z.string().max(600).transform((v) => clean(v).trim().slice(0, 300)).refine((v) => v.length > 0, "Escribe el nombre del festival"),
+  year: optNum,
+  country: pubStr(100),
+  city: pubStr(150),
+  result: festivalResult.default("seleccion"),
+  section: pubStr(200),
+  award: pubStr(200),
+  url: pubUrl,
+});
+
 /** Producción propuesta por el público: sin estado ni fuente (los fija el equipo); el póster solo si lo subió por nuestro endpoint. */
 export const publicFilmSchema = z.object({
   title: z.string().trim().min(1, "El título es obligatorio").max(300).transform(clean),
@@ -168,6 +207,7 @@ export const publicFilmSchema = z.object({
   synopsis: pubStr(2000),
   poster_url: pubImage,
   locations: z.array(pubLocation).max(20).default([]),
+  festivals: z.array(pubFestival).max(40).optional(),
 });
 
 export const publicOrgSchema = z.object({

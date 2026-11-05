@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { publicStore } from "@/lib/auth";
+import { sanitizeFestivalIds } from "@/lib/festivals-server";
 import { rateLimit } from "@/lib/rate-limit";
 import { submissionMetaSchema, submissionSchema } from "@/lib/schemas";
 import type { FilmInput, OrgInput } from "@/lib/types";
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
       const exists = d.kind === "film" ? await store.getFilm(target) : await store.getOrg(target);
       if (!exists) return fail("No encontramos el registro que quieres corregir.", 404);
     }
+    if (d.kind === "film") d.data.festivals = await sanitizeFestivalIds(store, d.data.festivals);
     await store.createSubmission({
       kind: d.kind,
       target_id: target,

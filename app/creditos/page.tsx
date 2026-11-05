@@ -33,6 +33,11 @@ const SOURCES: { name: string; text: string; href: string }[] = [
     text: "Datos abiertos del Ministerio de Finanzas Públicas (MINFIN) y códigos del Instituto Nacional de Estadística (INE).",
     href: "https://github.com/minfin-bi/mapas",
   },
+  {
+    name: "Catálogo de festivales",
+    text: "Nombres, países y ciudades de festivales a partir de la «Festival library» del proyecto Film Circulation (Zenodo), licencia CC BY 4.0. Se limpió y tradujo para este mapa.",
+    href: "https://creativecommons.org/licenses/by/4.0/",
+  },
 ];
 
 const A = "text-ink underline decoration-line underline-offset-2 hover:decoration-accent";

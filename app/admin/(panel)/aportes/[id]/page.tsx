@@ -41,13 +41,22 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
     <div className="max-w-3xl">
       <Link href="/admin/aportes" className="text-sm text-muted hover:text-ink">← Aportes</Link>
       <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-accent">
-        {isCorrection ? "Corrección" : "Registro nuevo"} · {sub.kind === "film" ? "Producción" : "Entidad"}
+        {sub.origin === "recopilacion" && "Recopilación · "}{isCorrection ? "Corrección" : "Registro nuevo"} · {sub.kind === "film" ? "Producción" : "Entidad"}
       </p>
       <h1 className="mt-1 font-display text-4xl tracking-tight">{sub.label}</h1>
       <p className="mt-1 text-sm text-muted">
         Enviado el {new Date(sub.created_at).toLocaleString("es-GT", { dateStyle: "long", timeStyle: "short" })}
         {sub.contact && <> · Correo: <a className="underline decoration-line underline-offset-2 hover:text-ink" href={`mailto:${sub.contact}`}>{sub.contact}</a></>}
       </p>
+
+      {sub.origin === "recopilacion" && (
+        <div className="mt-4 rounded-2xl border border-accent/30 bg-accent/5 px-4 py-3 text-sm leading-relaxed">
+          <b>Aporte de recopilación.</b> Lo envió {sub.submitter ? <b>{sub.submitter}</b> : "alguien del equipo"} desde un enlace privado de solicitud de información.
+          {current && (
+            <> Registro: <Link className="text-accent hover:underline" href={sub.kind === "film" ? `/admin/peliculas/${current.id}` : `/admin/entidades/${current.id}`}>ver y solicitar de nuevo</Link>.</>
+          )}
+        </div>
+      )}
 
       {sub.status !== "pending" && (
         <div className="mt-4 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
@@ -114,7 +123,7 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
 
       {sub.status === "pending" && (
         <div className="mt-6">
-          <SubmissionReview id={sub.id} isCorrection={isCorrection && !!current} />
+          <SubmissionReview id={sub.id} isCorrection={isCorrection && !!current} hidden={!!current && current.status === "draft"} />
         </div>
       )}
     </div>

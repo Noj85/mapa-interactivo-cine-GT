@@ -4,19 +4,65 @@ import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeCategories, orgCategories } from "@/lib/categories";
 import { buildFilm, buildOrg, newId, uniqueSlug } from "@/lib/data/records";
+import { festivalSearchKey } from "@/lib/festivals";
+import { normalize } from "@/lib/utils";
+import { hashPassword, hashToken, normPassword, verifyPassword } from "@/lib/info-requests";
+import { MAX_FAILED_ATTEMPTS } from "@/lib/request-state";
 import type {
+  Festival,
   Film,
+  FilmFestival,
   FilmInput,
   FilmLocation,
   ImportQuestion,
   ImportRecord,
+  InfoRequest,
+  OpenInfoResult,
   Org,
   OrgInput,
   QuestionStatus,
+  RecordStatus,
   Submission,
   SubmissionInput,
+  SubmissionKind,
   SubmissionStatus,
 } from "@/lib/types";
+
+export interface FestivalInput {
+  id?: string;
+  name: string;
+  aliases?: string[];
+  country?: string | null;
+  city?: string | null;
+  founded?: number | null;
+  source?: string | null;
+}
+
+export interface NewInfoRequest {
+  kind: SubmissionKind;
+  target_id: string;
+  recipient?: string | null;
+  recipient_email?: string | null;
+  expires_at: string;
+  /** Enlace y contraseña en claro: solo se usan para guardar su huella. */
+  token: string;
+  password: string;
+}
+
+export type SubmitInfoResult = { ok: true } | { ok: false; reason: "not_found" | "bad_password" | "expired" | "revoked" | "locked" };
+
+const cleanAliases = (name: string, aliases?: string[]) => {
+  const seen = new Set([name.trim().toLowerCase()]);
+  const out: string[] = [];
+  for (const a of aliases ?? []) {
+    const t = a.trim();
+    if (t && !seen.has(t.toLowerCase())) {
+      seen.add(t.toLowerCase());
+      out.push(t);
+    }
+  }
+  return out;
+};
 
 /**
  * Capa de almacenamiento. Dos implementaciones con la misma interfaz:
@@ -46,9 +92,42 @@ export interface Store {
     id: string,
     patch: { status: SubmissionStatus; reviewer_note?: string | null; result_id?: string | null },
   ): Promise<void>;
+
+  /** Publica u oculta varios registros de una vez. */
+  setRecordsStatus(kind: SubmissionKind, ids: string[], status: RecordStatus): Promise<void>;
+
+  /** Catálogo de festivales (lectura pública). `q` vacío lista todo por nombre. */
+  searchFestivals(q: string, opts?: { limit?: number; offset?: number }): Promise<{ rows: Festival[]; total: number }>;
+  getFestival(id: string): Promise<Festival | null>;
+  saveFestival(input: FestivalInput): Promise<Festival>;
+  deleteFestival(id: string): Promise<void>;
+  /** Pasa todas las participaciones de `fromId` a `intoId` y borra `fromId` (queda como alias). */
+  mergeFestivals(fromId: string, intoId: string): Promise<void>;
+  /** Agrega al catálogo los que no existan (por slug). Devuelve cuántos agregó. */
+  seedFestivals(list: Omit<Festival, "id">[]): Promise<number>;
+  /** Cuántas participaciones tiene cada festival del catálogo. */
+  festivalUsage(ids: string[]): Promise<Record<string, number>>;
+
+  /** Solicitudes de información (enlace privado + contraseña). */
+  createInfoRequest(input: NewInfoRequest): Promise<InfoRequest>;
+  listInfoRequests(opts?: { kind?: SubmissionKind; target_id?: string }): Promise<InfoRequest[]>;
+  revokeInfoRequest(id: string): Promise<void>;
+  /** Pública: abre el enlace con la contraseña. */
+  openInfoRequest(token: string, password: string): Promise<OpenInfoResult>;
+  /** Pública: envía un aporte de recopilación por el enlace. */
+  submitInfoRequest(
+    token: string,
+    password: string,
+    data: { payload: FilmInput | OrgInput; note: string; contact: string; submitter: string | null },
+  ): Promise<SubmitInfoResult>;
 }
 
 // ───────────────────────── Local ─────────────────────────
+
+interface LocalInfoRequest extends InfoRequest {
+  token_hash: string;
+  password_hash: string;
+}
 
 interface LocalDb {
   films: Film[];
@@ -56,6 +135,8 @@ interface LocalDb {
   imports: ImportRecord[];
   questions: ImportQuestion[];
   submissions: Submission[];
+  festivals: Festival[];
+  info_requests: LocalInfoRequest[];
 }
 
 const DB_PATH = path.join(process.cwd(), ".data", "db.json");
@@ -65,14 +146,21 @@ async function readDb(): Promise<LocalDb> {
     const raw = await fs.readFile(DB_PATH, "utf8");
     const j = JSON.parse(raw) as Partial<LocalDb>;
     return {
-      films: j.films ?? [],
+      films: (j.films ?? []).map((f) => ({ ...f, festivals: f.festivals ?? [] })),
       orgs: (j.orgs ?? []).map((o) => ({ ...o, categories: orgCategories(o) })),
       imports: j.imports ?? [],
       questions: j.questions ?? [],
-      submissions: j.submissions ?? [],
+      submissions: (j.submissions ?? []).map((s) => ({
+        ...s,
+        origin: s.origin ?? "publico",
+        request_id: s.request_id ?? null,
+        submitter: s.submitter ?? null,
+      })),
+      festivals: j.festivals ?? [],
+      info_requests: j.info_requests ?? [],
     };
   } catch {
-    return { films: [], orgs: [], imports: [], questions: [], submissions: [] };
+    return { films: [], orgs: [], imports: [], questions: [], submissions: [], festivals: [], info_requests: [] };
   }
 }
 
@@ -116,7 +204,10 @@ export class LocalStore implements Store {
     const slug =
       existing?.slug ??
       uniqueSlug(input.title, new Set(db.films.map((f) => f.slug)), input.year ?? null);
-    const film = buildFilm(input, { id: existing?.id, slug });
+    const film = buildFilm(input, { id: existing?.id, slug, existing });
+    // un festival que no está en el catálogo se conserva solo como texto
+    const known = new Set(db.festivals.map((x) => x.id));
+    film.festivals = film.festivals.map((x) => (x.festival_id && !known.has(x.festival_id) ? { ...x, festival_id: null } : x));
     db.films = existing ? db.films.map((f) => (f.id === film.id ? film : f)) : [...db.films, film];
     await writeDb(db);
     return film;
@@ -174,6 +265,9 @@ export class LocalStore implements Store {
     db.submissions.unshift({
       ...input,
       id: newId(),
+      origin: "publico",
+      request_id: null,
+      submitter: null,
       status: "pending",
       reviewer_note: null,
       result_id: null,
@@ -207,6 +301,193 @@ export class LocalStore implements Store {
     );
     await writeDb(db);
   }
+
+  async setRecordsStatus(kind: SubmissionKind, ids: string[], status: RecordStatus) {
+    const db = await readDb();
+    const set = new Set(ids);
+    if (kind === "film") db.films = db.films.map((f) => (set.has(f.id) && f.title.trim() ? { ...f, status } : f));
+    else db.orgs = db.orgs.map((o) => (set.has(o.id) && o.name.trim() ? { ...o, status } : o));
+    await writeDb(db);
+  }
+
+  // ───── catálogo de festivales ─────
+
+  async searchFestivals(q: string, opts?: { limit?: number; offset?: number }) {
+    const { festivals } = await readDb();
+    const nq = normalize(q);
+    let rows = nq ? festivals.filter((f) => festivalSearchKey(f.name, f.aliases).includes(nq)) : [...festivals];
+    rows.sort((a, b) => {
+      const sa = nq && normalize(a.name).startsWith(nq) ? 0 : 1;
+      const sb = nq && normalize(b.name).startsWith(nq) ? 0 : 1;
+      return sa - sb || a.name.localeCompare(b.name);
+    });
+    const total = rows.length;
+    rows = rows.slice(opts?.offset ?? 0, (opts?.offset ?? 0) + (opts?.limit ?? 50));
+    return { rows, total };
+  }
+  async getFestival(id: string) {
+    return (await readDb()).festivals.find((f) => f.id === id) ?? null;
+  }
+  async saveFestival(input: FestivalInput) {
+    const db = await readDb();
+    const existing = input.id ? db.festivals.find((f) => f.id === input.id) : undefined;
+    const name = input.name.trim();
+    const fest: Festival = {
+      id: existing?.id ?? newId(),
+      slug: existing?.slug ?? uniqueSlug(name, new Set(db.festivals.map((f) => f.slug))),
+      name,
+      aliases: cleanAliases(name, input.aliases),
+      country: input.country?.trim() || null,
+      city: input.city?.trim() || null,
+      founded: input.founded ?? null,
+      source: input.source ?? existing?.source ?? null,
+    };
+    db.festivals = existing ? db.festivals.map((f) => (f.id === fest.id ? fest : f)) : [...db.festivals, fest];
+    await writeDb(db);
+    return fest;
+  }
+  async deleteFestival(id: string) {
+    const db = await readDb();
+    db.festivals = db.festivals.filter((f) => f.id !== id);
+    db.films = db.films.map((f) => ({ ...f, festivals: f.festivals.map((x) => (x.festival_id === id ? { ...x, festival_id: null } : x)) }));
+    await writeDb(db);
+  }
+  async mergeFestivals(fromId: string, intoId: string) {
+    const db = await readDb();
+    const from = db.festivals.find((f) => f.id === fromId);
+    const into = db.festivals.find((f) => f.id === intoId);
+    if (!from || !into || from.id === into.id) return;
+    db.films = db.films.map((f) => ({
+      ...f,
+      festivals: f.festivals.map((x) => (x.festival_id === fromId ? { ...x, festival_id: into.id, name: into.name } : x)),
+    }));
+    into.aliases = cleanAliases(into.name, [...into.aliases, from.name, ...from.aliases]);
+    db.festivals = db.festivals.filter((f) => f.id !== fromId);
+    await writeDb(db);
+  }
+  async seedFestivals(list: Omit<Festival, "id">[]) {
+    const db = await readDb();
+    const taken = new Set(db.festivals.map((f) => f.slug));
+    let added = 0;
+    for (const f of list) {
+      if (taken.has(f.slug)) continue;
+      taken.add(f.slug);
+      db.festivals.push({ ...f, id: newId() });
+      added++;
+    }
+    if (added) await writeDb(db);
+    return added;
+  }
+  async festivalUsage(ids: string[]) {
+    const { films } = await readDb();
+    const want = new Set(ids);
+    const out: Record<string, number> = {};
+    for (const f of films) for (const x of f.festivals) if (x.festival_id && want.has(x.festival_id)) out[x.festival_id] = (out[x.festival_id] ?? 0) + 1;
+    return out;
+  }
+
+  // ───── solicitudes de información ─────
+
+  private publicRequest(r: LocalInfoRequest, db: LocalDb): InfoRequest {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { token_hash, password_hash, ...rest } = r;
+    return { ...rest, submissions_count: db.submissions.filter((s) => s.request_id === r.id).length };
+  }
+
+  async createInfoRequest(input: NewInfoRequest) {
+    const db = await readDb();
+    const rec: LocalInfoRequest = {
+      id: newId(),
+      kind: input.kind,
+      target_id: input.target_id,
+      recipient: input.recipient?.trim() || null,
+      recipient_email: input.recipient_email?.trim() || null,
+      expires_at: input.expires_at,
+      revoked_at: null,
+      failed_attempts: 0,
+      last_used_at: null,
+      created_at: new Date().toISOString(),
+      submissions_count: 0,
+      token_hash: hashToken(input.token),
+      password_hash: hashPassword(input.password),
+    };
+    db.info_requests.unshift(rec);
+    await writeDb(db);
+    return this.publicRequest(rec, db);
+  }
+  async listInfoRequests(opts?: { kind?: SubmissionKind; target_id?: string }) {
+    const db = await readDb();
+    return db.info_requests
+      .filter((r) => (!opts?.kind || r.kind === opts.kind) && (!opts?.target_id || r.target_id === opts.target_id))
+      .map((r) => this.publicRequest(r, db));
+  }
+  async revokeInfoRequest(id: string) {
+    const db = await readDb();
+    db.info_requests = db.info_requests.map((r) => (r.id === id && !r.revoked_at ? { ...r, revoked_at: new Date().toISOString() } : r));
+    await writeDb(db);
+  }
+
+  /** Verifica enlace y contraseña (y cuenta los intentos fallidos). */
+  private async verifyRequest(db: LocalDb, token: string, password: string) {
+    const r = db.info_requests.find((x) => x.token_hash === hashToken(token));
+    if (!r) return { ok: false as const, reason: "not_found" as const };
+    if (r.revoked_at) return { ok: false as const, reason: "revoked" as const };
+    if (new Date(r.expires_at).getTime() < Date.now()) return { ok: false as const, reason: "expired" as const };
+    if (r.failed_attempts >= MAX_FAILED_ATTEMPTS) return { ok: false as const, reason: "locked" as const };
+    if (!verifyPassword(password, r.password_hash)) {
+      r.failed_attempts += 1;
+      await writeDb(db);
+      return { ok: false as const, reason: "bad_password" as const };
+    }
+    if (r.failed_attempts) {
+      r.failed_attempts = 0;
+      await writeDb(db);
+    }
+    return { ok: true as const, request: r };
+  }
+
+  async openInfoRequest(token: string, password: string): Promise<OpenInfoResult> {
+    const db = await readDb();
+    const v = await this.verifyRequest(db, token, password);
+    if (!v.ok) return v;
+    const film = v.request.kind === "film" ? db.films.find((f) => f.id === v.request.target_id) : undefined;
+    const org = v.request.kind === "org" ? db.orgs.find((o) => o.id === v.request.target_id) : undefined;
+    if (!film && !org) return { ok: false, reason: "not_found" };
+    return { ok: true, request: this.publicRequest(v.request, db), film, org };
+  }
+
+  async submitInfoRequest(
+    token: string,
+    password: string,
+    data: { payload: FilmInput | OrgInput; note: string; contact: string; submitter: string | null },
+  ): Promise<SubmitInfoResult> {
+    const db = await readDb();
+    const v = await this.verifyRequest(db, token, password);
+    if (!v.ok) return v;
+    const r = v.request;
+    const label = r.kind === "film" ? db.films.find((f) => f.id === r.target_id)?.title : db.orgs.find((o) => o.id === r.target_id)?.name;
+    if (!label) return { ok: false, reason: "not_found" };
+    db.submissions.unshift({
+      id: newId(),
+      kind: r.kind,
+      origin: "recopilacion",
+      request_id: r.id,
+      submitter: data.submitter,
+      target_id: r.target_id,
+      label,
+      payload: data.payload,
+      note: data.note,
+      contact: data.contact,
+      status: "pending",
+      reviewer_note: null,
+      result_id: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+    });
+    r.last_used_at = new Date().toISOString();
+    await writeDb(db);
+    return { ok: true };
+  }
 }
 
 // ───────────────────────── Supabase ─────────────────────────
@@ -224,6 +505,52 @@ const rowToLocation = (r: any): FilmLocation => ({
   local_spend: r.local_spend == null ? null : Number(r.local_spend),
   jobs: r.jobs,
   confidence: r.confidence,
+});
+
+const rowToFilmFestival = (r: any): FilmFestival => ({
+  id: r.id,
+  film_id: r.film_id,
+  festival_id: r.festival_id ?? null,
+  name: r.name,
+  year: r.year,
+  country: r.country ?? null,
+  city: r.city ?? null,
+  result: r.result,
+  section: r.section ?? null,
+  award: r.award ?? null,
+  url: r.url ?? null,
+});
+
+const rowToFestival = (r: any): Festival => ({
+  id: r.id,
+  slug: r.slug,
+  name: r.name,
+  aliases: r.aliases ?? [],
+  country: r.country ?? null,
+  city: r.city ?? null,
+  founded: r.founded ?? null,
+  source: r.source ?? null,
+});
+
+const rowToInfoRequest = (r: any): InfoRequest => ({
+  id: r.id,
+  kind: r.kind,
+  target_id: r.target_id,
+  recipient: r.recipient ?? null,
+  recipient_email: r.recipient_email ?? null,
+  expires_at: r.expires_at,
+  revoked_at: r.revoked_at ?? null,
+  failed_attempts: r.failed_attempts ?? 0,
+  last_used_at: r.last_used_at ?? null,
+  created_at: r.created_at,
+  submissions_count: Number(r.submissions_count ?? 0),
+});
+
+const rowToSubmission = (r: any): Submission => ({
+  ...(r as Submission),
+  origin: r.origin ?? "publico",
+  request_id: r.request_id ?? null,
+  submitter: r.submitter ?? null,
 });
 
 const rowToFilm = (r: any): Film => ({
@@ -245,8 +572,10 @@ const rowToFilm = (r: any): Film => ({
   locations: ((r.film_locations ?? []) as any[])
     .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
     .map(rowToLocation),
+  festivals: ((r.film_festivals ?? []) as any[])
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map(rowToFilmFestival),
 });
-
 const rowToOrg = (r: any): Org => ({
   id: r.id,
   slug: r.slug,
@@ -281,7 +610,7 @@ export class SupabaseStore implements Store {
   constructor(private db: SupabaseClient) {}
 
   async listFilms(opts?: { drafts?: boolean }) {
-    let q = this.db.from("films").select("*, film_locations(*)").order("title");
+    let q = this.db.from("films").select("*, film_locations(*), film_festivals(*)").order("title");
     if (!opts?.drafts) q = q.eq("status", "published");
     return (must(await q) as any[]).map(rowToFilm);
   }
@@ -291,7 +620,7 @@ export class SupabaseStore implements Store {
     return (must(await q) as any[]).map(rowToOrg);
   }
   async getFilm(id: string) {
-    const r = must(await this.db.from("films").select("*, film_locations(*)").eq("id", id).maybeSingle());
+    const r = must(await this.db.from("films").select("*, film_locations(*), film_festivals(*)").eq("id", id).maybeSingle());
     return r ? rowToFilm(r) : null;
   }
   async getOrg(id: string) {
@@ -308,7 +637,7 @@ export class SupabaseStore implements Store {
         new Set((must(await this.db.from("films").select("slug")) as any[]).map((r) => r.slug)),
         input.year ?? null,
       );
-    const film = buildFilm(input, { id: existing?.id, slug });
+    const film = buildFilm(input, { id: existing?.id, slug, existing });
     must(
       await this.db.from("films").upsert({
         id: film.id,
@@ -349,6 +678,34 @@ export class SupabaseStore implements Store {
           })),
         ),
       );
+    }
+    // Festivales: solo se reescriben si la entrada los trae (si no, se conservan los actuales).
+    if (input.festivals !== undefined) {
+      must(await this.db.from("film_festivals").delete().eq("film_id", film.id));
+      if (film.festivals.length) {
+        // un festival que no está en el catálogo se conserva solo como texto
+        const wanted = [...new Set(film.festivals.map((x) => x.festival_id).filter((x): x is string => !!x))];
+        const known = new Set<string>(
+          wanted.length ? (must(await this.db.from("festivals").select("id").in("id", wanted)) as any[]).map((r) => r.id) : [],
+        );
+        must(
+          await this.db.from("film_festivals").insert(
+            film.festivals.map((x, i) => ({
+              film_id: film.id,
+              position: i,
+              festival_id: x.festival_id && known.has(x.festival_id) ? x.festival_id : null,
+              name: x.name,
+              year: x.year,
+              country: x.country,
+              city: x.city,
+              result: x.result,
+              section: x.section,
+              award: x.award,
+              url: x.url,
+            })),
+          ),
+        );
+      }
     }
     return (await this.getFilm(film.id)) ?? film;
   }
@@ -445,11 +802,11 @@ export class SupabaseStore implements Store {
   async listSubmissions(opts?: { status?: SubmissionStatus }) {
     let q = this.db.from("submissions").select("*").order("created_at", { ascending: false });
     if (opts?.status) q = q.eq("status", opts.status);
-    return must(await q) as Submission[];
+    return (must(await q) as any[]).map(rowToSubmission);
   }
   async getSubmission(id: string) {
     const r = must(await this.db.from("submissions").select("*").eq("id", id).maybeSingle());
-    return (r as Submission | null) ?? null;
+    return r ? rowToSubmission(r) : null;
   }
   async reviewSubmission(
     id: string,
@@ -462,5 +819,157 @@ export class SupabaseStore implements Store {
     };
     if (patch.result_id) upd.result_id = patch.result_id;
     must(await this.db.from("submissions").update(upd).eq("id", id));
+  }
+
+  async setRecordsStatus(kind: SubmissionKind, ids: string[], status: RecordStatus) {
+    if (!ids.length) return;
+    const table = kind === "film" ? "films" : "organizations";
+    // en bloques para no pasar el límite de la URL
+    for (let i = 0; i < ids.length; i += 100) {
+      must(await this.db.from(table).update({ status }).in("id", ids.slice(i, i + 100)));
+    }
+  }
+
+  // ───── catálogo de festivales ─────
+
+  async searchFestivals(q: string, opts?: { limit?: number; offset?: number }) {
+    const limit = opts?.limit ?? 50;
+    const offset = opts?.offset ?? 0;
+    const nq = normalize(q);
+    let query = this.db.from("festivals").select("*", { count: "exact" }).order("name");
+    // % y _ son comodines de ilike: se quitan (normalize ya deja solo letras, números y espacios)
+    if (nq) query = query.ilike("search", `%${nq}%`);
+    const res = await query.range(offset, offset + limit - 1);
+    if (res.error) throw new Error(res.error.message);
+    const rows = (res.data as any[]).map(rowToFestival);
+    if (nq) rows.sort((a, b) => Number(!normalize(a.name).startsWith(nq)) - Number(!normalize(b.name).startsWith(nq)) || a.name.localeCompare(b.name));
+    return { rows, total: res.count ?? rows.length };
+  }
+  async getFestival(id: string) {
+    const r = must(await this.db.from("festivals").select("*").eq("id", id).maybeSingle());
+    return r ? rowToFestival(r) : null;
+  }
+  async saveFestival(input: FestivalInput) {
+    const name = input.name.trim();
+    const existing = input.id ? await this.getFestival(input.id) : null;
+    const aliases = cleanAliases(name, input.aliases);
+    const base = {
+      name,
+      aliases,
+      country: input.country?.trim() || null,
+      city: input.city?.trim() || null,
+      founded: input.founded ?? null,
+      search: festivalSearchKey(name, aliases),
+    };
+    if (existing) {
+      must(await this.db.from("festivals").update({ ...base, source: input.source ?? existing.source }).eq("id", existing.id));
+      return { ...existing, ...base, source: input.source ?? existing.source };
+    }
+    const slugs = new Set((must(await this.db.from("festivals").select("slug").ilike("slug", `${uniqueSlug(name, new Set())}%`)) as any[]).map((r) => r.slug));
+    const row = { id: newId(), slug: uniqueSlug(name, slugs), ...base, source: input.source ?? null };
+    must(await this.db.from("festivals").insert(row));
+    return rowToFestival(row);
+  }
+  async deleteFestival(id: string) {
+    must(await this.db.from("festivals").delete().eq("id", id));
+  }
+  async mergeFestivals(fromId: string, intoId: string) {
+    if (fromId === intoId) return;
+    const [from, into] = await Promise.all([this.getFestival(fromId), this.getFestival(intoId)]);
+    if (!from || !into) return;
+    must(await this.db.from("film_festivals").update({ festival_id: into.id, name: into.name }).eq("festival_id", from.id));
+    const aliases = cleanAliases(into.name, [...into.aliases, from.name, ...from.aliases]);
+    must(await this.db.from("festivals").update({ aliases, search: festivalSearchKey(into.name, aliases) }).eq("id", into.id));
+    must(await this.db.from("festivals").delete().eq("id", from.id));
+  }
+  async seedFestivals(list: Omit<Festival, "id">[]) {
+    let added = 0;
+    for (let i = 0; i < list.length; i += 400) {
+      const chunk = list.slice(i, i + 400).map((f) => ({
+        slug: f.slug,
+        name: f.name,
+        aliases: f.aliases,
+        country: f.country,
+        city: f.city,
+        founded: f.founded,
+        source: f.source,
+        search: festivalSearchKey(f.name, f.aliases),
+      }));
+      const res = await this.db.from("festivals").upsert(chunk, { onConflict: "slug", ignoreDuplicates: true }).select("id");
+      if (res.error) throw new Error(res.error.message);
+      added += (res.data ?? []).length;
+    }
+    return added;
+  }
+  async festivalUsage(ids: string[]) {
+    const out: Record<string, number> = {};
+    if (!ids.length) return out;
+    const rows = must(await this.db.from("film_festivals").select("festival_id").in("festival_id", ids)) as any[];
+    for (const r of rows) out[r.festival_id] = (out[r.festival_id] ?? 0) + 1;
+    return out;
+  }
+
+  // ───── solicitudes de información ─────
+
+  async createInfoRequest(input: NewInfoRequest) {
+    const id = must(
+      await this.db.rpc("info_request_create", {
+        p_kind: input.kind,
+        p_target: input.target_id,
+        p_token_hash: hashToken(input.token),
+        p_password: normPassword(input.password),
+        p_recipient: input.recipient ?? null,
+        p_email: input.recipient_email ?? null,
+        p_expires: input.expires_at,
+      }),
+    ) as string;
+    const list = await this.listInfoRequests({ target_id: input.target_id });
+    const rec = list.find((r) => r.id === id);
+    if (!rec) throw new Error("No se pudo crear la solicitud");
+    return rec;
+  }
+  async listInfoRequests(opts?: { kind?: SubmissionKind; target_id?: string }) {
+    let q = this.db.from("info_requests").select("*").order("created_at", { ascending: false });
+    if (opts?.kind) q = q.eq("kind", opts.kind);
+    if (opts?.target_id) q = q.eq("target_id", opts.target_id);
+    const rows = must(await q) as any[];
+    const counts: Record<string, number> = {};
+    if (rows.length) {
+      const subs = must(await this.db.from("submissions").select("request_id").in("request_id", rows.map((r) => r.id))) as any[];
+      for (const s of subs) counts[s.request_id] = (counts[s.request_id] ?? 0) + 1;
+    }
+    return rows.map((r) => rowToInfoRequest({ ...r, submissions_count: counts[r.id] ?? 0 }));
+  }
+  async revokeInfoRequest(id: string) {
+    must(await this.db.from("info_requests").update({ revoked_at: new Date().toISOString() }).eq("id", id).is("revoked_at", null));
+  }
+
+  async openInfoRequest(token: string, password: string): Promise<OpenInfoResult> {
+    const res = await this.db.rpc("info_request_open", { p_token_hash: hashToken(token), p_password: normPassword(password) });
+    if (res.error) throw new Error(res.error.message);
+    const j = res.data as any;
+    if (!j || j.status !== "ok") return { ok: false, reason: (j?.status ?? "not_found") as never };
+    const request = rowToInfoRequest(j.request);
+    return j.request.kind === "film"
+      ? { ok: true, request, film: rowToFilm(j.record) }
+      : { ok: true, request, org: rowToOrg(j.record) };
+  }
+
+  async submitInfoRequest(
+    token: string,
+    password: string,
+    data: { payload: FilmInput | OrgInput; note: string; contact: string; submitter: string | null },
+  ): Promise<SubmitInfoResult> {
+    const res = await this.db.rpc("info_request_submit", {
+      p_token_hash: hashToken(token),
+      p_password: normPassword(password),
+      p_payload: data.payload,
+      p_note: data.note,
+      p_contact: data.contact,
+      p_submitter: data.submitter,
+    });
+    if (res.error) throw new Error(res.error.message);
+    const status = (res.data as any)?.status;
+    return status === "ok" ? { ok: true } : { ok: false, reason: (status ?? "not_found") as never };
   }
 }

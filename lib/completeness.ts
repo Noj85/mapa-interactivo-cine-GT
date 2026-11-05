@@ -16,7 +16,8 @@ export const hasAnchor = (l: Pick<FilmLocation, "depto_ine" | "muni_ine" | "lat"
  * Todo lo demás suma al porcentaje y a la lista de faltantes.
  */
 export function filmCompleteness(
-  f: Omit<Film, "completeness" | "missing_fields" | "status" | "id" | "slug" | "locations"> & {
+  // Los festivales no cuentan en el porcentaje: una producción puede no haber ido a ninguno.
+  f: Omit<Film, "completeness" | "missing_fields" | "status" | "id" | "slug" | "locations" | "festivals"> & {
     locations: Pick<
       FilmLocation,
       "depto_ine" | "muni_ine" | "lat" | "lng" | "days" | "local_spend" | "jobs"

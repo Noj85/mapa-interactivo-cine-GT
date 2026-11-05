@@ -13,7 +13,7 @@ export const USD_TO_GTQ = 7.7;
 /** Las tres categorías de descarga: producciones, entidades de circulación y entidades de industria. */
 export type ExportKind = "producciones" | "circulacion" | "entidades";
 /** Qué es una fila en las producciones: una por producción o una por locación de rodaje. */
-export type ExportRows = "producciones" | "locaciones";
+export type ExportRows = "producciones" | "locaciones" | "festivales";
 export type ExportFormat = "csv" | "xlsx";
 export type BudgetCurrency = "GTQ" | "USD";
 
@@ -94,7 +94,7 @@ const pick = <T extends string>(values: string[], allowed: readonly { id: T }[])
 export const kindLayer = (k: ExportKind): "circulacion" | "industria" | null => (k === "circulacion" ? "circulacion" : k === "entidades" ? "industria" : null);
 
 /**
- * Qué se pide: `tipo` (producciones | circulacion | entidades) y, en producciones, `filas` (producciones | locaciones).
+ * Qué se pide: `tipo` (producciones | circulacion | entidades) y, en producciones, `filas` (producciones | locaciones | festivales).
  * Entiende también los enlaces anteriores: tipo=peliculas, tipo=locaciones y tipo=entidades&capa=circulacion.
  */
 export function parseExportRequest(p: URLSearchParams): { tipo: ExportKind; filas: ExportRows } {
@@ -102,7 +102,8 @@ export function parseExportRequest(p: URLSearchParams): { tipo: ExportKind; fila
   if (t === "circulacion") return { tipo: "circulacion", filas: "producciones" };
   if (t === "entidades") return { tipo: p.get("capa") === "circulacion" ? "circulacion" : "entidades", filas: "producciones" };
   if (t === "locaciones") return { tipo: "producciones", filas: "locaciones" };
-  return { tipo: "producciones", filas: p.get("filas") === "locaciones" ? "locaciones" : "producciones" };
+  const filas = p.get("filas");
+  return { tipo: "producciones", filas: filas === "locaciones" || filas === "festivales" ? filas : "producciones" };
 }
 
 export function parseFilmFilter(p: URLSearchParams): FilmFilter {

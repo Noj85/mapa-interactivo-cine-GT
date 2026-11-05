@@ -62,7 +62,7 @@ Además de CSV y Excel, el asistente acepta **PDF** (catálogos, directorios, li
 
 ### Primera carga
 
-El mapa arranca vacío y se llena desde cero: entra a `/admin/agregar` y sube un archivo (CSV, Excel o PDF) o registra una producción o entidad a mano. El proyecto no trae datos ni catálogos propios. Las producciones sin lugar de rodaje salen en la zona **«Sin ubicación»** del mapa (ver abajo) hasta que les agregues sus locaciones desde `/admin/peliculas`; el botón «Publicar todas» de esa pantalla publica de una vez los borradores que ya tienen título.
+El mapa arranca vacío y se llena desde cero: entra a `/admin/agregar` y sube un archivo (CSV, Excel o PDF) o registra una producción o entidad a mano. El proyecto no trae datos de producciones ni entidades; solo trae el catálogo base de festivales (ver «Festivales y premios»). Las producciones sin lugar de rodaje salen en la zona **«Sin ubicación»** del mapa (ver abajo) hasta que les agregues sus locaciones desde `/admin/peliculas`; el botón «Publicar todas» de esa pantalla publica de una vez los borradores que ya tienen título.
 
 ## Dos partes: mapa público y equipo
 
@@ -89,6 +89,20 @@ La app es una sola, con dos áreas separadas. **`/` siempre es el mapa público*
 
 - Una producción puede tener **todas las locaciones que haga falta** (cada una con su lugar, sitio, días, inversión local y empleos). En el editor: «Agregar locación», o «Pegar varios lugares» para escribir una lista (uno por línea o separados por «;») que se resuelve con los códigos del INE. En un archivo importado, una fila por locación.
 - Las producciones **sin lugar de rodaje** ya no quedan ocultas: con tener título se publican y se muestran en una zona punteada «Sin ubicación» en el Pacífico, fuera del territorio de Guatemala, para que se entienda que no tienen ubicación. Tocarla abre la lista de esas producciones (`?sinlugar=1`), y la vista general avisa cuántas son. Al agregarles un lugar pasan solas al mapa.
+
+## Publicar o no en el mapa
+
+En **Registros** (`/admin/peliculas` y `/admin/entidades`) cada fila tiene un interruptor **En el mapa**, hay búsqueda, filtros (estado, completitud, categoría, origen…) y casillas para aplicar «Publicar» o «Ocultar» a varias filas a la vez. Lo que ves como registrado en el equipo puede ser más que lo que se muestra en el mapa público: solo aparece lo publicado.
+
+## Solicitar información (recopilación)
+
+Desde el editor de una producción o entidad, o desde varias filas seleccionadas, el botón **Solicitar información** genera un **enlace privado** (`/completar/<código>`) y una **contraseña** (palabra-palabra-número, se muestra una sola vez) y arma un mensaje listo para copiar y pegar en WhatsApp o correo, que explica que es un contacto directo para una investigación seria del Eje de Investigación de PROCINE / Academia de Cine. El enlace sirve varias veces hasta que venza o lo revoques (panel «Solicitudes» del registro). Quien lo abre escribe la contraseña y ve el formulario con los datos actuales, resaltando lo que falta. Lo que envía llega a `/admin/aportes` con origen **recopilación**; nada se publica hasta que lo apruebes («Aplicar y poner en el mapa»). Los códigos se guardan con hash y las contraseñas con bcrypt, con bloqueo tras 10 intentos fallidos. Requiere `supabase/migrations/0007_info_requests.sql`.
+
+## Festivales y premios
+
+Cada producción puede tener **varias entradas de festival** (festival, año, resultado —selección, premio, mención…—, sección, premio, enlace, país y ciudad), igual que las locaciones. Se ven en la ficha y en las descargas, no en los filtros del mapa, y no cuentan en la completitud. Al escribir el nombre aparecen sugerencias de un **catálogo** de festivales, pero se puede escribir cualquiera a mano: al aprobar un aporte, los festivales nuevos se agregan al catálogo. Administra el catálogo en `/admin/festivales` (buscar, editar, fusionar duplicados).
+
+Aplica `supabase/migrations/0008_festivals.sql` y luego pulsa **Cargar catálogo base** en `/admin/festivales`: importa `data/festivals.seed.json` (unos 3,300 festivales). Ese archivo se generó con `node scripts/seed-festivals.mjs <csv>` a partir de la «Festival library» de Film Circulation (Zenodo, [zenodo.org/records/7887672](https://zenodo.org/records/7887672)), licencia **CC BY 4.0**; la atribución está en `/creditos`.
 
 ## Filtros del mapa
 

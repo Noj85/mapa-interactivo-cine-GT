@@ -1,7 +1,7 @@
 import { categoriesText } from "@/lib/categories";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { filmFilterActive, locDepto, locationsMatching, orgFilterActive, type ExportKind, type ExportRows, type FilmFilter, type OrgFilter } from "@/lib/filters";
-import { FILM_KINDS, INITIATIVE_TYPES, NATIONALITIES, type Film, type Org } from "@/lib/types";
+import { FESTIVAL_RESULTS, FILM_KINDS, INITIATIVE_TYPES, NATIONALITIES, type Film, type Org } from "@/lib/types";
 
 export interface Table {
   /** Nombre corto para el archivo. */
@@ -59,6 +59,20 @@ export function buildTable(
     };
   }
 
+  if (tipo === "producciones" && filas === "festivales") {
+    const resultLabel = (r: string) => FESTIVAL_RESULTS.find((x) => x.id === r)?.label ?? r;
+    return {
+      name: "festivales",
+      title: "Festivales y premios",
+      header: ["Producción", "Año de la producción", "Tipo", "Festival", "Año del festival", "País", "Ciudad", "Resultado", "Sección", "Premio", "Enlace", "Estado"],
+      widths: [34, 10, 14, 36, 10, 16, 18, 18, 26, 30, 36, 11],
+      // las producciones sin festivales no aparecen: la hoja es una fila por participación
+      rows: films.flatMap((film) =>
+        (film.festivals ?? []).map((x) => [film.title, film.year, kindLabel(film.kind), x.name, x.year, x.country, x.city, resultLabel(x.result), x.section, x.award, x.url, estado(film.status)]),
+      ),
+    };
+  }
+
   if (tipo === "circulacion" || tipo === "entidades") {
     return {
       name: tipo,
@@ -91,8 +105,8 @@ export function buildTable(
   return {
     name: "producciones",
     title: "Producciones",
-    header: ["Título", "Año", "Tipo", "Dirección", "Productora", "Nacionalidad", "Presupuesto", "Moneda", "Locaciones", "Departamentos", "Días de rodaje", "Inversión local", "Empleos", "Sinopsis", "Registro completo (%)", "Falta", "Estado"],
-    widths: [34, 7, 14, 26, 26, 14, 14, 8, 10, 28, 10, 14, 9, 70, 12, 30, 11],
+    header: ["Título", "Año", "Tipo", "Dirección", "Productora", "Nacionalidad", "Presupuesto", "Moneda", "Locaciones", "Departamentos", "Días de rodaje", "Inversión local", "Empleos", "Festivales", "Sinopsis", "Registro completo (%)", "Falta", "Estado"],
+    widths: [34, 7, 14, 26, 26, 14, 14, 8, 10, 28, 10, 14, 9, 10, 70, 12, 30, 11],
     rows: films.map((f) => [
       f.title,
       f.year,
@@ -107,6 +121,7 @@ export function buildTable(
       sum(f, "days"),
       sum(f, "local_spend"),
       sum(f, "jobs"),
+      (f.festivals ?? []).length,
       f.synopsis,
       f.completeness,
       f.missing_fields.join("; "),

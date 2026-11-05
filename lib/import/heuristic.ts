@@ -5,6 +5,12 @@ import type { ImportPlan, ParsedFile, ParsedSheet, SheetPlan } from "./types";
 type Syn = [field: string, patterns: RegExp[]];
 
 const FILM_SYN: Syn[] = [
+  ["festival_year", [/^(ano|anio|year|edicion|fecha)( del| de)? (festival|premio|seleccion)$/, /^(festival|premio) (ano|anio|year|edicion)$/]],
+  ["festival_result", [/^(resultado|result|reconocimiento|estatus|seleccion|premiada?|ganadora?)( (en )?(el )?(festival|premio))?$/]],
+  ["festival_section", [/^(seccion|section|competencia|categoria de (festival|seleccion))( del festival)?$/]],
+  ["festival_award", [/^(premio|premios|award|awards|galardon|distincion|premio obtenido)$/]],
+  ["festival_url", [/^(enlace|url|link|sitio)( del| de)? (festival|premio)$/]],
+  ["festival", [/^(festival|festivales|festival(es)? (de seleccion|donde participo|y premios?)|selecciones|festival name)$/]],
   ["title", [/^(titulo|title|nombre( de la)?( pelicula| produccion| proyecto| obra)?|pelicula|produccion|proyecto|obra)$/]],
   ["year", [/^(ano|year|anio|ano de (estreno|produccion|rodaje|lanzamiento)|estreno|fecha)$/]],
   ["kind", [/^(tipo|genero|formato|categoria|type)( de (produccion|obra|proyecto))?$/]],
@@ -44,6 +50,7 @@ const ORG_SYN: Syn[] = [
 
 /** Segunda pasada, más tolerante: encabezados largos como "Nombre del proyecto" o "Dónde se filmó". */
 const FILM_LOOSE: Syn[] = [
+  ["festival", [/\bfestival/, /\bselecciones?\b/]],
   ["title", [/\b(titulo|pelicula|proyecto|obra|nombre)\b/]],
   ["year", [/\b(ano|anio|year|estreno)\b/]],
   ["director", [/\bdirec/, /realiza/]],

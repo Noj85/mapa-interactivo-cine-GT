@@ -1,6 +1,6 @@
 import { contactFromFields, contactParts } from "@/lib/contact";
 import { orgCategories } from "@/lib/categories";
-import type { Film, FilmKind, InitiativeType, Nationality, Org } from "@/lib/types";
+import type { FestivalResult, Film, FilmKind, InitiativeType, Nationality, Org } from "@/lib/types";
 
 /**
  * Borradores de formulario: todo como texto, igual que lo escribe la persona.
@@ -33,6 +33,25 @@ export const toNum = (v: string) => {
   return Number.isFinite(x) ? x : null;
 };
 
+/** Una participación en un festival, como se escribe en el formulario. */
+export interface FestDraft {
+  id?: string;
+  /** Festival del catálogo; null si se escribió a mano. */
+  festival_id: string | null;
+  name: string;
+  year: string;
+  country: string;
+  city: string;
+  result: FestivalResult;
+  section: string;
+  award: string;
+  url: string;
+}
+
+export const blankFest = (): FestDraft => ({ festival_id: null, name: "", year: "", country: "", city: "", result: "seleccion", section: "", award: "", url: "" });
+
+export const isBlankFest = (f: FestDraft) => !f.name.trim() && !f.year.trim() && !f.section.trim() && !f.award.trim() && !f.url.trim();
+
 export interface FilmDraft {
   title: string;
   year: string;
@@ -45,6 +64,7 @@ export interface FilmDraft {
   synopsis: string;
   poster: string | null;
   locs: LocDraft[];
+  fests: FestDraft[];
 }
 
 export function filmDraft(film?: Film): FilmDraft {
@@ -74,6 +94,18 @@ export function filmDraft(film?: Film): FilmDraft {
       : film
         ? []
         : [blankLoc()],
+    fests: (film?.festivals ?? []).map((x) => ({
+      id: x.id,
+      festival_id: x.festival_id,
+      name: x.name,
+      year: s(x.year),
+      country: x.country ?? "",
+      city: x.city ?? "",
+      result: x.result,
+      section: x.section ?? "",
+      award: x.award ?? "",
+      url: x.url ?? "",
+    })),
   };
 }
 
@@ -102,6 +134,20 @@ export function filmPayload(d: FilmDraft) {
         days: toNum(l.days),
         local_spend: toNum(l.local_spend),
         jobs: toNum(l.jobs),
+      })),
+    festivals: d.fests
+      .filter((x) => x.name.trim())
+      .map((x) => ({
+        id: x.id,
+        festival_id: x.festival_id,
+        name: x.name.trim(),
+        year: toNum(x.year),
+        country: x.country.trim() || null,
+        city: x.city.trim() || null,
+        result: x.result,
+        section: x.section.trim() || null,
+        award: x.award.trim() || null,
+        url: x.url.trim() || null,
       })),
   };
 }

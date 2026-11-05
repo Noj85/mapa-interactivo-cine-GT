@@ -53,7 +53,8 @@ export default async function AdminHome() {
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-display text-[15px]">
-              {submissions.length} {submissions.length === 1 ? "aporte del público por revisar" : "aportes del público por revisar"}
+              {submissions.length} {submissions.length === 1 ? "aporte por revisar" : "aportes por revisar"}
+              {submissions.some((x) => x.origin === "recopilacion") && ` (${submissions.filter((x) => x.origin === "recopilacion").length} de recopilación)`}
             </span>
             <span className="block truncate text-xs text-muted">{submissions.slice(0, 3).map((x) => x.label).join(" · ")}</span>
           </span>
@@ -62,8 +63,8 @@ export default async function AdminHome() {
       )}
 
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        {stat("Producciones", films.length, `${films.filter((f) => f.status === "published").length} publicadas`)}
-        {stat("Entidades", orgs.length, `${orgs.filter((o) => o.status === "published").length} publicadas`)}
+        {stat("Producciones registradas", films.length, `${films.filter((f) => f.status === "published").length} en el mapa`)}
+        {stat("Entidades registradas", orgs.length, `${orgs.filter((o) => o.status === "published").length} en el mapa`)}
         {stat("Con información pendiente", pending.length)}
         {stat("Preguntas sin responder", openQs.length)}
       </div>
@@ -104,7 +105,7 @@ export default async function AdminHome() {
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
                       <span className="truncate font-display text-[15px]">{p.name}</span>
-                      {p.draft && <span className="chip !py-0 text-[11px]">Borrador</span>}
+                      {p.draft && <span className="chip !py-0 text-[11px]">Oculto del mapa</span>}
                     </span>
                     <span className="block truncate text-xs text-muted">
                       <AlertCircle className="mr-1 inline h-3 w-3 text-warn" />

@@ -20,6 +20,48 @@ export interface FilmLocation {
   confidence: number | null;
 }
 
+export type FestivalResult = "seleccion" | "nominacion" | "premio" | "mencion" | "proyeccion";
+
+export const FESTIVAL_RESULTS: { id: FestivalResult; label: string }[] = [
+  { id: "premio", label: "Premio" },
+  { id: "nominacion", label: "Nominación" },
+  { id: "mencion", label: "Mención especial" },
+  { id: "seleccion", label: "Selección oficial" },
+  { id: "proyeccion", label: "Proyección especial" },
+];
+
+/** Una participación de la producción en un festival: selección, nominación o premio. */
+export interface FilmFestival {
+  id: string;
+  film_id: string;
+  /** Festival del catálogo, o null si se escribió a mano. */
+  festival_id: string | null;
+  /** Nombre del festival tal como se registra (siempre presente). */
+  name: string;
+  /** Año de la edición. */
+  year: number | null;
+  country: string | null;
+  city: string | null;
+  result: FestivalResult;
+  /** Sección o competencia ("Largometraje ficción"). */
+  section: string | null;
+  /** Nombre del premio o categoría ("Mejor película"). */
+  award: string | null;
+  url: string | null;
+}
+
+/** Festival del catálogo (semilla pública + los que agrega el equipo). */
+export interface Festival {
+  id: string;
+  slug: string;
+  name: string;
+  aliases: string[];
+  country: string | null;
+  city: string | null;
+  founded: number | null;
+  source: string | null;
+}
+
 export interface Film {
   id: string;
   slug: string;
@@ -39,6 +81,7 @@ export interface Film {
   completeness: number;
   missing_fields: string[];
   locations: FilmLocation[];
+  festivals: FilmFestival[];
 }
 
 export type FilmKind = "ficcion" | "documental" | "serie" | "comercial" | "corto" | "otro";
@@ -208,6 +251,8 @@ export interface FilmInput {
   status?: RecordStatus;
   source?: string | null;
   locations: Partial<Omit<FilmLocation, "film_id">>[];
+  /** Si no viene, se conservan los festivales que ya tiene la producción. */
+  festivals?: Partial<Omit<FilmFestival, "film_id">>[];
 }
 
 export interface OrgInput {
@@ -241,9 +286,17 @@ export type SubmissionKind = "film" | "org";
  * Propuesta enviada desde el mapa público. Nunca toca los registros publicados:
  * el equipo la revisa y, al aprobarla, se crea o actualiza el registro.
  */
+export type SubmissionOrigin = "publico" | "recopilacion";
+
 export interface Submission {
   id: string;
   kind: SubmissionKind;
+  /** "publico" = formulario abierto; "recopilacion" = enlace privado de una solicitud de información. */
+  origin: SubmissionOrigin;
+  /** Solicitud de información desde la que se envió (solo recopilación). */
+  request_id: string | null;
+  /** Nombre y rol de quien envía (solo recopilación). */
+  submitter: string | null;
   /** Registro que se propone corregir; null si es un registro nuevo. */
   target_id: string | null;
   /** Nombre del registro al enviar el aporte (para mostrarlo en la lista). */
@@ -263,3 +316,28 @@ export interface Submission {
 }
 
 export type SubmissionInput = Pick<Submission, "kind" | "target_id" | "label" | "payload" | "note" | "contact">;
+
+// ───────────────────────── solicitudes de información ─────────────────────────
+
+/** Enlace privado con contraseña para que alguien del equipo de una producción o entidad complete sus datos. */
+export interface InfoRequest {
+  id: string;
+  kind: SubmissionKind;
+  target_id: string;
+  /** Nombre o rol de la persona a quien se envía (opcional). */
+  recipient: string | null;
+  recipient_email: string | null;
+  expires_at: string;
+  revoked_at: string | null;
+  failed_attempts: number;
+  last_used_at: string | null;
+  created_at: string;
+  /** Aportes recibidos por este enlace. */
+  submissions_count: number;
+}
+
+export type InfoRequestState = "active" | "expired" | "revoked" | "locked";
+
+export type OpenInfoResult =
+  | { ok: true; request: InfoRequest; film?: Film; org?: Org }
+  | { ok: false; reason: "not_found" | "bad_password" | "expired" | "revoked" | "locked" };

@@ -206,7 +206,7 @@ export function StepUnderstand({
                   {sp.entity === "film" && (
                     <select className="field !w-auto !py-1.5 text-xs" value={sp.grain} onChange={(e) => update(sp.sheet, { grain: e.target.value as SheetPlan["grain"] })}>
                       <option value="row_per_film">Una fila por producción</option>
-                      <option value="row_per_location">Una fila por locación</option>
+                      <option value="row_per_location">Una fila por locación o festival</option>
                     </select>
                   )}
                 </div>

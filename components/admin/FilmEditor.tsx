@@ -7,6 +7,7 @@ import { deleteFilmAction, saveFilmAction } from "@/app/admin/actions";
 import { filmDraft, filmPayload, type FilmDraft } from "@/components/records/drafts";
 import { FilmFields } from "@/components/records/FilmFields";
 import { ImageField } from "@/components/records/ImageField";
+import { FestivalsEditor } from "@/components/records/FestivalsEditor";
 import { LocationsEditor } from "@/components/records/LocationsEditor";
 import { CompletenessMeter } from "@/components/ui/Badges";
 import { filmCompleteness } from "@/lib/completeness";
@@ -70,6 +71,7 @@ export function FilmEditor({ film }: { film?: Film }) {
       <div className="space-y-8">
         <FilmFields draft={d} onChange={set} />
         <LocationsEditor locs={d.locs} onChange={(locs) => set({ locs })} />
+        <FestivalsEditor fests={d.fests} onChange={(fests) => set({ fests })} />
       </div>
 
       <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
