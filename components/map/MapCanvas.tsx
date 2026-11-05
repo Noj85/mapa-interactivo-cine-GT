@@ -714,7 +714,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
         new maplibregl.AttributionControl({
           compact: true,
           customAttribution:
-            "Límites: MINFIN / INE · Mapa base © <a href='https://openfreemap.org' target='_blank'>OpenFreeMap</a> © OpenMapTiles, datos OpenStreetMap",
+            "Límites: MINFIN / INE · Mapa base © <a href='https://openfreemap.org' target='_blank' rel='noreferrer'>OpenFreeMap</a> © <a href='https://openmaptiles.org' target='_blank' rel='noreferrer'>OpenMapTiles</a> · Datos © <a href='https://www.openstreetmap.org/copyright' target='_blank' rel='noreferrer'>colaboradores de OpenStreetMap</a> · <a href='/creditos' target='_blank'>Créditos</a>",
         }),
         "bottom-left",
       );

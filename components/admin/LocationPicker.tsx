@@ -60,7 +60,10 @@ export function LocationPicker({
         zoom: point ? 12 : 6.5,
         minZoom: 5,
         dragRotate: false,
-        attributionControl: { compact: true },
+        attributionControl: {
+          compact: true,
+          customAttribution: "Datos © <a href='https://www.openstreetmap.org/copyright' target='_blank' rel='noreferrer'>colaboradores de OpenStreetMap</a>",
+        },
       });
       mapRef.current = map;
       map.addControl(new ml.NavigationControl({ showCompass: false }), "top-right");

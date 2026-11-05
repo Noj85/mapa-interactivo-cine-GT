@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /**
@@ -51,6 +52,9 @@ export function BrandFooter({ className, bare }: { className?: string; bare?: bo
             Mapa del Cine de Guatemala. Datos abiertos del cine nacional, mantenidos por el equipo de la Academia.
           </p>
         )}
+        <Link href="/creditos" className={cn("w-full text-xs text-muted underline decoration-line underline-offset-2 hover:text-ink hover:decoration-accent", !bare && "sm:w-auto")}>
+          Créditos y licencias
+        </Link>
       </div>
     </footer>
   );

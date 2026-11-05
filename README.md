@@ -148,7 +148,7 @@ Los enlaces anteriores (`tipo=peliculas`, `tipo=locaciones`, `tipo=entidades&cap
 
 ## Identidad visual
 
-Tipografía: **Biennale** (archivos en `fonts/biennale/`, cargados con `next/font/local` en `app/layout.tsx`) en toda la interfaz. Texto en Regular (400), etiquetas y botones en Medium/SemiBold, títulos en SemiBold (h1 en Bold); también están Hair, Thin, Ultra Light, Light, Book, Heavy y Black, cada una con su cursiva. Las etiquetas dibujadas dentro del mapa (nombres de pueblos y rutas) vienen del servidor de mapas y no pueden usar esta fuente. Paleta azul marino institucional con modo claro y oscuro (sigue la preferencia del sistema hasta que alguien elige; se recuerda en el navegador). Los colores viven como variables en `app/globals.css`; los de las capas del mapa, en `lib/map/colors.ts`.
+Tipografía: **Biennale** (archivos en `fonts/biennale/`, cargados con `next/font/local` en `app/layout.tsx`) en toda la interfaz. **Es temporal** (demostrativa, hasta tener la tipografía institucional de PROCINE): es una fuente comercial, no está licenciada para redistribución y debe reemplazarse antes del lanzamiento. Texto en Regular (400), etiquetas y botones en Medium/SemiBold, títulos en SemiBold (h1 en Bold); también están Hair, Thin, Ultra Light, Light, Book, Heavy y Black, cada una con su cursiva. Las etiquetas dibujadas dentro del mapa (nombres de pueblos y rutas) vienen del servidor de mapas y no pueden usar esta fuente. Paleta azul marino institucional con modo claro y oscuro (sigue la preferencia del sistema hasta que alguien elige; se recuerda en el navegador). Los colores viven como variables en `app/globals.css`; los de las capas del mapa, en `lib/map/colors.ts`.
 
 ## Exportación para informes (equipo)
 
@@ -166,3 +166,10 @@ Los límites vienen de `public/geo/` (departamentos, municipios con código INE,
 - `lib/claude/`: llamadas a Claude (mapeo de columnas y resolución de lugares).
 - `lib/data/`: almacén (Supabase o archivo local).
 - `app/admin/`: panel del equipo.
+
+## Licencia y créditos
+
+- **Código propio:** © Javier Oswaldo Borrayo Mazariegos, todos los derechos reservados (ver [`LICENSE`](LICENSE)). No es software libre: copiarlo, modificarlo o distribuirlo requiere autorización escrita o un acuerdo firmado.
+- **Componentes de terceros:** las librerías de código abierto conservan sus licencias (MIT, BSD, Apache-2.0, ISC y LGPL para los binarios de libvips que usa `sharp`). Sus avisos están en [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) y en `public/licencias.txt`. Se generan con `npm run licenses`; vuelve a correrlo cuando cambien las dependencias y sube los dos archivos.
+- **Datos y marcas:** los datos del mapa y los logotipos son de la Academia de Cine de Guatemala y PROCINE.
+- **En el sitio:** la página `/creditos` («Créditos y licencias») reconoce la autoría, los datos, los mapas (© colaboradores de OpenStreetMap, OpenFreeMap, OpenMapTiles, Esri, MINFIN / INE) y las librerías; está enlazada desde el pie de página y desde la atribución del mapa.

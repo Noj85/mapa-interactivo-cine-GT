@@ -11,7 +11,7 @@ const links = [
 ];
 
 /** Encabezado de las páginas de contenido (descargas, etc.). El mapa tiene su propia barra flotante. */
-export function SiteHeader({ current }: { current: "/" | "/descargas" | "/aportar" }) {
+export function SiteHeader({ current }: { current: "/" | "/descargas" | "/aportar" | "/creditos" }) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">

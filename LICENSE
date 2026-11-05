@@ -1,0 +1,53 @@
+Mapa del Cine de Guatemala
+Copyright (c) 2026 Javier Oswaldo Borrayo Mazariegos. Todos los derechos reservados.
+
+Este software, incluido su código fuente, su arquitectura, su modelo de datos, sus flujos
+de carga e importación, su diseño técnico y su documentación (el «Software»), es obra
+original de Javier Oswaldo Borrayo Mazariegos (el «Autor») y NO es software libre ni de
+código abierto.
+
+1. Permisos
+
+   Sin autorización escrita del Autor, o sin un acuerdo firmado que la otorgue, queda
+   prohibido copiar, modificar, distribuir, publicar, sublicenciar, vender, alojar para
+   terceros o crear obras derivadas del Software, en todo o en parte.
+
+   El acceso al código fuente que el Autor conceda a una persona o entidad es personal,
+   limitado al proyecto para el que se concedió y sujeto a los términos del acuerdo
+   firmado. No transfiere titularidad ni otorga licencia alguna fuera de ese acuerdo.
+
+2. Lo que esta licencia NO cubre
+
+   a) Componentes de terceros. Las librerías y herramientas de código abierto que el
+      Software utiliza conservan sus propias licencias y sus avisos de copyright. Sus
+      requisitos se respetan: ver THIRD_PARTY_NOTICES.md y la página «Créditos y
+      licencias» de la plataforma.
+
+   b) Datos y contenidos. La información de películas, producciones, entidades y demás
+      registros del mapa pertenece a la Academia de Cine de Guatemala y a PROCINE, o a
+      quienes la hayan aportado, y no se rige por esta licencia.
+
+   c) Marcas y logotipos. Los nombres, logotipos y marcas de la Academia de Cine de
+      Guatemala, de PROCINE y de terceros pertenecen a sus titulares.
+
+   d) Tipografía. La tipografía Biennale (carpeta fonts/biennale/) es propiedad de su
+      fabricante, se usa de forma temporal y no está licenciada para redistribución ni
+      para uso fuera de esta plataforma.
+
+   e) Servicios y datos geográficos de terceros (OpenStreetMap, OpenMapTiles,
+      OpenFreeMap, Esri, MINFIN / INE y otros) se rigen por sus propios términos, que se
+      detallan en THIRD_PARTY_NOTICES.md.
+
+3. Reconocimiento
+
+   Cualquier uso autorizado del Software, o de una obra derivada de él, debe conservar
+   este aviso y reconocer al Autor como creador de la arquitectura y del desarrollo
+   original, en los términos del acuerdo aplicable.
+
+4. Sin garantía
+
+   EL SOFTWARE SE ENTREGA «TAL CUAL», SIN GARANTÍA DE NINGÚN TIPO, EXPRESA O IMPLÍCITA.
+   EN NINGÚN CASO EL AUTOR SERÁ RESPONSABLE POR RECLAMACIONES, DAÑOS U OTRAS
+   RESPONSABILIDADES DERIVADAS DEL SOFTWARE O DE SU USO.
+
+Para solicitar permisos o acuerdos de uso, contactar al Autor.
