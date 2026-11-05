@@ -1,5 +1,5 @@
 import { normalizeCategories } from "@/lib/categories";
-import { parseFormat, parseGenreCell, parseNature, type FilmFormat, type FilmNature } from "@/lib/film-types";
+import { cleanMinutes, parseFormat, parseGenreCell, parseNature, type FilmFormat, type FilmNature } from "@/lib/film-types";
 import type { FestivalResult, InitiativeType, Nationality } from "@/lib/types";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
 import { normalize } from "@/lib/utils";
@@ -38,6 +38,29 @@ export function parseYear(v: unknown): number | null {
   if (!s) return null;
   const m = s.match(/(18|19|20)\d{2}/);
   return m ? Number(m[0]) : null;
+}
+
+/**
+ * Duración en minutos: «95», «95 min», «1h 35min», «1 hora 35», «1,5 h», «01:35:00», «1:35», «12:30» (12 min 30 s).
+ * Con dos partes separadas por «:», un primer número de 1 a 4 se lee como horas y minutos; uno mayor, como minutos y segundos.
+ * Lo que quede fuera de 1 a 2000 minutos se descarta.
+ */
+export function parseDuration(v: unknown): number | null {
+  if (typeof v === "number") return cleanMinutes(v);
+  const s = cleanText(v);
+  if (!s) return null;
+  const t = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/,/g, ".").trim();
+  let m = t.match(/^(\d+):(\d{1,2}):(\d{1,2})$/);
+  if (m) return cleanMinutes(Number(m[1]) * 60 + Number(m[2]) + Number(m[3]) / 60);
+  m = t.match(/^(\d+):(\d{1,2})$/);
+  if (m) return cleanMinutes(Number(m[1]) <= 4 ? Number(m[1]) * 60 + Number(m[2]) : Number(m[1]) + Number(m[2]) / 60);
+  m = t.match(/^(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hora|horas)\.?\s*(?:y\s*)?(?:(\d+)\s*(?:m|min|mins|minuto|minutos)?\.?)?$/);
+  if (m) return cleanMinutes(Number(m[1]) * 60 + (m[2] ? Number(m[2]) : 0));
+  m = t.match(/^(\d+(?:\.\d+)?)\s*(?:m|min|mins|minuto|minutos|minutes|')?\.?$/);
+  if (m) return cleanMinutes(Number(m[1]));
+  m = t.match(/^(\d+)\s*(?:m|min|mins|minuto|minutos)\.?\s*(\d+)\s*(?:s|seg|segundos)\.?$/);
+  if (m) return cleanMinutes(Number(m[1]) + Number(m[2]) / 60);
+  return null;
 }
 
 export function parseCoord(v: unknown, kind: "lat" | "lng"): number | null {

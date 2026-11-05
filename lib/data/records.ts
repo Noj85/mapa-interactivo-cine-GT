@@ -1,6 +1,6 @@
 import { filmCompleteness, orgCompleteness } from "@/lib/completeness";
 import { normalizeCategories } from "@/lib/categories";
-import { cleanGenres } from "@/lib/film-types";
+import { cleanGenres, cleanMinutes } from "@/lib/film-types";
 import { FESTIVAL_RESULTS, type Film, type FilmCompany, type FilmFestival, type FilmInput, type FilmLocation, type Org, type OrgInput } from "@/lib/types";
 import { slugify } from "@/lib/utils";
 
@@ -77,6 +77,7 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string; e
     format: input.format !== undefined ? input.format : opts.existing?.format ?? null,
     nature: input.nature !== undefined ? input.nature : opts.existing?.nature ?? null,
     genres: input.genres !== undefined ? cleanGenres(input.genres) : opts.existing?.genres ?? [],
+    duration_min: input.duration_min !== undefined ? cleanMinutes(input.duration_min) : opts.existing?.duration_min ?? null,
     director: str(input.director),
     producer: str(input.producer),
     nationality: input.nationality ?? null,

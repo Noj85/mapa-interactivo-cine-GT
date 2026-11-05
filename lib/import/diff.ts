@@ -73,8 +73,9 @@ function filmItems(existing: Film, incoming: FilmInput, names?: PlaceNames): Ite
     items.push({ ...it, current: it.current ?? null, defaultOn: it.group !== "conflict" });
 
   // campos simples: vacío → se llena; con otro valor → conflicto
-  const simple: { field: "year" | "format" | "nature" | "director" | "producer" | "nationality" | "synopsis"; label: string; show: (v: unknown) => string }[] = [
+  const simple: { field: "year" | "duration_min" | "format" | "nature" | "director" | "producer" | "nationality" | "synopsis"; label: string; show: (v: unknown) => string }[] = [
     { field: "year", label: "Año", show: (v) => String(v) },
+    { field: "duration_min", label: "Duración", show: (v) => `${v} min` },
     { field: "format", label: "Formato", show: (v) => formatLabel(v as string) },
     { field: "nature", label: "Naturaleza", show: (v) => natureLabel(v as string) },
     { field: "director", label: "Director/a", show: (v) => String(v) },
@@ -222,6 +223,7 @@ function draftFromFilm(f: Film): FilmInput {
     id: f.id,
     title: f.title,
     year: f.year,
+    duration_min: f.duration_min,
     format: f.format,
     nature: f.nature,
     genres: [...f.genres],

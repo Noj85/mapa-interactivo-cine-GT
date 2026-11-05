@@ -17,7 +17,7 @@ export const hasAnchor = (l: Pick<FilmLocation, "depto_ine" | "muni_ine" | "lat"
  */
 export function filmCompleteness(
   // Los festivales no cuentan en el porcentaje: una producción puede no haber ido a ninguno.
-  f: Omit<Film, "completeness" | "missing_fields" | "status" | "id" | "slug" | "locations" | "festivals" | "companies"> & {
+  f: Omit<Film, "completeness" | "missing_fields" | "status" | "id" | "slug" | "locations" | "festivals" | "companies" | "duration_min"> & {
     companies?: { name?: string | null }[];
     locations: Pick<
       FilmLocation,

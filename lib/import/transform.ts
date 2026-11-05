@@ -20,6 +20,7 @@ import {
   parseCoord,
   parseNumber,
   parseYear,
+  parseDuration,
 } from "./normalize";
 import type { Candidate, ImportPlan, Issue, ParsedFile, ParsedSheet, PlaceResolution, SheetPlan } from "./types";
 
@@ -171,6 +172,7 @@ function filmFields(row: Row, plan: SheetPlan): Omit<FilmInput, "locations" | "f
   return {
     title: cleanText(val(row, plan, "title")) ?? "",
     year: parseYear(val(row, plan, "year")),
+    duration_min: parseDuration(val(row, plan, "duration_min")),
     format: normalizeFormat(fmtCell, vm.format) ?? normalizeFormat(natCell, vm.format) ?? gen.format,
     nature: normalizeNature(natCell, vm.nature) ?? normalizeNature(fmtCell, vm.nature) ?? gen.nature,
     genres: gen.genres,

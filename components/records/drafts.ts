@@ -64,6 +64,7 @@ export const blankCompany = (country = ""): CompanyDraft => ({ name: "", country
 export interface FilmDraft {
   title: string;
   year: string;
+  duration: string;
   format: FilmFormat | "";
   nature: FilmNature | "";
   genres: string[];
@@ -83,6 +84,7 @@ export function filmDraft(film?: Film): FilmDraft {
   return {
     title: film?.title ?? "",
     year: s(film?.year),
+    duration: s(film?.duration_min),
     format: film?.format ?? "",
     nature: film?.nature ?? "",
     genres: film?.genres ?? [],
@@ -129,6 +131,7 @@ export function filmPayload(d: FilmDraft) {
   return {
     title: d.title,
     year: toNum(d.year),
+    duration_min: toNum(d.duration),
     format: d.format || null,
     nature: d.nature || null,
     genres: d.genres,

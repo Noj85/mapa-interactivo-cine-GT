@@ -14,10 +14,14 @@ export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange:
         <label className="label" htmlFor="f-title">Título *</label>
         <input id="f-title" className="field text-base" maxLength={300} value={d.title} onChange={(e) => onChange({ title: e.target.value })} />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div>
           <label className="label" htmlFor="f-year">Año</label>
           <input id="f-year" className="field" inputMode="numeric" value={d.year} onChange={(e) => onChange({ year: e.target.value })} />
+        </div>
+        <div>
+          <label className="label" htmlFor="f-dur">Duración (min)</label>
+          <input id="f-dur" className="field" inputMode="numeric" maxLength={4} placeholder="Ej.: 95" value={d.duration} onChange={(e) => onChange({ duration: e.target.value })} />
         </div>
         <div>
           <label className="label" htmlFor="f-format">Formato</label>

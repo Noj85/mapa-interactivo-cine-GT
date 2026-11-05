@@ -24,6 +24,7 @@ const TOOL = {
           properties: {
             title: str,
             year: { type: "string", description: "Año de estreno o producción, solo el número." },
+            duration: { type: "string", description: "Duración de la producción en minutos o en horas y minutos, tal como la dice el documento («95 min», «1h 35min»). Vacío si no se dice." },
             format: { type: "string", description: `Formato: ${FORMATS.map((f) => f.label).join(", ")}. Si el documento no lo dice, vacío.` },
             nature: { type: "string", description: `Naturaleza: ${NATURES.map((n) => n.label).join(", ")}. Aplica a cualquier formato («cortometraje documental» = formato Cortometraje, naturaleza Documental). Si no se dice, vacío.` },
             genres: {
@@ -114,12 +115,14 @@ Reglas:
 - Para "category" elige la categoría permitida más cercana al tipo de entidad; si la entidad hace varias cosas (por ejemplo producción y postproducción), enumera todas las que apliquen separadas por «;», la principal primero. Si ninguna encaja, la más cercana igualmente.
 - Teléfonos y correos van en "contact" (solo números de teléfono y direcciones de correo), no en la descripción.
 - Producciones: "format" es el formato (largometraje, cortometraje, serie, video musical…), "nature" es ficción, documental o híbrido, y "genres" son los géneros. Son tres datos distintos: «cortometraje documental de terror» = formato Cortometraje, naturaleza Documental, género Terror. No inventes ninguno que el documento no diga.
+- Duración: "duration" es la duración de la producción (minutos u horas), no los días de rodaje ni el año.
 - Festivales y lugares de una producción van en las listas "festivals" y "locations", uno por elemento; no los juntes en un solo texto.
 - Idioma de los datos: el original del documento.`;
 
 interface RawFilm {
   title?: string;
   year?: string;
+  duration?: string;
   format?: string;
   nature?: string;
   genres?: string;
@@ -224,6 +227,7 @@ const v = (s?: string) => (s ?? "").trim();
 const FILM_HEADERS = [
   "Título",
   "Año",
+  "Duración (min)",
   "Formato",
   "Naturaleza",
   "Géneros",
@@ -279,6 +283,7 @@ export async function claudePdf(data: Uint8Array, filename: string): Promise<Cla
       const base: Record<string, string> = {
         Título: v(f.title),
         Año: v(f.year),
+        "Duración (min)": v(f.duration),
         Formato: v(f.format),
         Naturaleza: v(f.nature),
         Géneros: v(f.genres),

@@ -2,7 +2,7 @@ import { orgCategories } from "@/lib/categories";
 import { companiesText } from "@/lib/companies";
 import { describeFestival, sortFestivals } from "@/lib/festivals";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
-import { formatLabel, natureLabel } from "@/lib/film-types";
+import { durationLabel, formatLabel, natureLabel } from "@/lib/film-types";
 import { INITIATIVE_TYPES, LAYERS, NATIONALITIES, type Film, type FilmInput, type Org, type OrgInput, type Submission } from "@/lib/types";
 import { fmtInt, fmtMoney } from "@/lib/utils";
 
@@ -67,6 +67,11 @@ export function diffSubmission(sub: Submission, current: Film | Org | null, gaz:
       row("Sinopsis", c?.synopsis ?? null, p.synopsis ?? null, isNew),
       row("Locaciones", c ? locsText(c.locations, gaz) : null, locsText(p.locations ?? [], gaz), isNew),
     ];
+    // los aportes anteriores a la duración no la traen: no se muestra como «vaciar»
+    if (p.duration_min !== undefined) {
+      const dur = (v: number | null | undefined) => durationLabel(v) || null;
+      rows.splice(2, 0, row("Duración", dur(c?.duration_min), dur(p.duration_min), isNew));
+    }
     // los aportes anteriores a los festivales no los traen: no se muestran como «vaciar»
     if (p.festivals !== undefined) {
       const mine = p.festivals.filter((x) => x.name).map((x) => ({ name: x.name!, year: x.year ?? null, result: x.result ?? "seleccion", award: x.award ?? null, section: x.section ?? null }));

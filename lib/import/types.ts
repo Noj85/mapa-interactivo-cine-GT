@@ -29,6 +29,7 @@ export interface FieldDef {
 export const FILM_FIELDS: FieldDef[] = [
   { id: "title", label: "Título", hint: "Nombre de la producción o proyecto" },
   { id: "year", label: "Año" },
+  { id: "duration_min", label: "Duración (min)", hint: "Duración de la producción: «95», «95 min», «1h 35min», «01:35:00»; se guarda en minutos. No es la duración del rodaje (eso son los días de rodaje)" },
   { id: "format", label: "Formato", hint: "largometraje, mediometraje, cortometraje, serie, miniserie, video musical, publicidad, programa de TV, contenido web, videoarte; puede venir junto a la naturaleza («Largometraje documental»)" },
   { id: "nature", label: "Naturaleza", hint: "ficción, documental, híbrido (aplica a cualquier formato)" },
   { id: "genres", label: "Géneros", hint: "uno o varios separados por «;» o «,» (drama, comedia, terror, ciencia ficción…); si trae uno que no es estándar, se conserva tal cual" },

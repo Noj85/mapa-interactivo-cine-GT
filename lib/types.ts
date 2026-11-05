@@ -82,6 +82,8 @@ export interface Film {
   nature: FilmNature | null;
   /** Géneros estándar o propios (por su nombre). */
   genres: string[];
+  /** Duración en minutos. */
+  duration_min: number | null;
   director: string | null;
   producer: string | null;
   nationality: Nationality | null;
@@ -251,6 +253,7 @@ export interface FilmInput {
   format?: FilmFormat | null;
   nature?: FilmNature | null;
   genres?: string[];
+  duration_min?: number | null;
   director?: string | null;
   producer?: string | null;
   nationality?: Nationality | null;

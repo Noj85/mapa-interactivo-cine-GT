@@ -2,7 +2,7 @@
 
 import { AlertCircle, Award, ExternalLink, MapPin, MessageSquarePlus, Pencil } from "lucide-react";
 import Link from "next/link";
-import { filmTypeLabel } from "@/lib/film-types";
+import { durationLabel, filmTypeLabel } from "@/lib/film-types";
 import { FESTIVAL_RESULTS, NATIONALITIES } from "@/lib/types";
 import { fmtInt, fmtMoney } from "@/lib/utils";
 import { CompletenessBadge, CompletenessMeter } from "@/components/ui/Badges";
@@ -24,7 +24,7 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
   const spend = film.locations.reduce((s, l) => s + (l.local_spend ?? 0), 0);
   const jobs = film.locations.reduce((s, l) => s + (l.jobs ?? 0), 0);
   const known = (k: "days" | "local_spend" | "jobs") => film.locations.some((l) => l[k] != null);
-  const meta = [film.year, kind, nat].filter(Boolean).join(" · ");
+  const meta = [film.year, kind, durationLabel(film.duration_min), nat].filter(Boolean).join(" · ");
   // Lo más reciente primero; los premios antes que las selecciones dentro de un mismo año.
   const rank = (r: string) => FESTIVAL_RESULTS.findIndex((x) => x.id === r);
   const fests = [...(film.festivals ?? [])].sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || rank(a.result) - rank(b.result));

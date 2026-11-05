@@ -7,7 +7,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Aggregates } from "@/lib/aggregate";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
-import { filmTypeLabel } from "@/lib/film-types";
+import { durationLabel, filmTypeLabel } from "@/lib/film-types";
 import type { Dataset, Film, LayerId, Org } from "@/lib/types";
 import type { Place, ViewState } from "@/lib/view";
 import { cn } from "@/lib/utils";
@@ -157,7 +157,7 @@ export function FilmCard({
       <span className="min-w-0 flex-1">
         <span className="block truncate font-display text-[15px] text-ink">{film.title}</span>
         <span className="block truncate text-xs text-muted">
-          {[film.year, kind].filter(Boolean).join(" · ") || "Sin datos básicos"}
+          {[film.year, kind, durationLabel(film.duration_min)].filter(Boolean).join(" · ") || "Sin datos básicos"}
           {sites ? ` — ${sites}` : ""}
         </span>
         <span className="mt-1 flex flex-wrap items-center gap-1.5">

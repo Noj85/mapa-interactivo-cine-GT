@@ -27,7 +27,7 @@ Copia `.env.example` a `.env.local` (o configúralas en Vercel).
 ## Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0011`, ver cada sección) de `supabase/migrations/`:
+2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0012`, ver cada sección) de `supabase/migrations/`:
    - `0001_init.sql`: tablas, políticas RLS y perfiles.
    - `0002_posters.sql`: campo del póster y bucket público `posters` en Storage.
    - `0003_submissions.sql`: aportes del público.
@@ -111,6 +111,14 @@ En **Registros** (`/admin/peliculas` y `/admin/entidades`) cada fila tiene un in
 ## Solicitar información (recopilación)
 
 Desde el editor de una producción o entidad, o desde varias filas seleccionadas, el botón **Solicitar información** genera un **enlace privado** (`/completar/<código>`) y una **clave** de 5 caracteres alfanuméricos (sin 0/o ni 1/l/i, se muestra una sola vez) y arma un mensaje corto y cordial, listo para copiar y pegar en WhatsApp o correo, que presenta a PROCINE (proyecto de fortalecimiento del sector cinematográfico) y a la Academia de Cine de Guatemala (que lo ejecuta). El mensaje no incluye la dirección del mapa, solo el enlace privado. El enlace sirve varias veces hasta que venza o lo revoques (panel «Solicitudes» del registro). Quien lo abre escribe la clave y ve el formulario con los datos actuales, resaltando lo que falta. Lo que envía llega a `/admin/aportes` con origen **recopilación**; nada se publica hasta que lo apruebes («Aplicar y poner en el mapa»). Los códigos se guardan con hash y las claves con bcrypt, con bloqueo tras 10 intentos fallidos. Requiere `supabase/migrations/0007_info_requests.sql`.
+
+## Duración en minutos
+
+Cada producción guarda su duración en minutos (entero de 1 a 2000, opcional). Se captura en el campo «Duración (min)» del formulario (admin y aportes), aparece en la ficha y las tarjetas («95 min»), viaja en los aportes del público y se descarga como columna «Duración (min)» en las hojas de producciones, locaciones y festivales. No cuenta en la completitud ni tiene filtro.
+
+Al importar, la columna «Duración», «Minutos», «Runtime» o «Metraje» va a este campo (una «Duración del rodaje» sigue siendo lugar o días). Se entiende «95», «95 min», «1h 35min», «1,5 h», «01:35:00» y «1:35»; con dos partes, un primer número de 1 a 4 son horas y uno mayor son minutos y segundos. Si en el paso «Lo que entendimos» una columna quedó sin asignar, escribe en «Instrucciones para el análisis» algo como «la columna Minutos es la duración de la producción» y pulsa «Volver a analizar». En una producción que ya existe sin duración, aparece como «completar»; si ya tenía otra distinta, como conflicto.
+
+Requiere `supabase/migrations/0012_film_duration.sql` (después de 0011). **Sin esta migración, guardar producciones falla.**
 
 ## Formato, naturaleza y géneros
 

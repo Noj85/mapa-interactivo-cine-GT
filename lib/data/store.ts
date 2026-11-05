@@ -4,7 +4,7 @@ import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeCategories, orgCategories } from "@/lib/categories";
 import { buildFilm, buildOrg, newId, uniqueSlug } from "@/lib/data/records";
-import { cleanGenres, isFormat, isNature, legacyKind, upgradeFilmPayload } from "@/lib/film-types";
+import { cleanGenres, cleanMinutes, isFormat, isNature, legacyKind, upgradeFilmPayload } from "@/lib/film-types";
 import { festivalSearchKey } from "@/lib/festivals";
 import { normalize } from "@/lib/utils";
 import { hashPassword, hashToken, normPassword, verifyPassword } from "@/lib/info-requests";
@@ -157,6 +157,7 @@ function readFilm(f: any): Film {
     format: isFormat(f.format) ? f.format : legacy.format,
     nature: isNature(f.nature) ? f.nature : legacy.nature,
     genres: cleanGenres(f.genres),
+    duration_min: cleanMinutes(f.duration_min),
     festivals: f.festivals ?? [],
     companies: f.companies ?? [],
   } as Film;
@@ -603,6 +604,7 @@ const rowToFilm = (r: any): Film => ({
   format: isFormat(r.format) ? r.format : legacyKind(r.kind).format,
   nature: isNature(r.nature) ? r.nature : legacyKind(r.kind).nature,
   genres: Array.isArray(r.genres) ? r.genres.map(String) : [],
+  duration_min: cleanMinutes(r.duration_min),
   director: r.director,
   producer: r.producer,
   nationality: r.nationality,
@@ -692,6 +694,7 @@ export class SupabaseStore implements Store {
         format: film.format,
         nature: film.nature,
         genres: film.genres,
+        duration_min: film.duration_min,
         director: film.director,
         producer: film.producer,
         companies: film.companies,

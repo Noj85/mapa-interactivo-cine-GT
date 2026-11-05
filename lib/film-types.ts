@@ -261,3 +261,18 @@ export function upgradeFilmPayload<T extends object>(payload: T): T {
   const { kind, ...rest } = p;
   return { ...rest, ...legacyKind(kind) } as T;
 }
+
+/** Duración máxima aceptada, en minutos (incluye series largas). */
+export const MAX_DURATION_MIN = 2000;
+
+/** Duración en minutos como entero de 1 a 2000; cualquier otra cosa queda vacía. */
+export function cleanMinutes(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "number" ? v : Number(String(v).replace(",", ".").replace(/[^0-9.\-]/g, ""));
+  if (!Number.isFinite(n)) return null;
+  const m = Math.round(n);
+  return m >= 1 && m <= MAX_DURATION_MIN ? m : null;
+}
+
+/** «95 min» para mostrar; vacío si no hay duración. */
+export const durationLabel = (m: number | null | undefined) => (m ? `${m} min` : "");
