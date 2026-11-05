@@ -117,7 +117,7 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
 
   if (status === "done") {
     return (
-      <div className="rounded-3xl border border-line bg-surface p-8 text-center">
+      <div className="mx-auto max-w-2xl rounded-3xl border border-line bg-surface p-8 text-center">
         <CheckCircle2 className="mx-auto h-10 w-10 text-ok" />
         <h2 className="mt-4 font-display text-3xl tracking-tight">¡Gracias por aportar!</h2>
         <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-muted">
@@ -158,7 +158,7 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
+      <div className="grid gap-8 lg:grid-cols-[1fr_300px] lg:gap-10">
         <div className="space-y-8">
           {kind === "film" ? (
             <>
@@ -193,22 +193,24 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
       </div>
 
       <section className="space-y-4 rounded-2xl border border-line bg-surface p-4">
-        <div>
-          <label className="label" htmlFor="c-note">Fuente de la información *</label>
-          <textarea
-            id="c-note"
-            className="field min-h-20"
-            required
-            aria-required
-            placeholder="Un enlace, el catálogo donde la viste, o cómo lo sabes. El equipo la usa para verificar el dato."
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            maxLength={1500}
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="c-mail">Tu correo *</label>
-          <input id="c-mail" type="email" required aria-required autoComplete="email" className="field" placeholder="Para que el equipo te escriba si tiene dudas; no se publica." value={email} onChange={(e) => setEmail(e.target.value)} />
+        <div className="grid gap-4 md:grid-cols-[3fr_2fr]">
+          <div>
+            <label className="label" htmlFor="c-note">Fuente de la información *</label>
+            <textarea
+              id="c-note"
+              className="field min-h-20"
+              required
+              aria-required
+              placeholder="Un enlace, el catálogo donde la viste, o cómo lo sabes. El equipo la usa para verificar el dato."
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              maxLength={1500}
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="c-mail">Tu correo *</label>
+            <input id="c-mail" type="email" required aria-required autoComplete="email" className="field" placeholder="Para que el equipo te escriba si tiene dudas; no se publica." value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
         </div>
         {/* campo trampa contra robots: las personas no lo ven */}
         <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
