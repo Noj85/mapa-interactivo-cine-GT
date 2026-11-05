@@ -102,6 +102,8 @@ export interface ImportPlan {
   questions: PlanQuestion[];
   /** "claude" si el análisis lo hizo el modelo; "heuristic" si fue el modo sin conexión. */
   engine: "claude" | "heuristic";
+  /** Una frase por cada instrucción del equipo: qué se hizo con ella o por qué no se pudo aplicar. */
+  instructions_applied?: string[];
 }
 
 // ───────────────────────── resolución de lugares ─────────────────────────

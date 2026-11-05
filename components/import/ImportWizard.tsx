@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Check, FileSpreadsheet, Loader2, Sparkles, Upload } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
+import { distinctValues } from "@/lib/import/distinct";
 import { parseFile } from "@/lib/import/parse";
 import { buildQuestions, type Question } from "@/lib/import/questions";
 import { buildCandidates, collectPlaceTexts } from "@/lib/import/transform";
@@ -23,6 +24,27 @@ const STEPS: { id: Step; label: string }[] = [
   { id: "questions", label: "Preguntas" },
 ];
 
+/** Pide el plan a Claude con las instrucciones del equipo y los valores distintos de todas las filas. */
+async function analyze(parsed: ParsedFile, instr: string): Promise<ImportPlan> {
+  const res = await fetch("/api/import/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      filename: parsed.filename,
+      instructions: instr.trim() || undefined,
+      sheets: parsed.sheets.map((s) => ({
+        name: s.name,
+        headers: s.headers,
+        rows: s.rows.slice(0, 40),
+        totalRows: s.totalRows,
+        distinct: distinctValues(s),
+      })),
+    }),
+  });
+  if (!res.ok) throw new Error(res.status === 401 ? "Tu sesión expiró. Vuelve a entrar." : "No pudimos analizar el archivo.");
+  return ignoreRepeatedSheets(parsed, (await res.json()) as ImportPlan);
+}
+
 export function ImportWizard() {
   const [step, setStep] = useState<Step>("drop");
   const [busy, setBusy] = useState<string | null>(null);
@@ -32,6 +54,7 @@ export function ImportWizard() {
 
   const [file, setFile] = useState<ParsedFile | null>(null);
   const [plan, setPlan] = useState<ImportPlan | null>(null);
+  const [instructions, setInstructions] = useState("");
   const [geo, setGeo] = useState<GeoBundle | null>(null);
   const [places, setPlaces] = useState<Record<string, PlaceResolution>>({});
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -42,11 +65,30 @@ export function ImportWizard() {
     setStep("drop");
     setFile(null);
     setPlan(null);
+    setInstructions("");
     setCandidates([]);
     setQuestions([]);
     setPlaces({});
     setError(null);
   };
+
+  // el texto que se esté escribiendo al soltar el archivo (sin volver a crear onFile en cada tecla)
+  const instructionsRef = useRef("");
+  instructionsRef.current = instructions;
+
+  /** Vuelve a analizar el mismo archivo con otras instrucciones (reemplaza los ajustes manuales hechos en «Esto entendimos»). */
+  const reanalyze = useCallback(async () => {
+    if (!file) return;
+    setError(null);
+    setBusy("Volviendo a analizar…");
+    try {
+      setPlan(await analyze(file, instructionsRef.current));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }, [file]);
 
   const onFile = useCallback(async (f: File) => {
     setError(null);
@@ -72,16 +114,7 @@ export function ImportWizard() {
       if (!parsed.sheets.length) throw new Error("No encontramos filas con datos en el archivo.");
       setFile(parsed);
       setBusy("Entendiendo qué trae cada hoja…");
-      const res = await fetch("/api/import/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename: parsed.filename,
-          sheets: parsed.sheets.map((s) => ({ name: s.name, headers: s.headers, rows: s.rows.slice(0, 40), totalRows: s.totalRows })),
-        }),
-      });
-      if (!res.ok) throw new Error(res.status === 401 ? "Tu sesión expiró. Vuelve a entrar." : "No pudimos analizar el archivo.");
-      setPlan(ignoreRepeatedSheets(parsed, (await res.json()) as ImportPlan));
+      setPlan(await analyze(parsed, instructionsRef.current));
       setStep("understand");
     } catch (e) {
       setError((e as Error).message);
@@ -158,6 +191,24 @@ export function ImportWizard() {
         <motion.div key={step} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
           {step === "drop" && (
             <div>
+              <div className="mb-4 rounded-xl border border-line bg-surface p-4">
+                <label htmlFor="instr" className="flex items-center gap-2 text-sm font-medium">
+                  <Sparkles className="h-4 w-4 text-accent" /> Instrucciones para el análisis <span className="font-normal text-muted">(opcional)</span>
+                </label>
+                <textarea
+                  id="instr"
+                  rows={2}
+                  maxLength={2000}
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  disabled={!!busy}
+                  className="field mt-2 resize-y text-sm"
+                  placeholder="Ej.: el contenido categorizado como «corto» o «cortometraje» debe quedar en una sola categoría, Cortometraje."
+                />
+                <p className="mt-1 text-xs text-muted">
+                  Escribe con libertad lo que quieras que el análisis tome en cuenta. Funciona para normalizar valores, elegir columnas o ignorar hojas.
+                </p>
+              </div>
               <div
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -232,6 +283,9 @@ export function ImportWizard() {
               error={error}
               onBack={reset}
               onNext={prepareReview}
+              instructions={instructions}
+              onInstructions={setInstructions}
+              onReanalyze={reanalyze}
             />
           )}
 

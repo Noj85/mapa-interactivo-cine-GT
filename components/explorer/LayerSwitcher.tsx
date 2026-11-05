@@ -2,8 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Clapperboard, Factory, Projector } from "lucide-react";
-import { CIRC_CATEGORIES, FILM_KINDS, IND_CATEGORIES, LAYERS, LAYER_METRICS, type Film, type LayerId, type MetricId, type Org } from "@/lib/types";
-import { metricLabel } from "@/lib/format";
+import { CIRC_CATEGORIES, FILM_KINDS, IND_CATEGORIES, LAYERS, type Film, type LayerId, type Org } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<LayerId, typeof Clapperboard> = {
@@ -43,37 +42,6 @@ export function LayerSwitcher({ layer, onChange }: { layer: LayerId; onChange(l:
           </button>
         );
       })}
-    </div>
-  );
-}
-
-export function MetricPicker({
-  layer,
-  metric,
-  onChange,
-}: {
-  layer: LayerId;
-  metric: MetricId;
-  onChange(m: MetricId): void;
-}) {
-  const list = LAYER_METRICS[layer];
-  if (list.length < 2) return null;
-  return (
-    <div className="glass flex max-w-full gap-1 overflow-x-auto whitespace-nowrap rounded-2xl border border-line p-1 shadow-soft [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="radiogroup" aria-label="Métrica">
-      {list.map((m) => (
-        <button
-          key={m}
-          role="radio"
-          aria-checked={metric === m}
-          onClick={() => onChange(m)}
-          className={cn(
-            "shrink-0 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors",
-            metric === m ? "bg-surface-2 text-ink" : "text-muted hover:text-ink",
-          )}
-        >
-          {metricLabel(m, layer)}
-        </button>
-      ))}
     </div>
   );
 }

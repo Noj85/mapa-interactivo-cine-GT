@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Bot, ChevronDown, Loader2, Wand2 } from "lucide-react";
+import { ArrowRight, Bot, ChevronDown, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { FILM_FIELDS, ORG_FIELDS, type ImportPlan, type ParsedFile, type SheetPlan } from "@/lib/import/types";
 import { cn } from "@/lib/utils";
@@ -34,6 +34,9 @@ export function StepUnderstand({
   error,
   onBack,
   onNext,
+  instructions,
+  onInstructions,
+  onReanalyze,
 }: {
   file: ParsedFile;
   plan: ImportPlan;
@@ -42,6 +45,9 @@ export function StepUnderstand({
   error: string | null;
   onBack(): void;
   onNext(): void;
+  instructions: string;
+  onInstructions(v: string): void;
+  onReanalyze(): void;
 }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const update = (sheet: string, patch: Partial<SheetPlan>) =>
@@ -91,6 +97,19 @@ export function StepUnderstand({
         </div>
       </div>
 
+      {plan.instructions_applied && plan.instructions_applied.length > 0 && (
+        <div className="rounded-2xl border border-accent/30 bg-accent/5 px-4 py-3 text-sm">
+          <p className="flex items-center gap-2 font-medium">
+            <Sparkles className="h-4 w-4 text-accent" /> Qué hicimos con tus instrucciones
+          </p>
+          <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-xs leading-relaxed text-muted">
+            {plan.instructions_applied.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {file.pdf && (
         <div className="rounded-2xl border border-warn/30 bg-warn/5 px-4 py-3 text-sm">
           <p className="font-medium">
@@ -135,6 +154,28 @@ export function StepUnderstand({
           ))}
         </div>
       )}
+
+      <details className="group rounded-xl border border-line bg-surface px-4 py-3" open={instructions.trim().length > 0}>
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium">
+          <Sparkles className="h-4 w-4 text-accent" /> Instrucciones para el análisis
+          <ChevronDown className="ml-auto h-4 w-4 text-muted transition-transform group-open:rotate-180" />
+        </summary>
+        <textarea
+          rows={3}
+          maxLength={2000}
+          value={instructions}
+          onChange={(e) => onInstructions(e.target.value)}
+          disabled={!!busy}
+          className="field mt-3 resize-y text-sm"
+          placeholder="Ej.: el contenido categorizado como «corto» o «cortometraje» debe quedar en una sola categoría, Cortometraje."
+        />
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted">Al volver a analizar se rehace el mapeo y se pierden los ajustes manuales de abajo.</p>
+          <button className="btn-outline" onClick={onReanalyze} disabled={!!busy || !instructions.trim()}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Volver a analizar
+          </button>
+        </div>
+      </details>
 
       <div className="space-y-4">
         {plan.sheets.map((sp) => {

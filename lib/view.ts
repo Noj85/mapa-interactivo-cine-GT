@@ -35,8 +35,8 @@ const LAYERS = ["produccion", "circulacion", "industria"];
 export function parseView(search: string): ViewState {
   const p = new URLSearchParams(search);
   const layer = (LAYERS.includes(p.get("capa") ?? "") ? p.get("capa") : "produccion") as LayerId;
-  const m = p.get("metrica") as MetricId | null;
-  const metric = m && LAYER_METRICS[layer].includes(m) ? m : LAYER_METRICS[layer][0];
+  // Ya no hay selector de métrica: el mapa siempre usa la principal de la capa (un ?metrica= viejo se ignora).
+  const metric: MetricId = LAYER_METRICS[layer][0];
   const lugar = p.get("lugar");
   let place: Place | null = null;
   if (lugar && /^[dm]\d+$/.test(lugar)) {
@@ -51,7 +51,6 @@ export function parseView(search: string): ViewState {
 export function serializeView(v: ViewState): string {
   const p = new URLSearchParams();
   if (v.layer !== "produccion") p.set("capa", v.layer);
-  if (v.metric !== LAYER_METRICS[v.layer][0]) p.set("metrica", v.metric);
   if (v.place) p.set("lugar", (v.place.type === "depto" ? "d" : "m") + v.place.code);
   if (v.film) p.set("pelicula", v.film);
   if (v.org) p.set("entidad", v.org);

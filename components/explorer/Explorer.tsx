@@ -11,11 +11,11 @@ import MapCanvas, { type MapHandle, type ScaleInfo } from "@/components/map/MapC
 import { aggregate } from "@/lib/aggregate";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
 import { useTheme } from "@/lib/use-theme";
-import { LAYER_METRICS, type Dataset, type LayerId, type MetricId } from "@/lib/types";
+import { LAYER_METRICS, type Dataset, type LayerId } from "@/lib/types";
 import { DEFAULT_VIEW, parseView, serializeView, type Place, type ViewState } from "@/lib/view";
 import { Breadcrumbs } from "./Breadcrumbs";
 import FilmPanel from "./FilmPanel";
-import { CategoryFilter, LayerSwitcher, MetricPicker } from "./LayerSwitcher";
+import { CategoryFilter, LayerSwitcher } from "./LayerSwitcher";
 import { Legend } from "./Legend";
 import { MapControls } from "./MapControls";
 import OrgPanel from "./OrgPanel";
@@ -131,8 +131,6 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
 
   const ctx: PanelCtx | null = geo ? { data: shown, gaz: geo.gaz, aggs, view, go, canEdit } : null;
 
-  const setMetric = (m: MetricId) => commit({ ...view, metric: m });
-
   // al elegir otra cosa, la hoja vuelve a su tamaño medio
   const selectionKey = `${view.film ?? ""}|${view.org ?? ""}|${view.place?.type ?? ""}${view.place?.code ?? ""}|${view.noloc}`;
   useEffect(() => setSheetFull(false), [selectionKey]);
@@ -230,7 +228,6 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
         )}
         <div className="pointer-events-auto flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap">
           <LayerSwitcher layer={view.layer} onChange={go.layer} />
-          <MetricPicker layer={view.layer} metric={view.metric} onChange={setMetric} />
         </div>
         {geo && <DepartmentFilter gaz={geo.gaz} place={view.place} onPlace={go.place} onClear={go.clear} />}
         <CategoryFilter
