@@ -113,7 +113,7 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
               />
             ))
           ) : (
-            <Empty>Todavía no hay rodajes registrados en {entry?.name}.</Empty>
+            <Empty>Todavía no hay películas registradas en {entry?.name}.</Empty>
           )
         ) : orgs.length ? (
           orgs.map((o) => <OrgCard key={o.id} org={o} gaz={gaz} onClick={() => go.org(o.slug)} />)

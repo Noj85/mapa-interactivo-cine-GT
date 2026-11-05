@@ -2,6 +2,7 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizeCategories, orgCategories } from "@/lib/categories";
 import { buildFilm, buildOrg, newId, uniqueSlug } from "@/lib/data/records";
 import type {
   Film,
@@ -65,7 +66,7 @@ async function readDb(): Promise<LocalDb> {
     const j = JSON.parse(raw) as Partial<LocalDb>;
     return {
       films: j.films ?? [],
-      orgs: j.orgs ?? [],
+      orgs: (j.orgs ?? []).map((o) => ({ ...o, categories: orgCategories(o) })),
       imports: j.imports ?? [],
       questions: j.questions ?? [],
       submissions: j.submissions ?? [],
@@ -252,6 +253,7 @@ const rowToOrg = (r: any): Org => ({
   name: r.name,
   layer: r.layer,
   category: r.category,
+  categories: normalizeCategories(r.categories, r.category),
   initiative_type: r.initiative_type,
   depto_ine: r.depto_ine,
   muni_ine: r.muni_ine,
@@ -367,6 +369,7 @@ export class SupabaseStore implements Store {
         name: org.name,
         layer: org.layer,
         category: org.category,
+        categories: org.categories,
         initiative_type: org.initiative_type,
         depto_ine: org.depto_ine,
         muni_ine: org.muni_ine,

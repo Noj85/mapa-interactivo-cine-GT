@@ -238,6 +238,7 @@ export function applyAnswer(
       else o[f] = answer;
     } else if (next.org) {
       (next.org as unknown as Record<string, unknown>)[f] = answer;
+      if (f === "category") next.org.categories = [answer];
     }
     return next;
   };

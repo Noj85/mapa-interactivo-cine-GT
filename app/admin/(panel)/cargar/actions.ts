@@ -1,5 +1,6 @@
 "use server";
 
+import { normalizeCategories, orgCategories } from "@/lib/categories";
 import { posterFromUrl } from "@/lib/posters";
 import { revalidatePath } from "next/cache";
 import { adminStore, requireSession } from "@/lib/auth";
@@ -61,6 +62,7 @@ function mergeOrg(existing: Org, incoming: OrgInput): OrgInput {
     name: existing.name,
     layer: existing.layer,
     category: existing.category || incoming.category,
+    categories: normalizeCategories([...orgCategories(existing), ...(incoming.categories ?? [incoming.category])]),
     initiative_type: keep(existing.initiative_type, incoming.initiative_type),
     depto_ine: keep(existing.depto_ine, incoming.depto_ine),
     muni_ine: keep(existing.muni_ine, incoming.muni_ine),

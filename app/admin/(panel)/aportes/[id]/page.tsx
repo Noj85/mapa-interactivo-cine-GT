@@ -46,7 +46,7 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
       <h1 className="mt-1 font-display text-4xl tracking-tight">{sub.label}</h1>
       <p className="mt-1 text-sm text-muted">
         Enviado el {new Date(sub.created_at).toLocaleString("es-GT", { dateStyle: "long", timeStyle: "short" })}
-        {sub.contact && <> · <a className="underline decoration-line underline-offset-2 hover:text-ink" href={`mailto:${sub.contact}`}>{sub.contact}</a></>}
+        {sub.contact && <> · Correo: <a className="underline decoration-line underline-offset-2 hover:text-ink" href={`mailto:${sub.contact}`}>{sub.contact}</a></>}
       </p>
 
       {sub.status !== "pending" && (
@@ -58,11 +58,13 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
         </div>
       )}
 
-      {sub.note && (
+      {sub.note ? (
         <div className="mt-5 rounded-2xl border border-line bg-surface px-4 py-3">
-          <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Fuente o comentario de quien aporta</div>
+          <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Fuente de la información</div>
           <p className="mt-1 whitespace-pre-line text-sm leading-relaxed">{sub.note}</p>
         </div>
+      ) : (
+        <p className="mt-5 rounded-2xl border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-warn">Este aporte no trae fuente (es anterior a que fuera obligatoria).</p>
       )}
       {isCorrection && !current && (
         <p className="mt-5 rounded-2xl border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-warn">El registro que se quería corregir ya no existe.</p>

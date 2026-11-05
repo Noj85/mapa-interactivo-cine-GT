@@ -1,6 +1,8 @@
 "use client";
 
-import { AlertCircle, AtSign, ExternalLink, MapPin, MessageSquarePlus, Pencil } from "lucide-react";
+import { categoriesText } from "@/lib/categories";
+import { contactParts } from "@/lib/contact";
+import { AlertCircle, AtSign, ExternalLink, Mail, MapPin, MessageSquarePlus, Pencil, Phone } from "lucide-react";
 import Link from "next/link";
 import { INITIATIVE_TYPES, LAYERS } from "@/lib/types";
 import { CompletenessBadge, CompletenessMeter } from "@/components/ui/Badges";
@@ -23,7 +25,7 @@ export default function OrgPanel({ ctx }: { ctx: PanelCtx }) {
   const layer = LAYERS.find((l) => l.id === org.layer)!;
 
   return (
-    <PanelShell eyebrow={`${layer.label} · ${org.category}`} onBack={go.up} onClose={go.clear}>
+    <PanelShell eyebrow={`${layer.label} · ${categoriesText(org)}`} onBack={go.up} onClose={go.clear}>
       {org.logo_url && <OrgLogo org={org} full className="mb-4 h-24 w-24 rounded-2xl" />}
       <h2 className="font-display text-[30px] leading-[1.08] tracking-tight text-ink">{org.name}</h2>
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
@@ -86,7 +88,25 @@ export default function OrgPanel({ ctx }: { ctx: PanelCtx }) {
             <AtSign className="h-4 w-4 text-muted" /> {org.instagram}
           </a>
         )}
-        {org.contact && <div className="text-muted">{org.contact}</div>}
+        {org.contact &&
+          (() => {
+            const c = contactParts(org.contact);
+            if (!c.phone && !c.email) return <div className="text-muted">{org.contact}</div>;
+            return (
+              <>
+                {c.phone && (
+                  <a className="flex items-center gap-2 text-ink transition hover:text-accent" href={`tel:${c.phone.replace(/\s/g, "")}`}>
+                    <Phone className="h-4 w-4 text-muted" /> {c.phone}
+                  </a>
+                )}
+                {c.email && (
+                  <a className="flex min-w-0 items-center gap-2 text-ink transition hover:text-accent" href={`mailto:${c.email}`}>
+                    <Mail className="h-4 w-4 shrink-0 text-muted" /> <span className="truncate">{c.email}</span>
+                  </a>
+                )}
+              </>
+            );
+          })()}
       </div>
       {org.source && <p className="mt-6 text-xs text-muted/70">Fuente: {org.source}</p>}
     </PanelShell>

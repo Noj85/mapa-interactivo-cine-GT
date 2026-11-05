@@ -27,11 +27,13 @@ Copia `.env.example` a `.env.local` (o configúralas en Vercel).
 ## Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. En el editor SQL ejecuta, **en orden**, las cuatro migraciones de `supabase/migrations/`:
+2. En el editor SQL ejecuta, **en orden**, las seis migraciones de `supabase/migrations/`:
    - `0001_init.sql`: tablas, políticas RLS y perfiles.
    - `0002_posters.sql`: campo del póster y bucket público `posters` en Storage.
    - `0003_submissions.sql`: aportes del público.
    - `0004_images_public.sql`: logo de las entidades y bucket `aportes` para las imágenes que sube el público.
+   - `0005_submissions_required.sql`: la fuente (≥ 8 caracteres) y un correo válido pasan a ser obligatorios en los aportes del público.
+   - `0006_org_categories.sql`: varias categorías por entidad (`organizations.categories`). **Sin esta migración, guardar entidades falla.**
 3. En *Authentication → Users* crea a las personas del equipo; en la tabla `profiles` asígnales el rol `admin` o `editor`. En *Authentication → Sign In / Providers → Email* desactiva «Allow new users to sign up» para que nadie más pueda crear cuentas.
 4. En *Authentication → URL configuration* agrega la URL de producción y `/auth/callback` para el enlace mágico y para recuperar la contraseña.
 
@@ -74,8 +76,14 @@ La app es una sola, con dos áreas separadas. **`/` siempre es el mapa público*
 **Aportes del público.** En `/aportar` cualquiera puede sugerir una película o entidad nueva (con varias locaciones), y desde la ficha de cada registro, «Sugerir corrección» abre el mismo formulario con los datos actuales. Nada se publica de inmediato: el aporte queda **pendiente** en `/admin/aportes`, donde el equipo ve los datos propuestos (en una corrección, lo que cambia frente al registro actual) y puede **aprobar y publicar**, **aprobar como borrador y editar**, **aplicar la corrección** o **rechazar** con una nota. El número de pendientes aparece en el menú y en el resumen.
 
 - Solo registros individuales: el público no puede subir archivos (Excel, CSV, PDF). `/api/aportes` rechaza todo lo que no sea JSON, y las cargas masivas exigen sesión del equipo. Quien quiera aportar una base de datos escribe a contacto@academiadecinegt.org.
-- Sin cuenta: correo opcional (solo lo ve el equipo). Protecciones: campo trampa, tiempo mínimo, límite de 10 aportes por hora por IP, texto sin HTML y enlaces solo http(s). Los aportes **nunca** tocan los registros publicados hasta que se aprueban.
+- Sin cuenta: la **fuente** (un enlace, un catálogo o cómo se sabe) y un **correo** son obligatorios para enviar, de modo que la curaduría pueda corroborar los datos; el correo solo lo ve el equipo. Protecciones: campo trampa, tiempo mínimo, límite de 10 aportes por hora por IP, texto sin HTML y enlaces solo http(s). Los aportes **nunca** tocan los registros publicados hasta que se aprueban.
 - Con Supabase, aplica `supabase/migrations/0003_submissions.sql`: el público solo puede insertar aportes «pendientes»; leer, aprobar o borrar es solo del equipo.
+
+## Lugar, categorías y contacto
+
+- **Lugar**: siempre es *Departamento → Municipio* (con la lista del INE) y una **dirección exacta** opcional. Vale igual para locaciones de películas y para entidades. En el mapa de «Elegir en el mapa» se ven ciudades y calles, hay vista satelital y se centra en el lugar elegido.
+- **Categorías**: una entidad puede tener varias (por ejemplo, producción, posproducción y efectos especiales). La primera es la principal; es la que usan el color y el resumen, y el resto cuenta en filtros y descargas. En archivos importados se pueden separar con «;», «,» o «/».
+- **Contacto**: teléfono y/o correo, en campos separados. Los teléfonos de Guatemala se guardan como `+502 5555 1234`; los extranjeros con su código de país. En archivos importados se extraen y estandarizan, y lo que no sea teléfono ni correo (nombres, notas) se avisa en la revisión y no se guarda.
 
 ## Varias locaciones y películas «Sin ubicación»
 

@@ -14,8 +14,8 @@ export function LoginScreen() {
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
           <AcademiaLogo className="mb-5 h-14" />
-          <h1 className="font-display text-3xl tracking-tight">Equipo de la Academia</h1>
-          <p className="mt-2 text-sm text-muted">Entra para cargar y completar la información del mapa.</p>
+          <h1 className="font-display text-3xl tracking-tight">Administración</h1>
+          <p className="mt-2 text-sm text-muted">Entra a la consola de administración para cargar y completar la información del mapa.</p>
         </div>
         <div className="rounded-xl border border-line bg-surface p-6 shadow-soft">
           {noPassword ? (

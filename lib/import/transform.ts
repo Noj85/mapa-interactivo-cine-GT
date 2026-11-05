@@ -1,3 +1,4 @@
+import { formatContact, parseContact } from "@/lib/contact";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import type { PolyCollection } from "@/lib/geo/load";
 import { municipalityAt } from "@/lib/geo/pip";
@@ -6,7 +7,7 @@ import { normalize } from "@/lib/utils";
 import {
   cleanText,
   detectCurrency,
-  normalizeCategory,
+  normalizeCategoryList,
   normalizeInitiative,
   normalizeInstagram,
   normalizeKind,
@@ -197,10 +198,14 @@ function orgCandidates(sheet: ParsedSheet, plan: SheetPlan, places: Record<strin
     if (!name) return;
     const qs = placeQueries(row, plan);
     const { loc, issue } = resolveLocation(qs[0] ?? null, row, plan, places, geo, true);
+    const contactRaw = cleanText(val(row, plan, "contact"));
+    const contactParsed = contactRaw ? parseContact(contactRaw) : null;
+    const cats = normalizeCategoryList(val(row, plan, "category"), layer, vm.category);
     const org: OrgInput = {
       name,
       layer,
-      category: normalizeCategory(val(row, plan, "category"), layer, vm.category) ?? "",
+      category: cats[0] ?? "",
+      categories: cats,
       initiative_type: normalizeInitiative(val(row, plan, "initiative_type"), vm.initiative_type),
       depto_ine: loc.depto_ine ?? null,
       muni_ine: loc.muni_ine ?? null,
@@ -209,12 +214,14 @@ function orgCandidates(sheet: ParsedSheet, plan: SheetPlan, places: Record<strin
       lng: loc.lng ?? null,
       web: normalizeWeb(val(row, plan, "web")),
       instagram: normalizeInstagram(val(row, plan, "instagram")),
-      contact: cleanText(val(row, plan, "contact")),
+      contact: contactParsed ? formatContact(contactParsed) : null,
       description: cleanText(val(row, plan, "description")),
       status: "published",
     };
     const issues: Issue[] = [];
     if (issue) issues.push({ ...issue, field: "location:0" });
+    if (contactParsed?.ignored.length)
+      issues.push({ field: "contact", level: "doubt", message: `Contacto estandarizado; no se guardó: ${contactParsed.ignored.map((t) => `«${t}»`).join(", ")}` });
     if (!org.category) issues.push({ field: "category", level: "missing", message: "Falta la categoría" });
     out.push({
       key: `org:${sheet.name}!${i}`,

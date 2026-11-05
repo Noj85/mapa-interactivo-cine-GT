@@ -1,3 +1,5 @@
+import { contactFromFields, contactParts } from "@/lib/contact";
+import { orgCategories } from "@/lib/categories";
 import type { Film, FilmKind, InitiativeType, Nationality, Org } from "@/lib/types";
 
 /**
@@ -109,7 +111,8 @@ export type OrgLayerId = "circulacion" | "industria";
 export interface OrgDraft {
   name: string;
   layer: OrgLayerId;
-  category: string;
+  /** Todas las categorías; la primera es la principal. */
+  categories: string[];
   type: InitiativeType | "";
   muni_ine: number | null;
   depto_ine: number | null;
@@ -118,7 +121,9 @@ export interface OrgDraft {
   lng: number | null;
   web: string;
   instagram: string;
-  contact: string;
+  /** Contacto: teléfono y correo por separado; se guardan juntos en formato estándar. */
+  phone: string;
+  email: string;
   description: string;
   logo: string | null;
 }
@@ -127,7 +132,7 @@ export function orgDraft(org?: Org, defaultLayer: OrgLayerId = "circulacion"): O
   return {
     name: org?.name ?? "",
     layer: org?.layer ?? defaultLayer,
-    category: org?.category ?? "",
+    categories: org ? orgCategories(org) : [],
     type: org?.initiative_type ?? "",
     muni_ine: org?.muni_ine ?? null,
     depto_ine: org?.depto_ine ?? null,
@@ -136,7 +141,10 @@ export function orgDraft(org?: Org, defaultLayer: OrgLayerId = "circulacion"): O
     lng: org?.lng ?? null,
     web: org?.web ?? "",
     instagram: org?.instagram ?? "",
-    contact: org?.contact ?? "",
+    ...(() => {
+      const c = contactParts(org?.contact);
+      return { phone: c.phone ?? "", email: c.email ?? "" };
+    })(),
     description: org?.description ?? "",
     logo: org?.logo_url ?? null,
   };
@@ -146,7 +154,8 @@ export function orgPayload(d: OrgDraft) {
   return {
     name: d.name,
     layer: d.layer,
-    category: d.category,
+    category: d.categories[0] ?? "",
+    categories: d.categories,
     initiative_type: d.type || null,
     muni_ine: d.muni_ine,
     depto_ine: d.depto_ine,
@@ -155,8 +164,14 @@ export function orgPayload(d: OrgDraft) {
     lng: d.lng,
     web: d.web || null,
     instagram: d.instagram || null,
-    contact: d.contact || null,
+    contact: contactFromFields(d.phone, d.email).value,
     description: d.description || null,
     logo_url: d.logo,
   };
 }
+
+/** Errores del contacto de una entidad (null si está bien o vacío). */
+export const orgContactErrors = (d: Pick<OrgDraft, "phone" | "email">) => {
+  const c = contactFromFields(d.phone, d.email);
+  return { phone: c.phoneError, email: c.emailError, ok: !c.phoneError && !c.emailError };
+};

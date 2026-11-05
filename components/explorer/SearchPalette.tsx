@@ -1,5 +1,6 @@
 "use client";
 
+import { categoriesText } from "@/lib/categories";
 import { AnimatePresence, motion } from "framer-motion";
 import { Clapperboard, Landmark, MapPin, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -67,8 +68,8 @@ export function SearchPalette({
         });
     }
     for (const o of data.orgs) {
-      if (normalize(`${o.name} ${o.category}`).includes(nq))
-        out.push({ kind: "org", id: `o${o.id}`, label: o.name, sub: o.category, slug: o.slug });
+      if (normalize(`${o.name} ${categoriesText(o, " ")}`).includes(nq))
+        out.push({ kind: "org", id: `o${o.id}`, label: o.name, sub: categoriesText(o), slug: o.slug });
     }
     return out.slice(0, 12);
   }, [q, gaz, data]);

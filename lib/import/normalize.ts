@@ -1,3 +1,4 @@
+import { normalizeCategories } from "@/lib/categories";
 import type { FilmKind, InitiativeType, Nationality } from "@/lib/types";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
 import { normalize } from "@/lib/utils";
@@ -122,6 +123,14 @@ export function normalizeCategory(v: unknown, layer: "circulacion" | "industria"
   if (syn) return syn.to;
   const partial = list.find((c) => normalize(c).includes(t) || t.includes(normalize(c)));
   return partial ?? mapped;
+}
+
+/** Celda con una o varias categorías («Productoras; Postproducción»): cada una se lleva a las de la capa. */
+export function normalizeCategoryList(v: unknown, layer: "circulacion" | "industria", map?: Record<string, string>): string[] {
+  const s = cleanText(v);
+  if (!s) return [];
+  const parts = map?.[s] ? [map[s]] : s.split(/\s*[;\/|\n]+\s*/);
+  return normalizeCategories(parts.map((p) => normalizeCategory(p, layer, map)).filter((x): x is string => !!x));
 }
 
 /** ¿Estas categorías son de Circulación o de Industria? null si no se puede saber. */

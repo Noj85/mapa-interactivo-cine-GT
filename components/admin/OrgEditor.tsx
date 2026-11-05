@@ -4,7 +4,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { deleteOrgAction, saveOrgAction } from "@/app/admin/actions";
-import { orgDraft, orgPayload, type OrgDraft, type OrgLayerId } from "@/components/records/drafts";
+import { orgContactErrors, orgDraft, orgPayload, type OrgDraft, type OrgLayerId } from "@/components/records/drafts";
 import { ImageField } from "@/components/records/ImageField";
 import { OrgFields } from "@/components/records/OrgFields";
 import { CompletenessMeter } from "@/components/ui/Badges";
@@ -30,7 +30,7 @@ export function OrgEditor({ org, defaultLayer = "circulacion" }: { org?: Org; de
     () =>
       orgCompleteness({
         name: d.name,
-        category: d.category,
+        category: d.categories[0] ?? "",
         initiative_type: data.initiative_type,
         depto_ine: d.depto_ine,
         muni_ine: d.muni_ine,
@@ -41,7 +41,7 @@ export function OrgEditor({ org, defaultLayer = "circulacion" }: { org?: Org; de
         contact: data.contact,
         description: data.description,
       }),
-    [data, d.name, d.category, d.depto_ine, d.muni_ine, d.lat, d.lng],
+    [data, d.name, d.categories, d.depto_ine, d.muni_ine, d.lat, d.lng],
   );
 
   const submit = () => {
@@ -91,7 +91,7 @@ export function OrgEditor({ org, defaultLayer = "circulacion" }: { org?: Org; de
           </label>
           {error && <p className="mt-3 text-sm text-danger">{error}</p>}
           {saved && !error && <p className="mt-3 text-sm text-ok">Guardado.</p>}
-          <button className="btn-primary mt-4 w-full" disabled={pending || !d.name.trim() || !d.category} onClick={submit}>
+          <button className="btn-primary mt-4 w-full" disabled={pending || !d.name.trim() || d.categories.length === 0 || !orgContactErrors(d).ok} onClick={submit}>
             {pending && <Loader2 className="h-4 w-4 animate-spin" />} Guardar
           </button>
           {org && (

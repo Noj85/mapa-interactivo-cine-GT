@@ -3,7 +3,7 @@
 import { Layers, MapPinned, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { LocationPicker, type PickedPoint } from "@/components/admin/LocationPicker";
-import { PlaceField } from "@/components/admin/PlaceField";
+import { PlaceSelect } from "./PlaceSelect";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
 import { blankLoc, isBlankLoc, type LocDraft } from "./drafts";
 
@@ -86,12 +86,12 @@ export function LocationsEditor({ locs, onChange }: { locs: LocDraft[]; onChange
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="label">Lugar</label>
-                <PlaceField value={{ muni_ine: l.muni_ine, depto_ine: l.depto_ine }} onChange={(v) => setLoc(i, v)} />
+                <label className="label">Departamento y municipio</label>
+                <PlaceSelect idPrefix={`loc-${i}`} geo={geo} value={{ muni_ine: l.muni_ine, depto_ine: l.depto_ine }} onChange={(v) => setLoc(i, v)} />
               </div>
               <div>
-                <label className="label">Sitio (opcional)</label>
-                <input className="field" maxLength={200} placeholder="Calle del Arco, Volcán de Pacaya…" value={l.site} onChange={(e) => setLoc(i, { site: e.target.value })} />
+                <label className="label">Dirección exacta (opcional)</label>
+                <input className="field" maxLength={200} placeholder="Calle, zona, finca, sitio de rodaje…" value={l.site} onChange={(e) => setLoc(i, { site: e.target.value })} />
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">

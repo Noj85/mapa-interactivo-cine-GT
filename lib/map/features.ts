@@ -1,3 +1,4 @@
+import { categoriesText } from "@/lib/categories";
 import type { Feature, FeatureCollection, GeometryCollection, LineString, Point, Polygon } from "geojson";
 import type { Agg, Aggregates } from "@/lib/aggregate";
 import { buildStops, levelOf, metricValue } from "@/lib/aggregate";
@@ -67,7 +68,7 @@ export function buildPins(data: Dataset, layer: LayerId, gaz: Gazetteer, depto?:
           kind: "org",
           slug: o.slug,
           title: o.name,
-          sub: o.category,
+          sub: categoriesText(o),
           approx: p.approx,
           incomplete: o.completeness < 100,
         },

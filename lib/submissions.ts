@@ -1,3 +1,4 @@
+import { orgCategories } from "@/lib/categories";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { FILM_KINDS, INITIATIVE_TYPES, LAYERS, NATIONALITIES, type Film, type FilmInput, type Org, type OrgInput, type Submission } from "@/lib/types";
 import { fmtInt, fmtMoney } from "@/lib/utils";
@@ -69,7 +70,7 @@ export function diffSubmission(sub: Submission, current: Film | Org | null, gaz:
   return [
     row("Nombre", c?.name ?? null, p.name, isNew),
     row("Capa", layer(c?.layer), layer(p.layer), isNew),
-    row("Categoría", c?.category ?? null, p.category, isNew),
+    row("Categorías", c ? orgCategories(c).join(", ") : null, orgCategories(p).join(", "), isNew),
     row("Iniciativa", itype(c?.initiative_type), itype(p.initiative_type), isNew),
     row("Lugar", place(c), place(p), isNew),
     row("Ciudad o referencia", c?.city ?? null, p.city ?? null, isNew),

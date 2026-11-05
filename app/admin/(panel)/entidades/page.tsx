@@ -1,3 +1,4 @@
+import { categoriesText } from "@/lib/categories";
 import Link from "next/link";
 import { RecordsTabs } from "@/components/admin/RecordsTabs";
 import { OrgLogo } from "@/components/explorer/parts";
@@ -41,7 +42,7 @@ export default async function OrgsPage() {
                     </Link>
                   </td>
                   <td className="hidden px-4 py-2.5 text-muted sm:table-cell">{LAYERS.find((l) => l.id === o.layer)?.label}</td>
-                  <td className="hidden px-4 py-2.5 text-muted md:table-cell">{o.category}</td>
+                  <td className="hidden px-4 py-2.5 text-muted md:table-cell">{categoriesText(o)}</td>
                   <td className="hidden px-4 py-2.5 text-muted md:table-cell">
                     {gaz.muni(o.muni_ine)?.name ?? gaz.depto(o.depto_ine)?.name ?? "—"}
                   </td>

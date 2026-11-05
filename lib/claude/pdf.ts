@@ -45,14 +45,14 @@ const TOOL = {
           type: "object",
           properties: {
             name: str,
-            category: { type: "string", description: "Una de las categorías permitidas, la más cercana." },
+            category: { type: "string", description: "Categoría(s) permitida(s) más cercana(s). Si aplican varias, sepáralas con «;»." },
             initiative_type: { type: "string", description: "pública, privada, comunitaria o transnacional." },
             place: { type: "string", description: "Ubicación tal como aparece en el documento." },
             municipality: str,
             department: str,
             website: str,
             instagram: str,
-            contact: { type: "string", description: "Correo, teléfono y persona de contacto, separados por ·" },
+            contact: { type: "string", description: "Teléfono(s) y correo(s) de contacto, sin nombres de personas." },
             description: str,
             page: { type: "integer", description: "Página dentro del fragmento recibido, empezando en 1." },
           },
@@ -76,8 +76,8 @@ Reglas:
 - Un nombre de persona NO es una entidad, salvo que sea claramente un colectivo, productora o empresa.
 - Si el PDF es multicolumna, lee cada ficha completa antes de pasar a la siguiente.
 - "municipality" y "department" solo si el documento los indica o si "place" nombra un municipio o departamento de Guatemala sin ambigüedad. Si el lugar está fuera de Guatemala, déjalos vacíos y conserva el texto en "place".
-- Para "category" elige la categoría permitida más cercana al tipo de entidad; si ninguna encaja, la más cercana igualmente.
-- Teléfonos y correos van en "contact", no en la descripción.
+- Para "category" elige la categoría permitida más cercana al tipo de entidad; si la entidad hace varias cosas (por ejemplo producción y postproducción), enumera todas las que apliquen separadas por «;», la principal primero. Si ninguna encaja, la más cercana igualmente.
+- Teléfonos y correos van en "contact" (solo números de teléfono y direcciones de correo), no en la descripción.
 - Idioma de los datos: el original del documento.`;
 
 interface RawFilm {

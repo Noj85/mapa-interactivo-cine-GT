@@ -1,7 +1,6 @@
 "use client";
 
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { BrandMark } from "@/components/site/Brand";
 import { Database, Globe, Inbox, LayoutDashboard, LogOut, Map as MapIcon, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -30,10 +29,11 @@ export function AdminNav({ email, pendingSubmissions = 0 }: { email: string; pen
   return (
     <header className="sticky top-0 z-30 border-b border-line border-t-2 border-t-accent bg-bg/95 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4">
-        <Link href="/admin" className="mr-3 flex items-center gap-2" aria-label="Equipo · Mapa del Cine, inicio del panel">
-          <BrandMark className="h-7" />
-          <span className="hidden font-display text-[15px] xl:block">Equipo · Mapa del Cine</span>
-          <span className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent-ink">Admin</span>
+        <Link href="/admin" className="mr-3 flex shrink-0 items-center" aria-label="Consola de administración, inicio" title="Consola de administración">
+          <span className="hidden whitespace-nowrap text-xs font-semibold uppercase tracking-[0.14em] text-ink sm:block">
+            <span className="hidden xl:inline">Consola de administración</span>
+            <span className="xl:hidden">Administración</span>
+          </span>
         </Link>
         <nav className="flex flex-1 items-center gap-0.5 overflow-x-auto">
           {items.map((it) => {
@@ -42,12 +42,14 @@ export function AdminNav({ email, pendingSubmissions = 0 }: { email: string; pen
               <Link
                 key={it.href}
                 href={it.href}
+                aria-label={it.label}
+                title={it.label}
                 className={cn(
                   "flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-1.5 text-sm transition-colors",
                   active ? "bg-surface-2 text-ink" : "text-muted hover:text-ink",
                 )}
               >
-                <it.icon className="h-4 w-4" />
+                <it.icon className="h-4 w-4" aria-hidden />
                 <span className="hidden md:inline">{it.label}</span>
                 {"badge" in it && it.badge && pendingSubmissions > 0 && (
                   <span

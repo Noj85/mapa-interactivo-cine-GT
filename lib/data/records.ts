@@ -1,4 +1,5 @@
 import { filmCompleteness, orgCompleteness } from "@/lib/completeness";
+import { normalizeCategories } from "@/lib/categories";
 import type { Film, FilmInput, FilmLocation, Org, OrgInput } from "@/lib/types";
 import { slugify } from "@/lib/utils";
 
@@ -75,9 +76,10 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string })
 export function buildOrg(input: OrgInput, opts: { id?: string; slug: string; source?: string | null }): Org {
   const muni = num(input.muni_ine);
   const depto = num(input.depto_ine) ?? (muni != null ? Math.floor(muni / 100) : null);
+  const categories = normalizeCategories(input.categories, input.category);
   const base = {
     name: input.name.trim(),
-    category: input.category,
+    category: categories[0] ?? "",
     initiative_type: input.initiative_type ?? null,
     depto_ine: depto,
     muni_ine: muni,
@@ -93,6 +95,7 @@ export function buildOrg(input: OrgInput, opts: { id?: string; slug: string; sou
     id: input.id ?? opts.id ?? newId(),
     slug: opts.slug,
     layer: input.layer,
+    categories,
     city: str(input.city),
     logo_url: str(input.logo_url),
     source: str(input.source) ?? opts.source ?? null,

@@ -3,7 +3,7 @@
 import { AlertTriangle, ArrowRight, Copy, MapPin } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
-import { PlaceField } from "@/components/admin/PlaceField";
+import { PlaceSelect } from "@/components/records/PlaceSelect";
 import { CompletenessBadge } from "@/components/ui/Badges";
 import type { GeoBundle } from "@/lib/geo/load";
 import { candidatesToDataset } from "@/lib/import/preview";
@@ -17,6 +17,10 @@ const MapCanvas = dynamic(() => import("@/components/map/MapCanvas"), { ssr: fal
 
 const PAGE = 40;
 type Filter = "all" | "doubts" | "dups";
+
+/** Cambia la categoría principal sin perder las demás que ya traía la fila. */
+const setPrimary = (cats: string[] | undefined, old: string, next: string) =>
+  next ? [next, ...(cats ?? []).filter((c) => c !== old && c !== next)] : (cats ?? []).filter((c) => c !== old);
 
 export function StepReview({
   geo,
@@ -158,7 +162,7 @@ export function StepReview({
                           <select
                             className="field !w-auto max-w-[220px] !py-1.5 text-xs"
                             value={c.org!.category}
-                            onChange={(e) => patch(c.key, (x) => ({ ...x, org: { ...x.org!, category: e.target.value }, issues: x.issues.filter((i) => i.field !== "category") }))}
+                            onChange={(e) => patch(c.key, (x) => ({ ...x, org: { ...x.org!, category: e.target.value, categories: setPrimary(x.org!.categories, x.org!.category, e.target.value) }, issues: x.issues.filter((i) => i.field !== "category") }))}
                           >
                             <option value="">Categoría…</option>
                             {(c.org!.layer === "circulacion" ? CIRC_CATEGORIES : IND_CATEGORIES).map((k) => (
@@ -201,7 +205,8 @@ export function StepReview({
 
                       {editing?.startsWith(`${c.key}#`) && (
                         <div className="mt-2 max-w-sm">
-                          <PlaceField
+                          <PlaceSelect
+                            idPrefix={`rev-${c.key}`}
                             geo={geo}
                             value={(() => {
                               const idx = Number(editing.split("#")[1]);
@@ -211,9 +216,9 @@ export function StepReview({
                             onChange={(v) => {
                               const idx = Number(editing.split("#")[1]);
                               patch(c.key, (x) => setCandidateLocation(x, idx, v));
-                              setEditing(null);
                             }}
                           />
+                          <button className="btn-ghost mt-1.5 !py-1 text-xs" onClick={() => setEditing(null)}>Listo</button>
                         </div>
                       )}
 

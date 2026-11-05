@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, CheckCircle2, CircleHelp, Loader2, PartyPopper } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { PlaceField } from "@/components/admin/PlaceField";
+import { PlaceSelect, type PlaceValue } from "@/components/records/PlaceSelect";
 import {
   commitBatchAction,
   createImportAction,
@@ -47,6 +47,7 @@ export function StepQuestions({
 }) {
   const [phase, setPhase] = useState<Phase>(questions.some((q) => q.status === "open") ? "asking" : "summary");
   const [text, setText] = useState("");
+  const [pickedPlace, setPickedPlace] = useState<PlaceValue>({ muni_ine: null, depto_ine: null });
   const [err, setErr] = useState<string | null>(null);
   const [publishIncomplete, setPublishIncomplete] = useState(true);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -189,12 +190,19 @@ export function StepQuestions({
 
             {current.kind === "place" ? (
               <div className="mt-5">
-                {!!current.options?.length && <p className="mb-2 text-xs text-muted">O busca otro lugar:</p>}
-                <PlaceField
-                  geo={geo}
-                  value={{ muni_ine: null, depto_ine: null }}
-                  onChange={(v) => answer(current, v.muni_ine != null ? `muni:${v.muni_ine}` : v.depto_ine != null ? `depto:${v.depto_ine}` : "")}
-                />
+                {!!current.options?.length && <p className="mb-2 text-xs text-muted">O elige otro lugar:</p>}
+                <PlaceSelect idPrefix={`q-${current.id}`} geo={geo} value={pickedPlace} onChange={setPickedPlace} />
+                <button
+                  className="btn-primary mt-3"
+                  disabled={pickedPlace.depto_ine == null && pickedPlace.muni_ine == null}
+                  onClick={() => {
+                    const v = pickedPlace;
+                    setPickedPlace({ muni_ine: null, depto_ine: null });
+                    answer(current, v.muni_ine != null ? `muni:${v.muni_ine}` : `depto:${v.depto_ine}`);
+                  }}
+                >
+                  Usar este lugar
+                </button>
               </div>
             ) : (
               !current.options?.length && (

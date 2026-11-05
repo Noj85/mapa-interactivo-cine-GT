@@ -51,7 +51,10 @@ export interface Org {
   slug: string;
   name: string;
   layer: Exclude<LayerId, "produccion">;
+  /** Categoría principal (la primera de `categories`). */
   category: string;
+  /** Todas las categorías de la entidad. */
+  categories: string[];
   initiative_type: InitiativeType | null;
   depto_ine: number | null;
   muni_ine: number | null;
@@ -138,10 +141,10 @@ export const INITIATIVE_TYPES: { id: InitiativeType; label: string }[] = [
   { id: "transnacional", label: "Transnacional" },
 ];
 
-export const LAYERS: { id: LayerId; label: string; short: string; blurb: string }[] = [
-  { id: "produccion", label: "Producción", short: "Rodajes", blurb: "Dónde se ha filmado" },
-  { id: "circulacion", label: "Circulación", short: "Pantallas", blurb: "Festivales, salas y cineclubs" },
-  { id: "industria", label: "Industria", short: "Empresas", blurb: "Productoras, servicios y formación" },
+export const LAYERS: { id: LayerId; label: string; blurb: string }[] = [
+  { id: "produccion", label: "Producción", blurb: "Dónde se ha filmado" },
+  { id: "circulacion", label: "Circulación", blurb: "Festivales, salas y cineclubs" },
+  { id: "industria", label: "Industria", blurb: "Productoras, servicios y formación" },
 ];
 
 export const METRICS: Record<
@@ -212,6 +215,8 @@ export interface OrgInput {
   name: string;
   layer: Exclude<LayerId, "produccion">;
   category: string;
+  /** Si viene, manda sobre `category`. */
+  categories?: string[];
   initiative_type?: InitiativeType | null;
   depto_ine?: number | null;
   muni_ine?: number | null;

@@ -35,7 +35,7 @@ export default async function AportarPage({ searchParams }: { searchParams: Prom
           <div className="text-muted">
             <p className="font-medium text-ink">Cómo se revisa tu aporte</p>
             <p className="mt-1">
-              Cada entrada pasa por un proceso de curaduría: el equipo de la Academia verifica los datos y, si hace falta, los completa o te escribe para aclararlos. Revisarla y aprobarla puede tomar hasta <strong className="font-semibold text-ink">tres días hábiles</strong>. Cuando se aprueba, aparece en el mapa.
+              Cada entrada pasa por un proceso de curaduría: el equipo de la Academia corrobora la fuente que indiques y, si hace falta, completa los datos o te escribe para aclararlos; por eso la fuente y tu correo son obligatorios. Revisarla y aprobarla puede tomar hasta <strong className="font-semibold text-ink">tres días hábiles</strong>. Cuando se aprueba, aparece en el mapa.
             </p>
           </div>
         </aside>

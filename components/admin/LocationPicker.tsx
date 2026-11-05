@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Check, Search, X } from "lucide-react";
+import { Check, Globe2, Map as MapIcon, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
 import { getMaplibre, type MapLibreMap } from "@/lib/map/maplibre";
@@ -34,6 +34,8 @@ export function LocationPicker({
       : null,
   );
   const [q, setQ] = useState("");
+  const [satellite, setSatellite] = useState(false);
+  const [hover, setHover] = useState<string | null>(null);
 
   useEffect(() => {
     loadGeo().then(setGeo);
@@ -48,7 +50,7 @@ export function LocationPicker({
     let map: MapLibreMap | null = null;
     const theme = document.documentElement.dataset.theme === "light" ? "light" : "dark";
     (async () => {
-      const style = await buildStyle(theme);
+      const style = await buildStyle(theme, { labels: true });
       if (cancelled || !el.current) return;
       const ml = getMaplibre();
       map = new ml.Map({
@@ -64,8 +66,30 @@ export function LocationPicker({
       map.addControl(new ml.NavigationControl({ showCompass: false }), "top-right");
       map.on("load", () => {
         const m = map!;
+        const dark = theme === "dark";
+        const halo = dark ? "rgba(11,15,25,0.92)" : "rgba(255,255,255,0.95)";
+        // satélite (apagado): debajo de las etiquetas
+        m.addSource("sat", {
+          type: "raster",
+          tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+          tileSize: 256,
+          maxzoom: 18,
+          attribution: "Imágenes © Esri, Maxar, Earthstar Geographics",
+        });
+        const firstSymbol = m.getStyle().layers.find((l) => l.type === "symbol")?.id;
+        m.addLayer({ id: "sat", type: "raster", source: "sat", layout: { visibility: "none" } }, firstSymbol);
         m.addSource("muni", { type: "geojson", data: geo.muni as any });
         m.addSource("depto", { type: "geojson", data: geo.depto as any });
+        // nombres propios: departamentos al alejar y municipios al acercar
+        const names = (type: "depto" | "muni") => ({
+          type: "FeatureCollection",
+          features: geo.gaz.entries
+            .filter((e) => e.type === type)
+            .map((e) => ({ type: "Feature", properties: { name: type === "depto" ? e.name.toUpperCase() : e.name }, geometry: { type: "Point", coordinates: e.center } })),
+        });
+        m.addSource("lbl-depto", { type: "geojson", data: names("depto") as any });
+        m.addSource("lbl-muni", { type: "geojson", data: names("muni") as any });
+        const text = { "text-color": dark ? "#e6ecf5" : "#14203a", "text-halo-color": halo, "text-halo-width": 1.8 };
         m.addLayer({ id: "muni-fill", type: "fill", source: "muni", paint: { "fill-color": "#e8b04a", "fill-opacity": 0.04 } });
         m.addLayer({
           id: "muni-line",
@@ -79,7 +103,44 @@ export function LocationPicker({
           source: "depto",
           paint: { "line-color": theme === "dark" ? "rgba(204,220,246,0.5)" : "rgba(25,40,70,0.55)", "line-width": 1.5 },
         });
+        m.addLayer({
+          id: "muni-hover",
+          type: "fill",
+          source: "muni",
+          filter: ["==", ["get", "muni_ine"], -1],
+          paint: { "fill-color": "#e8b04a", "fill-opacity": 0.22 },
+        });
+        m.addLayer({
+          id: "lbl-depto",
+          type: "symbol",
+          source: "lbl-depto",
+          maxzoom: 8.5,
+          layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Bold"], "text-size": ["interpolate", ["linear"], ["zoom"], 5, 10, 8, 14], "text-letter-spacing": 0.08, "text-max-width": 8 },
+          paint: text,
+        });
+        m.addLayer({
+          id: "lbl-muni",
+          type: "symbol",
+          source: "lbl-muni",
+          minzoom: 7.4,
+          layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": ["interpolate", ["linear"], ["zoom"], 7.5, 10, 11, 13, 14, 16], "text-max-width": 7, "text-padding": 3 },
+          paint: text,
+        });
         if (point) markerRef.current = new ml.Marker({ color: "#e8b04a" }).setLngLat([point.lng, point.lat]).addTo(m);
+        // sin punto pero con lugar ya elegido: abrir sobre ese departamento o municipio
+        if (!point) {
+          const e = geo.gaz.muni(initial?.muni_ine ?? null) ?? geo.gaz.depto(initial?.depto_ine ?? null);
+          if (e) m.fitBounds([[e.bbox[0], e.bbox[1]], [e.bbox[2], e.bbox[3]]], { padding: 40, maxZoom: e.type === "muni" ? 12.5 : 9, duration: 0 });
+        }
+      });
+      map.on("mousemove", (e) => {
+        const m = map!;
+        if (!m.getLayer("muni-fill")) return;
+        const f = m.queryRenderedFeatures(e.point, { layers: ["muni-fill"] })[0];
+        const code = f ? Number((f.properties as any).muni_ine) : -1;
+        m.setFilter("muni-hover", ["==", ["get", "muni_ine"], code]);
+        m.getCanvas().style.cursor = "crosshair";
+        setHover(f ? String((f.properties as any).name ?? geo.gaz.muni(code)?.name ?? "") || null : null);
       });
       map.on("click", (e) => {
         const m = map!;
@@ -102,6 +163,11 @@ export function LocationPicker({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo]);
+
+  useEffect(() => {
+    const m = mapRef.current;
+    if (m?.getLayer("sat")) m.setLayoutProperty("sat", "visibility", satellite ? "visible" : "none");
+  }, [satellite]);
 
   const jump = (i: number) => {
     const e = results[i]?.entry;
@@ -145,6 +211,16 @@ export function LocationPicker({
               </ul>
             )}
           </div>
+          <button
+            type="button"
+            className="btn-outline h-9 shrink-0 gap-1.5 !px-3 text-xs"
+            aria-pressed={satellite}
+            onClick={() => setSatellite((s) => !s)}
+            title={satellite ? "Ver mapa" : "Ver satélite"}
+          >
+            {satellite ? <MapIcon className="h-4 w-4" /> : <Globe2 className="h-4 w-4" />}
+            <span className="hidden sm:inline">{satellite ? "Mapa" : "Satélite"}</span>
+          </button>
           <button className="btn-ghost h-9 w-9 !p-0" onClick={onClose} aria-label="Cerrar">
             <X className="h-4 w-4" />
           </button>
@@ -158,7 +234,10 @@ export function LocationPicker({
                 {place?.type === "muni" && ` · ${place.depto}`} · {point.lat}, {point.lng}
               </>
             ) : (
-              "Haz clic en el mapa para marcar el sitio exacto."
+              <>
+                Haz clic en el sitio exacto; el municipio se detecta solo.
+                {hover && <span className="ml-1 text-ink">· {hover}</span>}
+              </>
             )}
           </div>
           <button className="btn-primary shrink-0" disabled={!point} onClick={() => point && onPick(point)}>

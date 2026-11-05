@@ -1,5 +1,6 @@
 "use client";
 
+import { categoriesText } from "@/lib/categories";
 import { posterThumb } from "@/lib/poster-url";
 import { ArrowLeft, Clapperboard, Download, Landmark, X } from "lucide-react";
 import Link from "next/link";
@@ -208,7 +209,7 @@ export function OrgCard({ org, gaz, onClick }: { org: Org; gaz: Gazetteer; onCli
       <span className="min-w-0 flex-1">
         <span className="block truncate font-display text-[15px] text-ink">{org.name}</span>
         <span className="block truncate text-xs text-muted">
-          {org.category}
+          {categoriesText(org)}
           {place ? ` — ${place}` : ""}
         </span>
         <span className="mt-1 flex flex-wrap items-center gap-1.5">

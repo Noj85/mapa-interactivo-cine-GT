@@ -3,7 +3,7 @@
 import { CheckCircle2, Clapperboard, Landmark, Loader2, Send } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
-import { filmDraft, filmPayload, orgDraft, orgPayload, type FilmDraft, type OrgDraft } from "@/components/records/drafts";
+import { filmDraft, filmPayload, orgContactErrors, orgDraft, orgPayload, type FilmDraft, type OrgDraft } from "@/components/records/drafts";
 import { FilmFields } from "@/components/records/FilmFields";
 import { ImageField } from "@/components/records/ImageField";
 import { LocationsEditor } from "@/components/records/LocationsEditor";
@@ -57,7 +57,7 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
           })
         : orgCompleteness({
             name: o.name,
-            category: o.category,
+            category: o.categories[0] ?? "",
             initiative_type: orgData.initiative_type,
             depto_ine: o.depto_ine,
             muni_ine: o.muni_ine,
@@ -68,10 +68,20 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
             contact: orgData.contact,
             description: orgData.description,
           }),
-    [kind, f.title, f.currency, filmData, o.name, o.category, o.depto_ine, o.muni_ine, o.lat, o.lng, orgData],
+    [kind, f.title, f.currency, filmData, o.name, o.categories, o.depto_ine, o.muni_ine, o.lat, o.lng, orgData],
   );
 
-  const ready = kind === "film" ? f.title.trim().length > 0 : o.name.trim().length > 0 && !!o.category;
+  const sourceOk = note.trim().length >= 8;
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const contactOk = kind === "film" || orgContactErrors(o).ok;
+  const recordOk = kind === "film" ? f.title.trim().length > 0 : o.name.trim().length > 0 && o.categories.length > 0;
+  const ready = recordOk && contactOk && sourceOk && emailOk;
+  const missingNow = [
+    !recordOk ? (kind === "film" ? "el título" : "el nombre y al menos una categoría") : null,
+    !contactOk ? "corregir el teléfono o correo de la entidad" : null,
+    !sourceOk ? "la fuente" : null,
+    !emailOk ? "tu correo" : null,
+  ].filter(Boolean);
 
   const send = async () => {
     setError(null);
@@ -89,8 +99,8 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
           kind,
           data,
           target_id: film?.id ?? org?.id ?? null,
-          note: note || null,
-          contact: email || null,
+          note: note.trim(),
+          contact: email.trim(),
           website_url_hp: trap,
           opened_at: opened.current,
         }),
@@ -111,8 +121,7 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
         <CheckCircle2 className="mx-auto h-10 w-10 text-ok" />
         <h2 className="mt-4 font-display text-3xl tracking-tight">¡Gracias por aportar!</h2>
         <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-muted">
-          Tu aporte quedó pendiente. El equipo de la Academia lo verificará antes de que aparezca en el mapa; la revisión y aprobación puede tomar hasta tres días hábiles
-          {email ? ", y te escribiremos si necesitamos aclarar algo" : ""}.
+          Tu aporte quedó pendiente. El equipo de la Academia lo verificará antes de que aparezca en el mapa; la revisión y aprobación puede tomar hasta tres días hábiles. Si necesitamos aclarar algo, te escribiremos a <b>{email.trim()}</b>.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <Link href="/" className="btn-primary">Volver al mapa</Link>
@@ -185,19 +194,21 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
 
       <section className="space-y-4 rounded-2xl border border-line bg-surface p-4">
         <div>
-          <label className="label" htmlFor="c-note">¿De dónde sale esta información? (opcional)</label>
+          <label className="label" htmlFor="c-note">Fuente de la información *</label>
           <textarea
             id="c-note"
             className="field min-h-20"
-            placeholder="Un enlace, el catálogo donde la viste, o cómo lo sabes. Ayuda al equipo a verificarla."
+            required
+            aria-required
+            placeholder="Un enlace, el catálogo donde la viste, o cómo lo sabes. El equipo la usa para verificar el dato."
             value={note}
             onChange={(e) => setNote(e.target.value)}
             maxLength={1500}
           />
         </div>
         <div>
-          <label className="label" htmlFor="c-mail">Tu correo (opcional)</label>
-          <input id="c-mail" type="email" className="field" placeholder="Solo para aclarar dudas; no se publica." value={email} onChange={(e) => setEmail(e.target.value)} />
+          <label className="label" htmlFor="c-mail">Tu correo *</label>
+          <input id="c-mail" type="email" required aria-required autoComplete="email" className="field" placeholder="Para que el equipo te escriba si tiene dudas; no se publica." value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
         {/* campo trampa contra robots: las personas no lo ven */}
         <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
@@ -211,7 +222,9 @@ export function ContributeForm({ film, org, initialKind }: { film?: Film; org?: 
           <button className="btn-primary" disabled={!ready || status === "sending"} onClick={send}>
             {status === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar aporte
           </button>
-          <span className="text-xs text-muted">El equipo lo revisa antes de publicarlo.</span>
+          <span className="text-xs text-muted">
+            {missingNow.length ? `Falta ${missingNow.join(", ")}.` : "El equipo lo revisa antes de publicarlo."}
+          </span>
         </div>
       </section>
     </div>

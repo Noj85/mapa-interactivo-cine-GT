@@ -32,8 +32,8 @@ export function ProcineLogo({ className }: { className?: string }) {
 export function BrandName({ compact }: { compact?: boolean }) {
   return (
     <span className="min-w-0 leading-tight">
-      <span className="line-clamp-2 block font-display text-[15px] font-semibold leading-[1.15] tracking-tight text-ink sm:line-clamp-1">Mapa del Cine de Guatemala</span>
-      {!compact && <span className="mt-0.5 hidden truncate text-[11px] uppercase tracking-[0.08em] text-muted sm:block">Academia de Cine de Guatemala</span>}
+      <span className="line-clamp-2 block font-display text-[15px] font-semibold leading-[1.15] tracking-tight text-ink">Mapa del Cine de Guatemala</span>
+      {!compact && <span className="mt-0.5 block text-[10.5px] uppercase leading-tight tracking-[0.04em] text-muted">Academia de Cine de Guatemala</span>}
     </span>
   );
 }

@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "Equipo · Mapa del Cine de Guatemala",
+  title: "Administración · Mapa del Cine de Guatemala",
   // el área del equipo no debe aparecer en buscadores
   robots: { index: false, follow: false, nocache: true },
 };

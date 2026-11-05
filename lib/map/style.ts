@@ -18,13 +18,14 @@ const HIDE = new Set(["label_state", "label_village", "label_town", "label_other
 
 /**
  * Estilo base OpenFreeMap (Positron) adaptado: se retiran las etiquetas
- * que duplican las nuestras y, en tema oscuro, se invierte la luminosidad.
+ * que duplican las nuestras (salvo con `labels`) y, en tema oscuro, se invierte la luminosidad.
  */
-export async function buildStyle(theme: Theme): Promise<StyleSpecification> {
+export async function buildStyle(theme: Theme, opts: { labels?: boolean } = {}): Promise<StyleSpecification> {
   const style = await baseStyle();
   const layers: LayerSpecification[] = [];
   for (let l of style.layers) {
-    if (HIDE.has(l.id)) continue;
+    // con `labels` se conservan los nombres de ciudades, pueblos y aldeas del mapa base (selector de punto)
+    if (!opts.labels && HIDE.has(l.id)) continue;
     // la capital ya la rotulamos nosotros: evitar el duplicado "Guatemala City"
     if (l.id === "label_city_capital" && "filter" in l && l.filter) {
       l = { ...l, filter: ["all", l.filter, ["!=", ["coalesce", ["get", "name_en"], ["get", "name"]], "Guatemala City"]] } as LayerSpecification;

@@ -1,3 +1,4 @@
+import { categoriesText } from "@/lib/categories";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { filmFilterActive, locDepto, locationsMatching, orgFilterActive, type ExportKind, type FilmFilter, type OrgFilter } from "@/lib/filters";
 import { FILM_KINDS, INITIATIVE_TYPES, NATIONALITIES, type Film, type Org } from "@/lib/types";
@@ -62,12 +63,12 @@ export function buildTable(
     return {
       name: capa ? `entidades-${capa}` : "entidades",
       title: "Entidades",
-      header: ["Nombre", "Capa", "Categoría", "Naturaleza", "Departamento", "Municipio", "Ciudad o referencia", "Latitud", "Longitud", "Sitio web", "Instagram", "Contacto", "Descripción", "Registro completo (%)", "Estado"],
+      header: ["Nombre", "Capa", "Categorías", "Naturaleza", "Departamento", "Municipio", "Ciudad o referencia", "Latitud", "Longitud", "Sitio web", "Instagram", "Contacto", "Descripción", "Registro completo (%)", "Estado"],
       widths: [34, 12, 26, 14, 16, 18, 22, 10, 10, 30, 22, 30, 60, 12, 11],
       rows: orgs.map((o) => [
         o.name,
         o.layer === "circulacion" ? "Circulación" : "Industria",
-        o.category,
+        categoriesText(o, "; "),
         iniLabel(o.initiative_type),
         depto(o.depto_ine ?? (o.muni_ine != null ? Math.floor(o.muni_ine / 100) : null)),
         muni(o.muni_ine),

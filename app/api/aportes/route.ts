@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   }
 
   const meta = submissionMetaSchema.safeParse(body);
-  if (!meta.success) return fail("Solicitud no válida.");
+  if (!meta.success) return fail(meta.error.issues[0]?.message ?? "Solicitud no válida.");
   // anti-spam: los robots llenan el campo trampa o envían demasiado rápido
   const m = meta.data;
   if (m.website_url_hp) return NextResponse.json({ ok: true }); // se descarta en silencio
@@ -38,7 +38,6 @@ export async function POST(req: Request) {
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Datos inválidos");
   const target = m.target_id && UUID.test(m.target_id) ? m.target_id : null;
   if (m.target_id && !target) return fail("Registro a corregir no válido.");
-  if (m.contact && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m.contact)) return fail("El correo de contacto no parece válido.");
 
   // el límite solo cuenta aportes válidos, para no castigar errores de captura
   const lim = rateLimit(`aporte:${ip}`, 10, 60 * 60 * 1000);

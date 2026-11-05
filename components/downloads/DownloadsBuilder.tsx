@@ -1,5 +1,6 @@
 "use client";
 
+import { categoriesText } from "@/lib/categories";
 import { Check, Clapperboard, Copy, Download, FileSpreadsheet, FileText, Landmark, MapPin, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { MultiSelect } from "@/components/ui/MultiSelect";
@@ -277,7 +278,7 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
                   ? (sample as Org[]).map((o) => (
                       <li key={o.id} className="flex items-baseline justify-between gap-4 px-4 py-2.5 text-sm">
                         <span className="min-w-0 truncate font-medium">{o.name}</span>
-                        <span className="shrink-0 text-xs text-muted">{o.category}</span>
+                        <span className="shrink-0 text-xs text-muted">{categoriesText(o)}</span>
                       </li>
                     ))
                   : (sample as Film[]).map((f) => (

@@ -1,3 +1,4 @@
+import { orgCategories } from "@/lib/categories";
 import { CIRC_CATEGORIES, FILM_KINDS, IND_CATEGORIES, INITIATIVE_TYPES, NATIONALITIES, type Film, type FilmKind, type InitiativeType, type Nationality, type Org } from "@/lib/types";
 
 /**
@@ -162,13 +163,13 @@ export function filmMatches(f: Film, flt: FilmFilter): boolean {
 
 export function orgMatches(o: Org, flt: OrgFilter): boolean {
   if (flt.capa && o.layer !== flt.capa) return false;
-  if (flt.categoria.length && !flt.categoria.includes(o.category)) return false;
+  if (flt.categoria.length && !orgCategories(o).some((c) => flt.categoria.includes(c))) return false;
   if (flt.iniciativa.length && (!o.initiative_type || !flt.iniciativa.includes(o.initiative_type))) return false;
   if (flt.depto.length) {
     const d = o.depto_ine ?? (o.muni_ine != null ? Math.floor(o.muni_ine / 100) : null);
     if (d == null || !flt.depto.includes(d)) return false;
   }
-  if (flt.q && !norm(`${o.name} ${o.category} ${o.description ?? ""}`).includes(norm(flt.q))) return false;
+  if (flt.q && !norm(`${o.name} ${orgCategories(o).join(" ")} ${o.description ?? ""}`).includes(norm(flt.q))) return false;
   return true;
 }
 

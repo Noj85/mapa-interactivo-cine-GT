@@ -1,5 +1,6 @@
 "use client";
 
+import { orgCategories } from "@/lib/categories";
 import { AnimatePresence, motion } from "framer-motion";
 import { Download, HandHeart, Moon, Search, Sun } from "lucide-react";
 import { DepartmentFilter } from "./DepartmentFilter";
@@ -78,7 +79,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       org: (slug: string) => {
         const o = data.orgs.find((x) => x.slug === slug);
         const layer: LayerId = o?.layer ?? view.layer;
-        const keep = layer === view.layer && o && view.cat === o.category ? view.cat : null;
+        const keep = layer === view.layer && o && view.cat && orgCategories(o).includes(view.cat) ? view.cat : null;
         commit({ ...view, layer, metric: LAYER_METRICS[layer][0], org: slug, film: null, noloc: false, cat: keep });
       },
       layer: (l: LayerId) =>
@@ -120,13 +121,13 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
   const shown = useMemo<Dataset>(() => {
     if (!view.cat) return data;
     if (view.layer === "produccion") return { ...data, films: data.films.filter((f) => f.kind === view.cat) };
-    return { ...data, orgs: data.orgs.filter((o) => o.layer !== view.layer || o.category === view.cat) };
+    return { ...data, orgs: data.orgs.filter((o) => o.layer !== view.layer || orgCategories(o).includes(view.cat!)) };
   }, [data, view.cat, view.layer]);
   const aggs = useMemo(() => aggregate(shown, view.layer), [shown, view.layer]);
   const hasSelection = !!(view.place || view.film || view.org || view.noloc);
   const desktop = vw.w >= 900;
   const padding = desktop
-    ? { top: 20, right: PANEL_W + 16, bottom: 20, left: 360 }
+    ? { top: 20, right: PANEL_W + 16, bottom: 20, left: 460 }
     : { top: view.layer === "produccion" ? 150 : 190, right: 0, bottom: hasSelection ? Math.round(vw.h * 0.5) : 0, left: 0 };
 
   const ctx: PanelCtx | null = geo ? { data: shown, gaz: geo.gaz, aggs, view, go, canEdit } : null;
@@ -194,7 +195,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       </AnimatePresence>
 
       {/* columna superior izquierda */}
-      <div className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex flex-col gap-2.5 sm:left-4 sm:right-auto sm:top-4 sm:w-[380px]">
+      <div className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex flex-col gap-2.5 sm:left-4 sm:right-auto sm:top-4 sm:w-[440px]">
         <div className="pointer-events-auto glass flex items-center gap-2 rounded-2xl border border-line p-2 shadow-soft">
           <BrandMark className="h-7 pl-1" />
           <div className="min-w-0 flex-1">
@@ -253,7 +254,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
           bottom: desktop ? 28 : hasSelection ? Math.round(vw.h * (sheetFull ? 0.88 : 0.5)) + 28 : 76,
         }}
       >
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto empty:hidden">
           <Legend
             layer={view.layer}
             metric={view.metric}
@@ -263,7 +264,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
             dimmed={!!(view.film || view.org)}
           />
         </div>
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto ml-auto">
           <MapControls
             onZoomIn={() => mapRef.current?.zoomIn()}
             onZoomOut={() => mapRef.current?.zoomOut()}
