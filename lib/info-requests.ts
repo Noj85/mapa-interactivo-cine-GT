@@ -57,7 +57,7 @@ const MAX_LISTED = 6;
 
 /**
  * Mensaje listo para pegar en WhatsApp o en un correo. Texto plano, de tú y corto. Deja claro quién
- * escribe (PROCINE, proyecto que ejecuta la Academia) y no incluye la dirección del mapa: solo el
+ * escribe (PROCINE, proyecto de fortalecimiento del sector cinematográfico que ejecuta la Academia) y no incluye la dirección del mapa: solo el
  * enlace privado, solo en su línea (para que WhatsApp lo reconozca), y la clave aparte. No menciona la
  * vigencia: si el enlace venció, la página lo explica.
  */
@@ -82,15 +82,18 @@ export function buildRequestMessage(i: RequestMessageInput): { subject: string; 
   // La prioridad de esta fase de investigación aplica solo a producciones (las entidades no tienen locaciones ni empleos).
   const priority = isFilm
     ? films
-      ? "Puedes completar todo lo que quieras; lo más importante en esta fase de investigación son los lugares donde se rodaron y, si puedes, los empleos que generaron."
-      : "Puedes completar todo lo que quieras; lo más importante en esta fase de investigación son los lugares donde se rodó y, si puedes, los empleos que generó."
+      ? "Puedes completar todo lo que quieras; lo más importante en esta fase de investigación son las locaciones donde se rodaron y, si puedes, los empleos que generaron."
+      : "Puedes completar todo lo que quieras; lo más importante en esta fase de investigación son las locaciones donde se rodó y, si puedes, los empleos que generó."
     : null;
+  const time = films ? "Te tomará unos dos minutos por producción." : "Te tomará unos dos minutos.";
+  const note = [priority, time].filter(Boolean).join(" ");
 
   const body = [
     greeting,
     "",
-    `Desde PROCINE, proyecto que ejecuta la Academia de Cine de Guatemala, estamos documentando el cine nacional. ${ask}`,
-    ...(priority ? ["", priority] : []),
+    `Desde PROCINE, proyecto de fortalecimiento del sector cinematográfico que ejecuta la Academia de Cine de Guatemala, estamos documentando el cine nacional. ${ask}`,
+    "",
+    note,
     "",
     i.link,
     "",
