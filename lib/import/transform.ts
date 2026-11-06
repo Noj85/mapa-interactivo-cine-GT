@@ -194,6 +194,8 @@ function filmFields(row: Row, plan: SheetPlan): Omit<FilmInput, "locations" | "f
     genres: gen.genres,
     director: cleanText(val(row, plan, "director")),
     producer: cleanText(val(row, plan, "producer")),
+    cinematographer: cleanText(val(row, plan, "cinematographer")),
+    screenwriter: cleanText(val(row, plan, "screenwriter")),
     nationality: normalizeNationality(val(row, plan, "nationality"), vm.nationality),
     budget: parseNumber(budgetRaw),
     currency: detectCurrency(val(row, plan, "currency")) ?? detectCurrency(budgetRaw) ?? "GTQ",

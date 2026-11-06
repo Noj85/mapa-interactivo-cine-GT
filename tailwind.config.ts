@@ -20,6 +20,10 @@ const config: Config = {
         ok: "rgb(var(--ok) / <alpha-value>)",
         danger: "rgb(var(--danger) / <alpha-value>)",
       },
+      backgroundImage: {
+        // el degradado magenta a violeta del pin del logo
+        "brand-gradient": "linear-gradient(135deg, rgb(var(--grad-a)), rgb(var(--grad-b)))",
+      },
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
         // «display» es la misma Biennale; el peso y el espaciado de los títulos están en globals.css

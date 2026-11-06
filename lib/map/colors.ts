@@ -2,11 +2,18 @@ import type { LayerId } from "@/lib/types";
 
 export type Theme = "dark" | "light";
 
+/**
+ * Colores de las capas, tomados de la paleta del logo y de PROCINE: Producción magenta, Circulación cian, Industria naranja.
+ * La variante clara es más oscura para que se lea sobre el mapa claro.
+ */
 export const LAYER_COLORS: Record<LayerId, { dark: string; light: string }> = {
-  produccion: { dark: "#e8b04a", light: "#c9820f" },
-  circulacion: { dark: "#5ec4b6", light: "#12877a" },
-  industria: { dark: "#a98bf0", light: "#6b46c8" },
+  produccion: { dark: "#ee5fd2", light: "#b61c9b" },
+  circulacion: { dark: "#33c9f2", light: "#007ba0" },
+  industria: { dark: "#ffa95a", light: "#d9700f" },
 };
+
+/** Amarillo de PROCINE: marca las locaciones con datos por completar (no choca con ninguna capa). */
+export const INCOMPLETE_COLOR: Record<Theme, string> = { dark: "#ffcc00", light: "#c79100" };
 
 export const MAP_BG: Record<Theme, string> = { dark: "#0b0f19", light: "#eef1f5" };
 
@@ -21,6 +28,22 @@ export function mix(a: string, b: string, t: number) {
   const [r1, g1, b1] = hex(a);
   const [r2, g2, b2] = hex(b);
   return toHex(r1 + (r2 - r1) * t, g1 + (g2 - g1) * t, b1 + (b2 - b1) * t);
+}
+
+const luminance = (c: string) => {
+  const [r, g, b] = hex(c).map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+/** Color de texto (blanco o casi negro) con más contraste sobre `bg`; para los números dentro de pines y grupos. */
+export function readableOn(bg: string): string {
+  const l = luminance(bg);
+  const white = 1.05 / (l + 0.05);
+  const dark = (l + 0.05) / (luminance("#16120a") + 0.05);
+  return white >= dark ? "#ffffff" : "#16120a";
 }
 
 /** 5 pasos de la coropleta, del más tenue al más intenso. */

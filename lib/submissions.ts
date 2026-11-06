@@ -65,6 +65,8 @@ export function diffSubmission(sub: Submission, current: Film | Org | null, gaz:
       row("Casas productoras", c ? companiesText(c.companies, "\n") || null : null, companiesText(p.companies, "\n") || null, isNew),
       row("Director/a", c?.director ?? null, p.director ?? null, isNew),
       row("Productor/a", c?.producer ?? null, p.producer ?? null, isNew),
+      row("Director/a de fotografía", c?.cinematographer ?? null, p.cinematographer ?? null, isNew),
+      row("Guionista", c?.screenwriter ?? null, p.screenwriter ?? null, isNew),
       row("Presupuesto", money(c?.budget, c?.currency), money(p.budget, p.currency), isNew),
       row("Sinopsis", c?.synopsis ?? null, p.synopsis ?? null, isNew),
       row("Locaciones", c ? locsText(c.locations, gaz) : null, locsText(p.locations ?? [], gaz), isNew),

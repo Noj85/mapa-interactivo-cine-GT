@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Clapperboard, Landmark, MapPin, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { filmTypeLabel } from "@/lib/film-types";
+import { posterThumb } from "@/lib/poster-url";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import type { Dataset } from "@/lib/types";
 import type { Place } from "@/lib/view";
@@ -13,8 +14,27 @@ import { cn, normalize } from "@/lib/utils";
 
 type Result =
   | { kind: "place"; id: string; label: string; sub: string; place: Place }
-  | { kind: "film"; id: string; label: string; sub: string; slug: string }
+  | { kind: "film"; id: string; label: string; sub: string; slug: string; poster: string | null }
   | { kind: "org"; id: string; label: string; sub: string; slug: string };
+
+/** Icono del resultado; las producciones con póster muestran su miniatura (si no carga, vuelve el icono). */
+function ResultIcon({ result }: { result: Result }) {
+  const [failed, setFailed] = useState(false);
+  const poster = result.kind === "film" && !failed ? posterThumb(result.poster) : null;
+  if (poster)
+    return (
+      <span className="block h-12 w-8 shrink-0 overflow-hidden rounded-md bg-surface-2 ring-1 ring-line">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={poster} alt="" loading="lazy" className="h-full w-full object-cover" onError={() => setFailed(true)} />
+      </span>
+    );
+  const Icon = result.kind === "place" ? MapPin : result.kind === "film" ? Clapperboard : Landmark;
+  return (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/12 text-accent">
+      <Icon className="h-4 w-4" />
+    </span>
+  );
+}
 
 export function SearchPalette({
   open,
@@ -59,7 +79,7 @@ export function SearchPalette({
       });
     }
     for (const f of data.films) {
-      const hay = normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${companyNames(f.companies).join(" ")} ${f.genres.join(" ")}`);
+      const hay = normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${f.cinematographer ?? ""} ${f.screenwriter ?? ""} ${companyNames(f.companies).join(" ")} ${f.genres.join(" ")}`);
       if (hay.includes(nq))
         out.push({
           kind: "film",
@@ -67,6 +87,7 @@ export function SearchPalette({
           label: f.title,
           sub: ["Producción", f.year, filmTypeLabel(f) || null, f.genres.slice(0, 2).join(", ") || null].filter(Boolean).join(" · "),
           slug: f.slug,
+          poster: f.poster_url ?? null,
         });
     }
     for (const o of data.orgs) {
@@ -139,7 +160,6 @@ export function SearchPalette({
                 <p className="px-3 py-6 text-center text-sm text-muted">Sin resultados para “{q}”.</p>
               )}
               {results.map((r, i) => {
-                const Icon = r.kind === "place" ? MapPin : r.kind === "film" ? Clapperboard : Landmark;
                 return (
                   <button
                     key={r.id}
@@ -150,9 +170,7 @@ export function SearchPalette({
                       i === idx ? "bg-surface-2" : "",
                     )}
                   >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent/12 text-accent">
-                      <Icon className="h-4 w-4" />
-                    </span>
+                    <ResultIcon result={r} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm text-ink">{r.label}</span>
                       <span className="block truncate text-xs text-muted">{r.sub}</span>

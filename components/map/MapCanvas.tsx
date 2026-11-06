@@ -8,7 +8,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { aggregate, type Stop } from "@/lib/aggregate";
 import { metricText } from "@/lib/format";
 import type { GeoBundle } from "@/lib/geo/load";
-import { LAYER_COLORS, MAP_BG, ramp, type Theme } from "@/lib/map/colors";
+import { INCOMPLETE_COLOR, LAYER_COLORS, MAP_BG, ramp, readableOn, type Theme } from "@/lib/map/colors";
 import { abroadFilms, ABROAD, ABROAD_BBOX, buildAbroad, buildFilmRoute, buildLabels, buildMask, buildNowhere, buildPins, hasAbroad, levels, locationPoint, NOWHERE, NOWHERE_BBOX, isUnlocated, unlocatedFilms, withZones } from "@/lib/map/features";
 import { isAbroad } from "@/lib/completeness";
 import { buildStyle, firstSymbolId } from "@/lib/map/style";
@@ -384,7 +384,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
         "text-size": 12,
         "text-allow-overlap": true,
       },
-      paint: { "text-color": "#16120a" },
+      paint: { "text-color": readableOn(accent) },
     });
     add({
       id: "pin-incomplete",
@@ -394,7 +394,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       paint: {
         "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 8, 12, 12, 15, 15],
         "circle-color": "rgba(0,0,0,0)",
-        "circle-stroke-color": dark ? "#f2a65a" : "#c2570c",
+        "circle-stroke-color": INCOMPLETE_COLOR[theme],
         "circle-stroke-width": 1.5,
         "circle-opacity": pinFade,
         "circle-stroke-opacity": pinFade,
@@ -486,7 +486,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
         "text-ignore-placement": true,
         visibility: "none",
       },
-      paint: { "text-color": ["case", ["==", ["get", "approx"], true], accent, "#16120a"] },
+      paint: { "text-color": ["case", ["==", ["get", "approx"], true], accent, readableOn(accent)] },
     });
     add({
       id: "film-site",
@@ -559,6 +559,8 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
     }
     for (const id of ["film-line"]) map.setPaintProperty(id, "line-color", accent);
     map.setPaintProperty("film-halo", "circle-color", accent);
+    map.setPaintProperty("pin-cluster-count", "text-color", readableOn(accent));
+    map.setPaintProperty("film-n", "text-color", ["case", ["==", ["get", "approx"], true], accent, readableOn(accent)] as any);
 
     // etiquetas
     const labels = buildLabels(geo.gaz, aggs, view.metric, view.layer);

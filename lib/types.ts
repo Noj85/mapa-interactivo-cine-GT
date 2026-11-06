@@ -91,6 +91,10 @@ export interface Film {
   duration_min: number | null;
   director: string | null;
   producer: string | null;
+  /** Director/a de fotografía (persona). */
+  cinematographer: string | null;
+  /** Guionista (persona). */
+  screenwriter: string | null;
   nationality: Nationality | null;
   budget: number | null;
   currency: "GTQ" | "USD";
@@ -263,6 +267,8 @@ export interface FilmInput {
   duration_min?: number | null;
   director?: string | null;
   producer?: string | null;
+  cinematographer?: string | null;
+  screenwriter?: string | null;
   nationality?: Nationality | null;
   budget?: number | null;
   currency?: "GTQ" | "USD";

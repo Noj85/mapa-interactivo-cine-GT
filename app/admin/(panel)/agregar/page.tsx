@@ -41,7 +41,7 @@ export default async function AddDataPage() {
             <span
               className={
                 o.primary
-                  ? "flex h-11 w-11 items-center justify-center rounded-xl bg-brand text-brand-ink"
+                  ? "flex h-11 w-11 items-center justify-center rounded-xl bg-brand-gradient text-white"
                   : "flex h-11 w-11 items-center justify-center rounded-xl bg-accent/12 text-accent"
               }
             >

@@ -175,6 +175,8 @@ function readFilm(f: any): Film {
     duration_min: cleanMinutes(f.duration_min),
     festivals: f.festivals ?? [],
     companies: f.companies ?? [],
+    cinematographer: f.cinematographer ?? null,
+    screenwriter: f.screenwriter ?? null,
   } as Film;
 }
 
@@ -642,6 +644,8 @@ const rowToFilm = (r: any): Film => ({
   duration_min: cleanMinutes(r.duration_min),
   director: r.director,
   producer: r.producer,
+  cinematographer: r.cinematographer ?? null,
+  screenwriter: r.screenwriter ?? null,
   nationality: r.nationality,
   budget: r.budget == null ? null : Number(r.budget),
   currency: r.currency,
@@ -732,6 +736,8 @@ export class SupabaseStore implements Store {
         duration_min: film.duration_min,
         director: film.director,
         producer: film.producer,
+        cinematographer: film.cinematographer,
+        screenwriter: film.screenwriter,
         companies: film.companies,
         nationality: film.nationality,
         budget: film.budget,

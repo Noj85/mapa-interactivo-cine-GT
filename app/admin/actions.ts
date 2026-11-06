@@ -120,7 +120,7 @@ export async function deleteOrgAction(id: string): Promise<Result> {
   }
 }
 
-const FILM_FIELDS = new Set(["year", "director", "producer", "nationality", "budget", "synopsis"]);
+const FILM_FIELDS = new Set(["year", "director", "producer", "cinematographer", "screenwriter", "nationality", "budget", "synopsis"]);
 const ORG_FIELDS = new Set(["initiative_type", "web", "instagram", "contact", "description", "city"]);
 
 /** Guarda la respuesta y, si es posible, la aplica al registro correspondiente. */

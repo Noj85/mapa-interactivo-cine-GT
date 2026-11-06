@@ -85,6 +85,8 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string; e
     duration_min: input.duration_min !== undefined ? cleanMinutes(input.duration_min) : opts.existing?.duration_min ?? null,
     director: str(input.director),
     producer: str(input.producer),
+    cinematographer: str(input.cinematographer),
+    screenwriter: str(input.screenwriter),
     nationality: input.nationality ?? null,
     budget: num(input.budget),
     currency: input.currency ?? ("GTQ" as const),

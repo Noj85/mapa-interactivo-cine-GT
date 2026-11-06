@@ -76,6 +76,8 @@ export interface FilmDraft {
   nationality: Nationality | "";
   director: string;
   producer: string;
+  cinematographer: string;
+  screenwriter: string;
   budget: string;
   currency: "GTQ" | "USD";
   synopsis: string;
@@ -96,6 +98,8 @@ export function filmDraft(film?: Film): FilmDraft {
     nationality: film?.nationality ?? "",
     director: film?.director ?? "",
     producer: film?.producer ?? "",
+    cinematographer: film?.cinematographer ?? "",
+    screenwriter: film?.screenwriter ?? "",
     budget: s(film?.budget),
     currency: film?.currency ?? "GTQ",
     synopsis: film?.synopsis ?? "",
@@ -146,6 +150,8 @@ export function filmPayload(d: FilmDraft) {
     nationality: d.nationality || null,
     director: d.director || null,
     producer: d.producer || null,
+    cinematographer: d.cinematographer || null,
+    screenwriter: d.screenwriter || null,
     budget: toNum(d.budget),
     currency: d.currency,
     synopsis: d.synopsis || null,

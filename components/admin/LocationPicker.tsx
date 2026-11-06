@@ -4,8 +4,12 @@
 import { Check, Globe2, Map as MapIcon, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
+import { LAYER_COLORS } from "@/lib/map/colors";
 import { getMaplibre, type MapLibreMap } from "@/lib/map/maplibre";
 import { buildStyle } from "@/lib/map/style";
+
+/** Color de Producción (magenta) según el tema actual, para el marcador y el municipio elegido. */
+const pickerColor = () => LAYER_COLORS.produccion[document.documentElement.dataset.theme === "light" ? "light" : "dark"];
 
 export interface PickedPoint {
   lat: number;
@@ -93,7 +97,7 @@ export function LocationPicker({
         m.addSource("lbl-depto", { type: "geojson", data: names("depto") as any });
         m.addSource("lbl-muni", { type: "geojson", data: names("muni") as any });
         const text = { "text-color": dark ? "#e6ecf5" : "#14203a", "text-halo-color": halo, "text-halo-width": 1.8 };
-        m.addLayer({ id: "muni-fill", type: "fill", source: "muni", paint: { "fill-color": "#e8b04a", "fill-opacity": 0.04 } });
+        m.addLayer({ id: "muni-fill", type: "fill", source: "muni", paint: { "fill-color": pickerColor(), "fill-opacity": 0.04 } });
         m.addLayer({
           id: "muni-line",
           type: "line",
@@ -111,7 +115,7 @@ export function LocationPicker({
           type: "fill",
           source: "muni",
           filter: ["==", ["get", "muni_ine"], -1],
-          paint: { "fill-color": "#e8b04a", "fill-opacity": 0.22 },
+          paint: { "fill-color": pickerColor(), "fill-opacity": 0.22 },
         });
         m.addLayer({
           id: "lbl-depto",
@@ -129,7 +133,7 @@ export function LocationPicker({
           layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": ["interpolate", ["linear"], ["zoom"], 7.5, 10, 11, 13, 14, 16], "text-max-width": 7, "text-padding": 3 },
           paint: text,
         });
-        if (point) markerRef.current = new ml.Marker({ color: "#e8b04a" }).setLngLat([point.lng, point.lat]).addTo(m);
+        if (point) markerRef.current = new ml.Marker({ color: pickerColor() }).setLngLat([point.lng, point.lat]).addTo(m);
         // sin punto pero con lugar ya elegido: abrir sobre ese departamento o municipio
         if (!point) {
           const e = geo.gaz.muni(initial?.muni_ine ?? null) ?? geo.gaz.depto(initial?.depto_ine ?? null);
@@ -156,7 +160,7 @@ export function LocationPicker({
         };
         setPoint(next);
         markerRef.current?.remove();
-        markerRef.current = new ml.Marker({ color: "#e8b04a" }).setLngLat([next.lng, next.lat]).addTo(m);
+        markerRef.current = new ml.Marker({ color: pickerColor() }).setLngLat([next.lng, next.lat]).addTo(m);
       });
     })();
     return () => {

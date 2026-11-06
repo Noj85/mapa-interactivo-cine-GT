@@ -34,6 +34,8 @@ const TOOL = {
             },
             director: { type: "string", description: "Persona que dirigió la producción." },
             producer: { type: "string", description: "Persona productora (no la empresa)." },
+            cinematographer: { type: "string", description: "Director/a de fotografía (persona). Solo si el documento lo dice." },
+            screenwriter: { type: "string", description: "Guionista (persona). Solo si el documento lo dice." },
             production_company: {
               type: "string",
               description: "Casa(s) productora(s) (empresas). Si hay varias, sepáralas con «;». Si el documento indica el país de una casa, escríbelo entre paréntesis: «Casa Uno (México); Casa Dos (Guatemala)».",
@@ -132,6 +134,8 @@ interface RawFilm {
   genres?: string;
   director?: string;
   producer?: string;
+  cinematographer?: string;
+  screenwriter?: string;
   production_company?: string;
   production_company_country?: string;
   nationality?: string;
@@ -319,6 +323,8 @@ function aggregate(results: ChunkResult[], refHeader: string | null, filename: s
         Géneros: v(f.genres),
         "Director/a": v(f.director),
         "Productor/a": v(f.producer),
+        "Director/a de fotografía": v(f.cinematographer),
+        Guionista: v(f.screenwriter),
         "Casa productora": v(f.production_company),
         "País de la casa productora": v(f.production_company_country),
         Nacionalidad: v(f.nationality),

@@ -35,6 +35,8 @@ export const FILM_FIELDS: FieldDef[] = [
   { id: "genres", label: "Géneros", hint: "uno o varios separados por «;» o «,» (drama, comedia, terror, ciencia ficción…); si trae uno que no es estándar, se conserva tal cual" },
   { id: "director", label: "Director/a", hint: "Persona que dirigió la producción" },
   { id: "producer", label: "Productor/a", hint: "Persona productora (no la empresa)" },
+  { id: "cinematographer", label: "Director/a de fotografía", hint: "Persona a cargo de la fotografía (DP, DoP, cinematografía)" },
+  { id: "screenwriter", label: "Guionista", hint: "Persona que escribió el guion" },
   { id: "company", label: "Casa productora", hint: "Empresa productora; varias separadas por «;», con el país entre paréntesis si lo trae" },
   { id: "company_country", label: "País de la casa productora" },
   { id: "nationality", label: "Nacionalidad", hint: "guatemalteca, coproducción, extranjera" },

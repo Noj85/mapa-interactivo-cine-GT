@@ -62,6 +62,14 @@ export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange:
           <label className="label" htmlFor="f-prod">Productor/a</label>
           <input id="f-prod" className="field" maxLength={300} value={d.producer} onChange={(e) => onChange({ producer: e.target.value })} />
         </div>
+        <div>
+          <label className="label" htmlFor="f-dp">Director/a de fotografía</label>
+          <input id="f-dp" className="field" maxLength={300} value={d.cinematographer} onChange={(e) => onChange({ cinematographer: e.target.value })} />
+        </div>
+        <div>
+          <label className="label" htmlFor="f-guion">Guionista</label>
+          <input id="f-guion" className="field" maxLength={300} value={d.screenwriter} onChange={(e) => onChange({ screenwriter: e.target.value })} />
+        </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-[1fr_120px]">
         <div>

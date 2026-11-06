@@ -4,16 +4,19 @@
 
 :root,
 [data-theme="light"] {
-  /* Claro: papel frío, tinta azul marino y un azul institucional */
+  /* Claro: papel frío, tinta azul marino; el acento es el violeta del pin del logo y de PROCINE */
   --bg: 245 247 250;
   --surface: 255 255 255;
   --surface-2: 237 241 246;
   --line: 214 220 230;
   --ink: 15 23 42;
   --muted: 88 100 120;
-  --accent: 29 78 156;
+  --accent: 122 69 181;
   --accent-ink: 255 255 255;
   --brand: 18 39 77;
+  /* degradado del pin (magenta a violeta), para botones principales */
+  --grad-a: 196 32 160;
+  --grad-b: 122 69 181;
   --brand-ink: 255 255 255;
   --warn: 180 83 9;
   --ok: 21 128 61;
@@ -22,16 +25,18 @@
 }
 
 [data-theme="dark"] {
-  /* Oscuro: azul noche, no negro puro; el acento se aclara para mantener contraste */
+  /* Oscuro: azul noche, no negro puro; el violeta se aclara para mantener contraste */
   --bg: 9 13 22;
   --surface: 16 22 35;
   --surface-2: 26 34 51;
   --line: 44 55 77;
   --ink: 232 237 246;
   --muted: 145 158 180;
-  --accent: 128 168 240;
-  --accent-ink: 8 14 28;
+  --accent: 181 139 224;
+  --accent-ink: 20 10 36;
   --brand: 62 101 186;
+  --grad-a: 204 40 168;
+  --grad-b: 128 82 204;
   --brand-ink: 255 255 255;
   --warn: 240 160 70;
   --ok: 94 190 132;
@@ -99,7 +104,7 @@ body {
     @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold leading-none tracking-[-0.005em] transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-brand text-brand-ink shadow-sm hover:brightness-110 active:brightness-95;
+    @apply btn bg-brand-gradient text-white shadow-sm hover:brightness-110 active:brightness-95;
   }
   .btn-ghost {
     @apply btn font-medium text-muted hover:bg-surface-2 hover:text-ink;

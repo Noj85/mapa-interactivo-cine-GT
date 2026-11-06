@@ -75,13 +75,15 @@ function filmItems(existing: Film, incoming: FilmInput, names?: PlaceNames): Ite
     items.push({ ...it, current: it.current ?? null, defaultOn: it.group !== "conflict" });
 
   // campos simples: vacío → se llena; con otro valor → conflicto
-  const simple: { field: "year" | "duration_min" | "format" | "nature" | "director" | "producer" | "nationality" | "synopsis"; label: string; show: (v: unknown) => string }[] = [
+  const simple: { field: "year" | "duration_min" | "format" | "nature" | "director" | "producer" | "cinematographer" | "screenwriter" | "nationality" | "synopsis"; label: string; show: (v: unknown) => string }[] = [
     { field: "year", label: "Año", show: (v) => String(v) },
     { field: "duration_min", label: "Duración", show: (v) => `${v} min` },
     { field: "format", label: "Formato", show: (v) => formatLabel(v as string) },
     { field: "nature", label: "Naturaleza", show: (v) => natureLabel(v as string) },
     { field: "director", label: "Director/a", show: (v) => String(v) },
     { field: "producer", label: "Productor/a", show: (v) => String(v) },
+    { field: "cinematographer", label: "Director/a de fotografía", show: (v) => String(v) },
+    { field: "screenwriter", label: "Guionista", show: (v) => String(v) },
     { field: "nationality", label: "Nacionalidad", show: (v) => natLabel(v as string) },
     { field: "synopsis", label: "Sinopsis", show: (v) => trunc(String(v)) },
   ];
@@ -234,6 +236,8 @@ function draftFromFilm(f: Film): FilmInput {
     genres: [...f.genres],
     director: f.director,
     producer: f.producer,
+    cinematographer: f.cinematographer,
+    screenwriter: f.screenwriter,
     nationality: f.nationality,
     budget: f.budget,
     currency: f.currency,

@@ -37,7 +37,7 @@ export function filmRows(films: Film[], gaz: Gazetteer, open: Record<string, num
       noFestivals: f.festivals.length === 0,
       openRequests: open[f.id] ?? 0,
       thumb: posterThumb(f.poster_url) ?? null,
-      search: normalize([f.title, f.director, f.producer, f.year, kind, ...f.genres, ...places, ...f.festivals.map((x) => x.name), ...companyNames(f.companies)].filter(Boolean).join(" ")),
+      search: normalize([f.title, f.director, f.producer, f.cinematographer, f.screenwriter, f.year, kind, ...f.genres, ...places, ...f.festivals.map((x) => x.name), ...companyNames(f.companies)].filter(Boolean).join(" ")),
     };
   });
 }

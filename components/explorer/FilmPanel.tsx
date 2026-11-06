@@ -109,6 +109,18 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
             <dd className="text-ink">{film.producer}</dd>
           </>
         )}
+        {film.screenwriter && (
+          <>
+            <dt className="text-muted">Guionista</dt>
+            <dd className="text-ink">{film.screenwriter}</dd>
+          </>
+        )}
+        {film.cinematographer && (
+          <>
+            <dt className="text-muted">Dir. de fotografía</dt>
+            <dd className="text-ink">{film.cinematographer}</dd>
+          </>
+        )}
         {(film.companies ?? []).length > 0 && (
           <>
             <dt className="text-muted">{film.companies.length === 1 ? "Casa productora" : "Casas productoras"}</dt>

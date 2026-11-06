@@ -19,7 +19,7 @@ export default function UnlocatedPanel({ ctx }: { ctx: PanelCtx }) {
 
   const list = useMemo(() => {
     const nq = normalize(q);
-    return nq ? films.filter((f) => normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${companyNames(f.companies).join(" ")}`).includes(nq)) : films;
+    return nq ? films.filter((f) => normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${f.cinematographer ?? ""} ${f.screenwriter ?? ""} ${companyNames(f.companies).join(" ")}`).includes(nq)) : films;
   }, [films, q]);
 
   return (
