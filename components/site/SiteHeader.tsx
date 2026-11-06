@@ -2,7 +2,7 @@ import { Download, HandHeart, Map as MapIcon } from "lucide-react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
-import { BrandMark, BrandName, ProcineLogo } from "./Brand";
+import { BrandName, MapMark, ProcineLogo } from "./Brand";
 
 const links = [
   { href: "/", label: "Mapa", icon: MapIcon },
@@ -16,7 +16,7 @@ export function SiteHeader({ current }: { current?: "/" | "/descargas" | "/aport
     <header className="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
         <Link href="/" className="flex min-w-0 items-center gap-3" aria-label="Mapa del Cine de Guatemala, inicio">
-          <BrandMark />
+          <MapMark className="h-10" />
           <BrandName />
         </Link>
         <div className="ml-auto hidden md:block">

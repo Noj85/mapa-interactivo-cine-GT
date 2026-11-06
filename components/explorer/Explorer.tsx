@@ -8,7 +8,7 @@ import { Download, HandHeart, Moon, Search, Sun } from "lucide-react";
 import { DepartmentFilter } from "./DepartmentFilter";
 import AbroadPanel from "./AbroadPanel";
 import UnlocatedPanel from "./UnlocatedPanel";
-import { AcademiaLogo, BrandMark, BrandName, ProcineLogo } from "@/components/site/Brand";
+import { AcademiaLogo, BrandName, MapMark, ProcineLogo } from "@/components/site/Brand";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MapCanvas, { type MapHandle } from "@/components/map/MapCanvas";
@@ -215,9 +215,12 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
               <p className="text-sm text-muted">No pudimos cargar los límites del mapa. Recarga la página.</p>
             ) : (
               <>
-                <AcademiaLogo className="h-14 animate-pulse" />
+                <MapMark className="h-20 animate-pulse" />
                 <p className="font-display text-lg text-ink">Mapa del Cine de Guatemala</p>
-                <ProcineLogo className="h-6 opacity-80" />
+                <div className="flex items-center gap-5 opacity-80">
+                  <AcademiaLogo className="h-9" />
+                  <ProcineLogo className="h-6" />
+                </div>
               </>
             )}
           </motion.div>
@@ -227,7 +230,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       {/* columna superior izquierda */}
       <div className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex flex-col gap-2.5 sm:left-4 sm:right-auto sm:top-4 sm:w-[440px]">
         <div className="pointer-events-auto glass flex items-center gap-2 rounded-2xl border border-line p-2 shadow-soft">
-          <BrandMark className="h-7 pl-1" />
+          <MapMark className="h-9 pl-1" />
           <div className="min-w-0 flex-1">
             <BrandName />
           </div>
@@ -260,23 +263,25 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
         <div className="pointer-events-auto flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap">
           <LayerSwitcher layer={view.layer} onChange={go.layer} />
         </div>
-        {canEdit && (
+        {(canEdit || geo) && (
           <div className="pointer-events-none relative flex flex-wrap items-start gap-2">
             {geo && <DepartmentFilter gaz={geo.gaz} place={view.place} onPlace={go.place} onClear={go.clear} />}
-            <FilterPanel
-              layer={view.layer}
-              metric={view.metric}
-              filmFilter={view.filmFilter}
-              orgFilter={view.orgFilter}
-              count={layerCount}
-              total={layerTotal}
-              extraCategories={extraCategories}
-              extraGenres={extraGenres}
-              onFilm={(filmFilter) => commit({ ...view, filmFilter, film: null, org: null, noloc: false, abroad: false })}
-              onOrg={(orgFilter) => commit({ ...view, orgFilter, film: null, org: null, noloc: false, abroad: false })}
-              onMetric={(metric) => commit({ ...view, metric })}
-              downloadHref={downloadHref(view)}
-            />
+            {canEdit && (
+              <FilterPanel
+                layer={view.layer}
+                metric={view.metric}
+                filmFilter={view.filmFilter}
+                orgFilter={view.orgFilter}
+                count={layerCount}
+                total={layerTotal}
+                extraCategories={extraCategories}
+                extraGenres={extraGenres}
+                onFilm={(filmFilter) => commit({ ...view, filmFilter, film: null, org: null, noloc: false, abroad: false })}
+                onOrg={(orgFilter) => commit({ ...view, orgFilter, film: null, org: null, noloc: false, abroad: false })}
+                onMetric={(metric) => commit({ ...view, metric })}
+                downloadHref={downloadHref(view)}
+              />
+            )}
           </div>
         )}
         {geo && (

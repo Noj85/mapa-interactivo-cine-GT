@@ -39,10 +39,29 @@ const biennale = localFont({
   fallback: ["system-ui", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
 });
 
+const SITE_NAME = "Mapa del Cine de Guatemala";
+const DESCRIPTION = "Dónde se rueda, se exhibe y se produce el cine en Guatemala: departamentos, municipios y locaciones. Un proyecto de PROCINE y la Academia Guatemalteca de Artes y Ciencias Cinematográficas.";
+
+/**
+ * Dirección pública del sitio, para que las imágenes al compartir un enlace (WhatsApp, redes, correo) lleven dirección absoluta.
+ * En producción se define con NEXT_PUBLIC_SITE_URL (por ejemplo https://mapa.academiadecinegt.org); en Vercel, si falta, se usa el dominio del proyecto.
+ */
+function siteUrl() {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (explicit) return explicit.startsWith("http") ? explicit : `https://${explicit}`;
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+  return vercel ? `https://${vercel}` : "http://localhost:3000";
+}
+
 export const metadata: Metadata = {
-  title: { default: "Mapa del Cine de Guatemala · Academia de Cine", template: "%s" },
-  description:
-    "Dónde se rueda, se exhibe y se produce el cine en Guatemala: departamentos, municipios y locaciones.",
+  metadataBase: new URL(siteUrl()),
+  title: { default: SITE_NAME, template: "%s" },
+  description: DESCRIPTION,
+  applicationName: SITE_NAME,
+  // la imagen (opengraph-image) y los iconos salen de los archivos de esta carpeta
+  openGraph: { type: "website", siteName: SITE_NAME, locale: "es_GT", title: SITE_NAME, description: DESCRIPTION },
+  twitter: { card: "summary_large_image", title: SITE_NAME, description: DESCRIPTION },
+  appleWebApp: { title: "Mapa del Cine GT", capable: true },
 };
 
 export const viewport: Viewport = {

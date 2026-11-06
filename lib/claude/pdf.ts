@@ -104,7 +104,7 @@ const TOOL = {
   },
 };
 
-const SYSTEM = `Eres el asistente de carga del "Mapa del Cine de Guatemala", de la Academia de Cine de Guatemala.
+const SYSTEM = `Eres el asistente de carga del "Mapa del Cine de Guatemala", de la Academia Guatemalteca de Artes y Ciencias Cinematográficas.
 Recibes páginas de un PDF o el contenido de un documento de Word (catálogo, directorio, informe, listado, fichas) y extraes SOLO los registros que aparecen: producciones (películas, cortometrajes, series) y entidades del ecosistema audiovisual.
 
 Reglas:

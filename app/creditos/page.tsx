@@ -67,11 +67,11 @@ export default function CreditosPage() {
               </div>
               <div>
                 <dt className="font-medium text-ink">Datos, marcas e institución</dt>
-                <dd className="text-muted">Academia de Cine de Guatemala y PROCINE.</dd>
+                <dd className="text-muted">La Academia Guatemalteca de Artes y Ciencias Cinematográficas y PROCINE.</dd>
               </div>
             </dl>
             <p className="mt-4 text-xs leading-relaxed text-muted">
-              El software es © {new Date().getFullYear()} Javier Oswaldo Borrayo Mazariegos, todos los derechos reservados. Los datos y contenidos del mapa pertenecen a la Academia de Cine de Guatemala y a PROCINE, o a quienes los aportaron. Los logotipos son marcas de sus titulares.
+              El software es © {new Date().getFullYear()} Javier Oswaldo Borrayo Mazariegos, todos los derechos reservados. Los datos y contenidos del mapa pertenecen a la Academia Guatemalteca de Artes y Ciencias Cinematográficas y a PROCINE, o a quienes los aportaron. Los logotipos son marcas de sus titulares.
             </p>
           </section>
 

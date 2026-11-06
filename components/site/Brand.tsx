@@ -16,9 +16,13 @@ function ThemedLogo({ name, alt, className, width, height }: { name: string; alt
   );
 }
 
-/** Sello de la Academia (la cinta de película), sin texto. */
-export function BrandMark({ className }: { className?: string }) {
-  return <ThemedLogo name="academia-mark" alt="Academia Guatemalteca de Artes y Ciencias Cinematográficas" width={303} height={164} className={cn("h-9 shrink-0", className)} />;
+/**
+ * Logo del mapa: un marcador de mapa con la estrella de PROCINE, entre el «play» cian y el abanico de luz amarillo.
+ * Lleva sus propios colores, así que sirve igual en modo claro y oscuro (ver scripts/brand-map.mjs).
+ */
+export function MapMark({ className }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/brand/mapa-mark.svg" alt="" aria-hidden width={160} height={120} className={cn("block h-9 w-auto shrink-0", className)} />;
 }
 
 /** Logo completo de la Academia (sello + nombre). */
@@ -34,7 +38,7 @@ export function BrandName({ compact }: { compact?: boolean }) {
   return (
     <span className="min-w-0 leading-tight">
       <span className="line-clamp-2 block font-display text-[15px] font-semibold leading-[1.15] tracking-tight text-ink">Mapa del Cine de Guatemala</span>
-      {!compact && <span className="mt-0.5 block text-[10.5px] uppercase leading-tight tracking-[0.04em] text-muted">Academia de Cine de Guatemala</span>}
+      {!compact && <span className="mt-0.5 line-clamp-2 block text-[9.5px] uppercase leading-[1.2] tracking-[0.04em] text-muted">Academia Guatemalteca de Artes y Ciencias Cinematográficas</span>}
     </span>
   );
 }
@@ -49,7 +53,7 @@ export function BrandFooter({ className, bare }: { className?: string; bare?: bo
         <ProcineLogo className="h-9" />
         {!bare && (
           <p className="max-w-sm text-xs leading-relaxed text-muted sm:ml-auto">
-            Mapa del Cine de Guatemala. Datos abiertos del cine nacional, mantenidos por el equipo de la Academia.
+            Mapa del Cine de Guatemala. Datos abiertos del cine nacional, mantenidos por la Academia Guatemalteca de Artes y Ciencias Cinematográficas.
           </p>
         )}
         <Link href="/creditos" className={cn("w-full text-xs text-muted underline decoration-line underline-offset-2 hover:text-ink hover:decoration-accent", !bare && "sm:w-auto")}>

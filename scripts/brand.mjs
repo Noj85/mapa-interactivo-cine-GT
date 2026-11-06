@@ -66,10 +66,3 @@ for (const f of ["academia-light", "academia-dark", "academia-mark-light", "acad
   const m = await sharp(path.join(OUT, `${f}.png`)).metadata();
   console.log(f, m.width, "x", m.height);
 }
-
-// Favicon: sello blanco sobre el azul institucional.
-const mark = await sharp(path.join(OUT, "academia-mark-dark.png")).resize({ width: 200 }).toBuffer();
-await sharp({ create: { width: 256, height: 256, channels: 4, background: { r: 18, g: 39, b: 77, alpha: 1 } } })
-  .composite([{ input: mark, gravity: "center" }])
-  .png()
-  .toFile(path.join(ROOT, "app", "icon.png"));

@@ -56,9 +56,10 @@ export interface RequestMessageInput {
 const MAX_LISTED = 6;
 
 /**
- * Mensaje listo para pegar en WhatsApp o en un correo. Texto plano, de tú y corto. Deja claro quién
- * escribe (PROCINE, proyecto de fortalecimiento del sector cinematográfico que ejecuta la Academia) y no incluye la dirección del mapa: solo el
- * enlace privado, solo en su línea (para que WhatsApp lo reconozca), y la clave aparte. No menciona la
+ * Mensaje listo para pegar en WhatsApp o en un correo. Texto plano, de tú y corto, en este orden: quién escribe
+ * (PROCINE, proyecto de fortalecimiento del sector cinematográfico), la pregunta, lo más importante (en mayúsculas,
+ * solo para producciones) con el tiempo, la lista de títulos si son varios, el enlace privado solo en su línea
+ * (para que WhatsApp lo reconozca), la clave aparte y el cierre. No incluye la dirección del mapa ni menciona la
  * vigencia: si el enlace venció, la página lo explica.
  */
 export function buildRequestMessage(i: RequestMessageInput): { subject: string; body: string } {
@@ -69,32 +70,35 @@ export function buildRequestMessage(i: RequestMessageInput): { subject: string; 
 
   let ask: string;
   let subject: string;
+  let list: string | null = null;
   if (films) {
     const shown = films.slice(0, MAX_LISTED).map((f) => `• ${label(f.title, f.year)}`);
     if (films.length > MAX_LISTED) shown.push(`• y ${films.length - MAX_LISTED} más`);
-    ask = `¿Nos ayudas a completar la información de tus ${films.length} producciones?\n${shown.join("\n")}`;
+    list = shown.join("\n");
+    ask = `¿Nos ayudas a completar la información de tus ${films.length} producciones?`;
     subject = "Información de tus producciones · PROCINE";
   } else {
     ask = `¿Nos ayudas a completar la información de ${isFilm ? "" : "la entidad "}${label(i.title, i.year)}?`;
     subject = `Información de ${label(i.title, i.year)} · PROCINE`;
   }
 
-  // La prioridad de esta fase de investigación aplica solo a producciones (las entidades no tienen locaciones ni empleos).
-  const priority = isFilm
+  // Lo más importante de esta fase aplica solo a producciones (las entidades no tienen locaciones ni empleos).
+  const note = isFilm
     ? films
-      ? "Puedes completar todo lo que quieras; lo más importante en esta fase de investigación son las locaciones donde se rodaron y, si puedes, los empleos que generaron."
-      : "Puedes completar todo lo que quieras; lo más importante en esta fase de investigación son las locaciones donde se rodó y, si puedes, los empleos que generó."
+      ? "Lo más importante: LAS LOCACIONES donde se rodaron y, si puedes, CUÁNTOS EMPLEOS generaron. Toma unos 2 minutos por producción."
+      : "Lo más importante: LAS LOCACIONES donde se rodó y, si puedes, CUÁNTOS EMPLEOS generó. Toma unos 2 minutos."
     : null;
-  const time = films ? "Te tomará unos dos minutos por producción." : "Te tomará unos dos minutos.";
-  const note = [priority, time].filter(Boolean).join(" ");
 
   const body = [
     greeting,
     "",
-    `Desde PROCINE, proyecto de fortalecimiento del sector cinematográfico que ejecuta la Academia de Cine de Guatemala, estamos documentando el cine nacional. ${ask}`,
+    "Desde PROCINE, proyecto de fortalecimiento del sector cinematográfico, estamos documentando el cine nacional.",
     "",
-    note,
+    note ? ask : `${ask} Toma unos 2 minutos.`,
+    ...(note ? ["", note] : []),
+    ...(list ? ["", list] : []),
     "",
+    "Entra aquí:",
     i.link,
     "",
     `Clave: ${i.password}`,

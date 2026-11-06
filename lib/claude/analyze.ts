@@ -116,7 +116,7 @@ function sample(file: ParsedFile, distinct?: DistinctMap) {
   });
 }
 
-const SYSTEM = `Eres el asistente de carga del "Mapa del Cine de Guatemala", de la Academia de Cine de Guatemala.
+const SYSTEM = `Eres el asistente de carga del "Mapa del Cine de Guatemala", de la Academia Guatemalteca de Artes y Ciencias Cinematográficas.
 Recibes la estructura de un archivo CSV/XLSX con formato libre y debes decidir cómo mapearlo a la base de datos. Tu trabajo es SOLO el mapeo: el código procesará las filas después.
 
 Reglas:

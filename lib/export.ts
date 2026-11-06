@@ -168,7 +168,7 @@ export async function toXlsx(t: Table, notes: string[]): Promise<Buffer> {
   ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(t.rows.length, 1), c: t.header.length - 1 } }) };
 
   const info = [
-    ["Mapa del Cine de Guatemala · Academia de Cine de Guatemala"],
+    ["Mapa del Cine de Guatemala · Academia Guatemalteca de Artes y Ciencias Cinematográficas"],
     [t.title],
     [`Descargado el ${new Date().toLocaleDateString("es-GT", { day: "numeric", month: "long", year: "numeric" })}`],
     [`Filas: ${t.rows.length}`],

@@ -36,7 +36,7 @@ export function CompleteGate({ token }: { token: string }) {
     const title = film?.title ?? opened.org?.name ?? "";
     return (
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">PROCINE · Academia de Cine de Guatemala</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">PROCINE · Academia Guatemalteca de Artes y Ciencias Cinematográficas</p>
         <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight sm:text-[44px]">Completar información</h1>
         {many && !film ? (
           <>
@@ -108,7 +108,7 @@ export function CompleteGate({ token }: { token: string }) {
         </span>
         <h1 className="mt-4 font-display text-3xl tracking-tight">Enlace privado</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-muted">
-          PROCINE, proyecto que ejecuta la Academia de Cine de Guatemala, te compartió este enlace para completar información para el Mapa del Cine de Guatemala. Escribe la clave de 5 caracteres que viene en el mensaje.
+          PROCINE, proyecto que ejecuta la Academia Guatemalteca de Artes y Ciencias Cinematográficas, te compartió este enlace para completar información para el Mapa del Cine de Guatemala. Escribe la clave de 5 caracteres que viene en el mensaje.
         </p>
         <form onSubmit={open} className="mt-5 space-y-3">
           <div>
