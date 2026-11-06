@@ -5,15 +5,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Check, FileSpreadsheet, Loader2, Sparkles, Upload } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
-import { planFilmUpdate, planOrgUpdate } from "@/lib/import/diff";
 import { distinctValues } from "@/lib/import/distinct";
+import { decisionFor, resolveItemOf } from "@/lib/import/existing";
 import { parseFile } from "@/lib/import/parse";
 import { buildQuestions, type Question } from "@/lib/import/questions";
 import { buildCandidates, collectPlaceTexts } from "@/lib/import/transform";
 import type { Candidate, ImportPlan, ParsedFile, PlaceResolution, ResolveResponse } from "@/lib/import/types";
 import type { DocxResponse } from "@/app/api/import/docx/route";
 import type { PdfResponse } from "@/app/api/import/pdf/route";
-import type { Film, Org } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { StepQuestions } from "./StepQuestions";
 import { StepReview } from "./StepReview";
@@ -27,6 +26,16 @@ const STEPS: { id: Step; label: string }[] = [
   { id: "questions", label: "Preguntas" },
 ];
 
+/** Muestra para Claude: filas del inicio, del medio y del final, porque lo que cambia a lo largo del archivo no se ve en las primeras. */
+function sampleRows<T>(rows: T[], max = 60): T[] {
+  if (rows.length <= max) return rows;
+  const head = Math.floor(max / 2);
+  const mid = Math.floor(max / 4);
+  const tail = max - head - mid;
+  const from = Math.floor(rows.length / 2 - mid / 2);
+  return [...rows.slice(0, head), ...rows.slice(from, from + mid), ...rows.slice(-tail)];
+}
+
 /** Pide el plan a Claude con las instrucciones del equipo y los valores distintos de todas las filas. */
 async function analyze(parsed: ParsedFile, instr: string): Promise<ImportPlan> {
   const res = await fetch("/api/import/analyze", {
@@ -38,8 +47,10 @@ async function analyze(parsed: ParsedFile, instr: string): Promise<ImportPlan> {
       sheets: parsed.sheets.map((s) => ({
         name: s.name,
         headers: s.headers,
-        rows: s.rows.slice(0, 40),
+        rows: sampleRows(s.rows),
         totalRows: s.totalRows,
+        layout: s.layout,
+        subHeaders: s.subHeaders,
         distinct: distinctValues(s),
       })),
     }),
@@ -154,10 +165,12 @@ export function ImportWizard() {
         body: JSON.stringify({
           places: collectPlaceTexts(file, plan),
           items: pre.map((c) => ({
+            ...resolveItemOf(c),
             key: c.key,
             type: c.type,
             title: c.film?.title ?? c.org?.name ?? "",
             year: c.film?.year ?? null,
+            placeTexts: c.type === "org" ? c.placeTexts.slice(0, 10) : undefined,
           })),
         }),
       });
@@ -168,10 +181,7 @@ export function ImportWizard() {
       const cands = buildCandidates(file, plan, r.places, { gaz: g.gaz, muni: g.muni }).map((c) => {
         const dup = r.duplicates[c.key];
         if (!dup) return c;
-        // si el archivo no trae nada nuevo para el registro que ya existe, se omite de entrada
-        const rec = dup.record;
-        const news = !rec ? 1 : c.type === "film" && c.film ? planFilmUpdate(rec as Film, c.film).news : c.org ? planOrgUpdate(rec as Org, c.org).news : 1;
-        return { ...c, duplicate: dup, decision: news > 0 ? ("update" as const) : ("skip" as const) };
+        return { ...c, duplicate: dup, decision: decisionFor(c, dup) };
       });
       setCandidates(cands);
       setStep("review");
@@ -316,6 +326,7 @@ export function ImportWizard() {
               candidates={candidates}
               onCandidates={setCandidates}
               engine={engine}
+              filename={file?.filename ?? "carga"}
               onBack={() => setStep("understand")}
               onNext={toQuestions}
             />

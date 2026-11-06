@@ -15,6 +15,8 @@ const body = z.object({
         headers: z.array(z.string().max(300)).max(200),
         rows: z.array(z.record(z.string(), z.string())).max(60),
         totalRows: z.number(),
+        layout: z.enum(["dos filas", "ficha"]).optional(),
+        subHeaders: z.record(z.string().max(300), z.string().max(300)).optional(),
         // valores distintos de las columnas tipo lista, calculados en el navegador sobre todas las filas
         distinct: z
           .record(z.string().max(300), z.array(z.object({ v: z.string().max(200), n: z.number() })).max(40))

@@ -6,7 +6,7 @@ import { normalizeCategories, orgCategories } from "@/lib/categories";
 import { buildFilm, buildOrg, newId, uniqueSlug } from "@/lib/data/records";
 import { cleanGenres, cleanMinutes, isFormat, isNature, legacyKind, upgradeFilmPayload } from "@/lib/film-types";
 import { festivalSearchKey } from "@/lib/festivals";
-import { normalize } from "@/lib/utils";
+import { normalize, upperTitle } from "@/lib/utils";
 import { hashPassword, hashToken, normPassword, verifyPassword } from "@/lib/info-requests";
 import { MAX_FAILED_ATTEMPTS } from "@/lib/request-state";
 import type {
@@ -23,6 +23,7 @@ import type {
   OrgInput,
   QuestionStatus,
   RecordStatus,
+  ImportSubmissionInput,
   Submission,
   SubmissionInput,
   SubmissionKind,
@@ -91,6 +92,8 @@ export interface Store {
   answerQuestion(id: string, answer: string | null, status: QuestionStatus): Promise<void>;
   /** Aportes del público. `createSubmission` es lo único que puede llamar quien no es del equipo. */
   createSubmission(input: SubmissionInput): Promise<void>;
+  /** Aporte «Carga de archivo»: lo crea una carga del equipo para lo que no pudo decidir sola. */
+  createImportSubmission(input: ImportSubmissionInput): Promise<string>;
   listSubmissions(opts?: { status?: SubmissionStatus }): Promise<Submission[]>;
   getSubmission(id: string): Promise<Submission | null>;
   reviewSubmission(
@@ -169,6 +172,7 @@ function readFilm(f: any): Film {
   const legacy = f.format === undefined && f.nature === undefined ? legacyKind(kind) : { format: null, nature: null };
   return {
     ...rest,
+    title: upperTitle(f.title),
     format: isFormat(f.format) ? f.format : legacy.format,
     nature: isNature(f.nature) ? f.nature : legacy.nature,
     genres: cleanGenres(f.genres),
@@ -318,6 +322,23 @@ export class LocalStore implements Store {
       reviewed_at: null,
     });
     await writeDb(db);
+  }
+  async createImportSubmission(input: ImportSubmissionInput) {
+    const db = await readDb();
+    const id = newId();
+    db.submissions.unshift({
+      ...input,
+      id,
+      origin: "carga",
+      request_id: null,
+      status: "pending",
+      reviewer_note: null,
+      result_id: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+    });
+    await writeDb(db);
+    return id;
   }
   async listSubmissions(opts?: { status?: SubmissionStatus }) {
     const { submissions } = await readDb();
@@ -630,13 +651,15 @@ const rowToSubmission = (r: any): Submission => ({
   origin: r.origin ?? "publico",
   request_id: r.request_id ?? null,
   submitter: r.submitter ?? null,
+  import_id: r.import_id ?? null,
+  candidates: r.candidates ?? null,
   payload: r.kind === "film" ? upgradeFilmPayload(r.payload) : r.payload,
 });
 
 const rowToFilm = (r: any): Film => ({
   id: r.id,
   slug: r.slug,
-  title: r.title,
+  title: upperTitle(r.title),
   year: r.year,
   format: isFormat(r.format) ? r.format : legacyKind(r.kind).format,
   nature: isNature(r.nature) ? r.nature : legacyKind(r.kind).nature,
@@ -892,6 +915,26 @@ export class SupabaseStore implements Store {
         status: "pending",
       }),
     );
+  }
+  async createImportSubmission(input: ImportSubmissionInput) {
+    const id = newId();
+    must(
+      await this.db.from("submissions").insert({
+        id,
+        kind: input.kind,
+        target_id: input.target_id,
+        label: input.label,
+        payload: input.payload,
+        note: input.note,
+        contact: null,
+        origin: "carga",
+        submitter: input.submitter.slice(0, 200),
+        import_id: input.import_id,
+        candidates: input.candidates,
+        status: "pending",
+      }),
+    );
+    return id;
   }
   async listSubmissions(opts?: { status?: SubmissionStatus }) {
     let q = this.db.from("submissions").select("*").order("created_at", { ascending: false });

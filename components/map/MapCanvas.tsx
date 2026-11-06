@@ -91,7 +91,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
   const fitCountry = useCallback((animate = true) => {
     const map = mapRef.current;
     if (!map) return;
-    // si hay producciones sin lugar, la vista incluye también la zona «Sin ubicación»
+    // si hay producciones sin lugar, la vista incluye también la zona «Sin locación»
     const { data, view } = propsRef.current;
     const prod = view.layer === "produccion";
     const b = withZones(COUNTRY_BBOX as [number, number, number, number], { nowhere: prod && unlocatedFilms(data.films).length > 0, abroad: prod && abroadFilms(data.films).length > 0 });
@@ -571,7 +571,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
     (map.getSource("pins") as MapLibre.GeoJSONSource).setData(buildPins(data, view.layer, geo.gaz, deptoOf(view.place)) as any);
     for (const id of PIN_LAYERS) map.setLayoutProperty(id, "visibility", filmMode ? "none" : "visible");
 
-    // zona «Sin ubicación»: solo en Producción, sin filtro de departamento y sin entidad abierta
+    // zona «Sin locación»: solo en Producción, sin filtro de departamento y sin entidad abierta
     const selFilm = view.film ? data.films.find((f) => f.slug === view.film) : undefined;
     const showZone = view.layer === "produccion" && !view.place && !view.org && (!view.film || (!!selFilm && isUnlocated(selFilm)));
     const unlocatedCount = showZone ? (view.film ? 1 : unlocatedFilms(data.films).length) : 0;
@@ -605,10 +605,10 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
           }))
           .slice(0, 1);
         if (!route.coords.length && !abroadPts.length) {
-          // sin lugar de rodaje: la producción queda dentro de la zona «Sin ubicación»
+          // sin lugar de rodaje: la producción queda dentro de la zona «Sin locación»
           filmSrc.setData({
             type: "FeatureCollection",
-            features: [{ type: "Feature", properties: { n: "", site: "Sin ubicación", approx: true }, geometry: { type: "Point", coordinates: [NOWHERE.lng, NOWHERE.lat - 0.46] } }],
+            features: [{ type: "Feature", properties: { n: "", site: "Sin locación", approx: true }, geometry: { type: "Point", coordinates: [NOWHERE.lng, NOWHERE.lat - 0.46] } }],
           } as any);
           lineSrc.setData(empty);
         } else {
@@ -715,7 +715,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
         zoom: initial?.zoom ?? 6.3,
         minZoom: 5,
         maxZoom: 17.5,
-        // margen amplio: incluye la zona «Sin ubicación» (Pacífico) y deja alejar el mapa en pantallas altas
+        // margen amplio: incluye la zona «Sin locación» (Pacífico) y deja alejar el mapa en pantallas altas
         maxBounds: [
           [-101, 8],
           [-80, 23],
@@ -827,7 +827,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
           } else if (hit.kind === "nowhere") {
             const isAbroadZone = (hit.f.properties as any)?.zone === "abroad";
             const n = (isAbroadZone ? abroadFilms(data.films) : unlocatedFilms(data.films)).length;
-            title = isAbroadZone ? "Fuera de Guatemala" : "Sin ubicación";
+            title = isAbroadZone ? "Fuera de Guatemala" : "Sin locación";
             sub = `${n === 1 ? "1 producción" : `${n.toLocaleString("es-GT")} producciones`} ${isAbroadZone ? "con locaciones en otros países" : "sin lugar de rodaje registrado"}`;
             note = "Clic para ver la lista";
             setHover(null);

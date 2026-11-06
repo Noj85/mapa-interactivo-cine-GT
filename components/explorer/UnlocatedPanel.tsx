@@ -10,7 +10,7 @@ import { Empty, FilmCard, PanelShell, type PanelCtx, SectionTitle } from "./part
 
 const STEP = 40;
 
-/** Producciones que todavía no tienen lugar de rodaje: viven en la zona «Sin ubicación», fuera del territorio. */
+/** Producciones que todavía no tienen lugar de rodaje: viven en la zona «Sin locación», fuera del territorio. */
 export default function UnlocatedPanel({ ctx }: { ctx: PanelCtx }) {
   const { data, gaz, go, canEdit } = ctx;
   const films = useMemo(() => unlocatedFilms(data.films).sort((a, b) => a.title.localeCompare(b.title, "es")), [data.films]);
@@ -28,7 +28,7 @@ export default function UnlocatedPanel({ ctx }: { ctx: PanelCtx }) {
         <span className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-muted">
           <MapPinOff className="h-5 w-5" />
         </span>
-        <h2 className="font-display text-[30px] leading-[1.05] tracking-tight text-ink">Sin ubicación</h2>
+        <h2 className="font-display text-[30px] leading-[1.05] tracking-tight text-ink">Sin locación</h2>
       </div>
       <p className="mt-3 text-sm leading-relaxed text-muted">
         {films.length === 1 ? "Esta producción aún no tiene" : `Estas ${films.length.toLocaleString("es-GT")} producciones aún no tienen`} un lugar de rodaje registrado. Se
@@ -42,7 +42,7 @@ export default function UnlocatedPanel({ ctx }: { ctx: PanelCtx }) {
 
       {films.length > 8 && (
         <label className="relative mt-5 block">
-          <span className="sr-only">Buscar entre las producciones sin ubicación</span>
+          <span className="sr-only">Buscar entre las producciones sin locación</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             className="field !pl-9"

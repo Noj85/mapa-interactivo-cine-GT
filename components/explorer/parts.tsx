@@ -31,7 +31,35 @@ export interface PanelCtx {
     layer(l: LayerId): void;
     up(): void;
     clear(): void;
+    /** Filtro público de producciones: con o sin locación registrada (null: todas). */
+    locacion(v: "con" | "sin" | null): void;
   };
+}
+
+const LOCACION_OPTIONS: { id: "con" | "sin" | null; label: string }[] = [
+  { id: null, label: "Todas" },
+  { id: "con", label: "Con locación" },
+  { id: "sin", label: "Sin locación" },
+];
+
+/** Selector de tres estados para ver solo las producciones con o sin locación registrada (afecta la lista y el mapa). */
+export function LocacionFilter({ value, onChange }: { value: "con" | "sin" | null; onChange(v: "con" | "sin" | null): void }) {
+  return (
+    <div role="radiogroup" aria-label="Filtrar producciones por locación" className="mb-2 grid grid-cols-3 gap-1 rounded-lg border border-line bg-surface-2 p-0.5 text-xs">
+      {LOCACION_OPTIONS.map((o) => (
+        <button
+          key={String(o.id)}
+          type="button"
+          role="radio"
+          aria-checked={value === o.id}
+          onClick={() => onChange(o.id)}
+          className={cn("rounded px-2 py-1.5 transition-colors", value === o.id ? "bg-surface font-medium text-ink shadow-sm" : "text-muted hover:text-ink")}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function PanelShell({

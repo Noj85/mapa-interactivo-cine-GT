@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ImportSubmissionReview, type CargaOption } from "@/components/admin/ImportSubmissionReview";
 import { SubmissionReview } from "@/components/admin/SubmissionReview";
 import { adminStore } from "@/lib/auth";
 import { serverGazetteer } from "@/lib/geo/server";
 import { posterThumb } from "@/lib/poster-url";
+import { planFilmUpdate, planOrgUpdate } from "@/lib/import/diff";
+import { filmSchema, orgSchema } from "@/lib/schemas";
 import { diffSubmission } from "@/lib/submissions";
-import type { Film, Org, SubmissionKind } from "@/lib/types";
+import type { Film, FilmInput, Org, OrgInput, SubmissionKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 function ImageBox({ url, kind, alt }: { url: string; kind: SubmissionKind; alt: string }) {
@@ -27,6 +30,22 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
     sub.target_id ? (sub.kind === "film" ? store.getFilm(sub.target_id) : store.getOrg(sub.target_id)) : Promise.resolve(null),
   ]);
   const rows = diffSubmission(sub, current, gaz);
+
+  // Carga de archivo: qué traería el archivo para cada registro posible, comparado con lo que tiene HOY
+  const isCarga = sub.origin === "carga";
+  const cargaOptions: CargaOption[] = [];
+  if (isCarga) {
+    const names = { muni: (c: number | null | undefined) => gaz.muni(c ?? null)?.name ?? "", depto: (c: number | null | undefined) => gaz.depto(c ?? null)?.name ?? "" };
+    const parsed = sub.kind === "film" ? filmSchema.safeParse(sub.payload) : orgSchema.safeParse(sub.payload);
+    const incoming = parsed.success ? parsed.data : sub.payload;
+    const refs = sub.target_id ? [{ id: sub.target_id, level: undefined, score: undefined }] : (sub.candidates ?? []).map((c) => ({ id: c.id, level: c.level, score: c.score }));
+    for (const r of refs) {
+      const rec = sub.kind === "film" ? await store.getFilm(r.id) : await store.getOrg(r.id);
+      if (!rec) continue;
+      const items = sub.kind === "film" ? planFilmUpdate(rec as Film, incoming as unknown as FilmInput, names).items : planOrgUpdate(rec as Org, incoming as unknown as OrgInput, names).items;
+      cargaOptions.push({ id: rec.id, title: sub.kind === "film" ? (rec as Film).title : (rec as Org).name, year: sub.kind === "film" ? (rec as Film).year : null, level: r.level, score: r.score, status: rec.status ?? "published", items });
+    }
+  }
   const isCorrection = !!sub.target_id;
   const visible = isCorrection ? rows : rows.filter((r) => r.after);
   const changes = rows.filter((r) => r.changed).length;
@@ -41,7 +60,7 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
     <div className="max-w-3xl">
       <Link href="/admin/aportes" className="text-sm text-muted hover:text-ink">← Aportes</Link>
       <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-accent">
-        {sub.origin === "recopilacion" && "Recopilación · "}{isCorrection ? "Corrección" : "Registro nuevo"} · {sub.kind === "film" ? "Producción" : "Entidad"}
+        {sub.origin === "recopilacion" && "Recopilación · "}{isCarga && "Carga de archivo · "}{isCarga ? (isCorrection ? "Diferencias con el registro" : "Coincidencia dudosa") : isCorrection ? "Corrección" : "Registro nuevo"} · {sub.kind === "film" ? "Producción" : "Entidad"}
       </p>
       <h1 className="mt-1 font-display text-4xl tracking-tight">{sub.label}</h1>
       <p className="mt-1 text-sm text-muted">
@@ -55,6 +74,13 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
           {current && (
             <> Registro: <Link className="text-accent hover:underline" href={sub.kind === "film" ? `/admin/peliculas/${current.id}` : `/admin/entidades/${current.id}`}>ver y solicitar de nuevo</Link>.</>
           )}
+        </div>
+      )}
+
+      {isCarga && (
+        <div className="mt-4 rounded-2xl border border-accent/30 bg-accent/5 px-4 py-3 text-sm leading-relaxed">
+          <b>Aporte de carga de archivo.</b> Viene de «{sub.submitter ?? "un archivo"}». La carga no cambió nada de esto por su cuenta:{" "}
+          {isCorrection ? "el registro ya existía y el archivo traía datos distintos a los guardados." : "no pudo saber si el registro ya existía."}
         </div>
       )}
 
@@ -96,7 +122,7 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
               <figcaption className="mt-1.5 text-xs text-muted">{imageChanges ? "Propuesto" : "Enviado con el aporte"}</figcaption>
             </figure>
           </div>
-          {sub.status === "pending" && <p className="mt-2 text-xs text-muted">Si rechazas el aporte, esta imagen se borra. Si lo apruebas, queda en el registro.</p>}
+          {sub.status === "pending" && !isCarga && <p className="mt-2 text-xs text-muted">Si rechazas el aporte, esta imagen se borra. Si lo apruebas, queda en el registro.</p>}
         </section>
       )}
 
@@ -121,7 +147,12 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
         ))}
       </dl>
 
-      {sub.status === "pending" && (
+      {sub.status === "pending" && isCarga && (
+        <div className="mt-6">
+          <ImportSubmissionReview id={sub.id} kind={sub.kind} doubt={!isCorrection} options={cargaOptions} />
+        </div>
+      )}
+      {sub.status === "pending" && !isCarga && (
         <div className="mt-6">
           <SubmissionReview id={sub.id} isCorrection={isCorrection && !!current} hidden={!!current && current.status === "draft"} />
         </div>

@@ -4,6 +4,7 @@ import { MAX_CATEGORIES, normalizeCategories } from "@/lib/categories";
 import { isOwnImageUrl } from "@/lib/poster-url";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
 import { cleanGenres, FORMATS, NATURES } from "@/lib/film-types";
+import { upperTitle } from "@/lib/utils";
 
 const FORMAT_VALUES = FORMATS.map((f) => f.id) as [string, ...string[]];
 const NATURE_VALUES = NATURES.map((n) => n.id) as [string, ...string[]];
@@ -94,7 +95,7 @@ export const companyEntrySchema = z.object({
 
 export const filmSchema = z.object({
   id: z.string().optional(),
-  title: z.string().trim().min(1, "El título es obligatorio").max(300),
+  title: z.string().trim().min(1, "El título es obligatorio").max(300).transform(upperTitle),
   year: optNum,
   format: z.enum(FORMAT_VALUES).nullish(),
   nature: z.enum(NATURE_VALUES).nullish(),
@@ -226,7 +227,7 @@ const pubCompany = z.object({
 
 /** Producción propuesta por el público: sin estado ni fuente (los fija el equipo); el póster solo si lo subió por nuestro endpoint. */
 export const publicFilmSchema = z.object({
-  title: z.string().trim().min(1, "El título es obligatorio").max(300).transform(clean),
+  title: z.string().trim().min(1, "El título es obligatorio").max(300).transform((v) => upperTitle(clean(v))),
   year: optNum,
   format: z.enum(FORMAT_VALUES).nullish(),
   nature: z.enum(NATURE_VALUES).nullish(),

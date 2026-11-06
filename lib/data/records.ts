@@ -2,7 +2,7 @@ import { filmCompleteness, isAbroad, orgCompleteness } from "@/lib/completeness"
 import { normalizeCategories } from "@/lib/categories";
 import { cleanGenres, cleanMinutes } from "@/lib/film-types";
 import { FESTIVAL_RESULTS, type Film, type FilmCompany, type FilmFestival, type FilmInput, type FilmLocation, type Org, type OrgInput } from "@/lib/types";
-import { slugify } from "@/lib/utils";
+import { slugify, upperTitle } from "@/lib/utils";
 
 const num = (v: unknown): number | null => {
   if (v === null || v === undefined || v === "") return null;
@@ -77,7 +77,7 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string; e
     };
   });
   const base = {
-    title: input.title.trim(),
+    title: upperTitle(input.title),
     year: num(input.year),
     format: input.format !== undefined ? input.format : opts.existing?.format ?? null,
     nature: input.nature !== undefined ? input.nature : opts.existing?.nature ?? null,
@@ -101,7 +101,7 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string; e
     slug: opts.slug,
     ...base,
     festivals,
-    // Sin el mínimo (título) nunca se publica. Sin lugar de rodaje sale en «Sin ubicación».
+    // Sin el mínimo (título) nunca se publica. Sin lugar de rodaje sale en «Sin locación».
     status: c.publishable && input.status === "published" ? "published" : "draft",
     completeness: c.completeness,
     missing_fields: c.missing,

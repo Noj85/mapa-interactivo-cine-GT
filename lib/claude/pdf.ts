@@ -71,6 +71,7 @@ const TOOL = {
                   result: { type: "string", description: "selección, nominación, premio, mención o proyección." },
                   section: { type: "string", description: "Sección o competencia." },
                   award: { type: "string", description: "Nombre del premio, si ganó uno." },
+                  url: { type: "string", description: "Enlace (URL) al festival o al premio, solo si el documento lo trae." },
                 },
               },
             },
@@ -143,7 +144,7 @@ interface RawFilm {
   currency?: string;
   synopsis?: string;
   locations?: { place?: string; site?: string; municipality?: string; department?: string; country?: string; city?: string }[];
-  festivals?: { festival?: string; year?: string; result?: string; section?: string; award?: string }[];
+  festivals?: { festival?: string; year?: string; result?: string; section?: string; award?: string; url?: string }[];
   /** Respuestas anteriores a las listas: un solo lugar. */
   place?: string;
   municipality?: string;
@@ -166,7 +167,7 @@ interface RawOrg {
 interface FilmAgg {
   base: Record<string, string>;
   locs: { place: string; site: string; municipality: string; department: string }[];
-  fests: { festival: string; year: string; result: string; section: string; award: string }[];
+  fests: { festival: string; year: string; result: string; section: string; award: string; url: string }[];
 }
 interface ChunkResult {
   films: (RawFilm & { page: number })[];
@@ -257,6 +258,7 @@ const FILM_HEADERS = [
   "Resultado en el festival",
   "Sección del festival",
   "Premio",
+  "Enlace del festival o premio",
   "Página del PDF",
 ];
 const ORG_HEADERS = ["Nombre", "Categoría", "Tipo de iniciativa", "Lugar", "Municipio", "Departamento", "Sitio web", "Instagram", "Contacto", "Descripción", "Página del PDF"];
@@ -345,7 +347,7 @@ function aggregate(results: ChunkResult[], refHeader: string | null, filename: s
       if (!locs.length && (v(f.place) || v(f.municipality) || v(f.department)))
         locs.push({ place: v(f.place), site: "", municipality: v(f.municipality), department: v(f.department) });
       const fests = (f.festivals ?? [])
-        .map((x) => ({ festival: v(x.festival), year: v(x.year), result: v(x.result), section: v(x.section), award: v(x.award) }))
+        .map((x) => ({ festival: v(x.festival), year: v(x.year), result: v(x.result), section: v(x.section), award: v(x.award), url: v(x.url) }))
         .filter((x) => x.festival);
       const prev = films.get(k);
       if (!prev) {
@@ -399,6 +401,7 @@ function aggregate(results: ChunkResult[], refHeader: string | null, filename: s
         "Resultado en el festival": x?.result ?? "",
         "Sección del festival": x?.section ?? "",
         Premio: x?.award ?? "",
+        "Enlace del festival o premio": x?.url ?? "",
       });
     }
   }

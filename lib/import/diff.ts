@@ -3,6 +3,31 @@ import { cleanGenres, formatLabel, MAX_GENRES, natureLabel } from "@/lib/film-ty
 import { orgCategories, normalizeCategories } from "@/lib/categories";
 import { NATIONALITIES, type Film, type FilmInput, type Org, type OrgInput } from "@/lib/types";
 import { normalize } from "@/lib/utils";
+import { sameName, similarity } from "./duplicates";
+
+/** Sitios de rodaje iguales: vacíos los dos, el mismo texto o casi (similitud 0.85). */
+export function sameSite(a: string | null | undefined, b: string | null | undefined) {
+  const x = normalize(a ?? "");
+  const y = normalize(b ?? "");
+  return x === y || (!!x && !!y && similarity(x, y) >= 0.85);
+}
+
+/** Nombres de festival equivalentes: mismas palabras que distinguen (sin «festival», «internacional», «de cine»…) o casi idénticos. */
+export function sameFestivalName(a: string | null | undefined, b: string | null | undefined) {
+  const ca = festivalCore(a ?? "");
+  const cb = festivalCore(b ?? "");
+  if (ca && cb && ca === cb) return true;
+  return sameName(a ?? "", b ?? "", 0.93);
+}
+
+const FEST_STOP = new Set(["festival", "festivales", "internacional", "international", "cine", "film", "films", "filmes", "cinematografico", "de", "del", "la", "el", "las", "los", "y", "the", "of", "and", "en", "para"]);
+/** Lo que distingue a un festival: sus palabras sin las genéricas, en orden alfabético. */
+export const festivalCore = (s: string) =>
+  normalize(s)
+    .split(" ")
+    .filter((t) => t.length > 1 && !FEST_STOP.has(t) && !/^\d{4}$/.test(t))
+    .sort()
+    .join(" ");
 
 /**
  * Qué cambiaría un archivo nuevo en un registro que ya existe. Lo usan el navegador (para mostrar la vista previa)
@@ -125,7 +150,7 @@ function filmItems(existing: Film, incoming: FilmInput, names?: PlaceNames): Ite
   for (const nc of incoming.companies ?? []) {
     const name = (nc.name ?? "").trim();
     if (!name) continue;
-    const match = existing.companies.find((c) => normalize(c.name) === normalize(name));
+    const match = existing.companies.find((c) => sameName(c.name ?? "", name));
     if (!match) {
       push({ id: `add:company:${normalize(name)}`, group: "add", label: "Casa productora", incoming: nc.country ? `${name} (${nc.country})` : name, apply: (d) => (d.companies = [...(d.companies ?? []), { name, country: nc.country ?? null }]) });
     } else if (!match.country && nc.country) {
@@ -134,7 +159,7 @@ function filmItems(existing: Film, incoming: FilmInput, names?: PlaceNames): Ite
         group: "fill",
         label: `País de ${match.name}`,
         incoming: nc.country,
-        apply: (d) => (d.companies = (d.companies ?? []).map((c) => (normalize(c.name ?? "") === normalize(name) ? { ...c, country: nc.country ?? null } : c))),
+        apply: (d) => (d.companies = (d.companies ?? []).map((c) => (sameName(c.name ?? "", name) ? { ...c, country: nc.country ?? null } : c))),
       });
     }
   }
@@ -143,7 +168,8 @@ function filmItems(existing: Film, incoming: FilmInput, names?: PlaceNames): Ite
   const festKey = (f: { name?: string | null; year?: number | null; award?: string | null }) => `${normalize(f.name ?? "")}|${f.year ?? ""}|${normalize(f.award ?? "")}`;
   for (const nf of incoming.festivals ?? []) {
     if (!(nf.name ?? "").trim()) continue;
-    if (existing.festivals.some((f) => festKey(f) === festKey(nf))) continue;
+    // el mismo festival, aunque se escriba distinto («Festival de Cine de Sundance» ~ «Sundance»), el mismo año y el mismo premio
+    if (existing.festivals.some((f) => festKey(f) === festKey(nf) || ((f.year ?? null) === (nf.year ?? null) && normalize(f.award ?? "") === normalize(nf.award ?? "") && sameFestivalName(f.name, nf.name ?? "")))) continue;
     push({
       id: `add:festival:${festKey(nf)}`,
       group: "add",
@@ -160,17 +186,18 @@ function filmItems(existing: Film, incoming: FilmInput, names?: PlaceNames): Ite
     const abroad = isAbroad(nl);
     if (!hasAny) continue;
     const site = normalize(nl.site ?? "");
+    const siteIs = (s: string | null | undefined) => sameSite(s, nl.site);
     const deptoOf = nl.depto_ine ?? (nl.muni_ine != null ? Math.floor(nl.muni_ine / 100) : null);
     const lDepto = (l: { depto_ine: number | null; muni_ine: number | null }) => l.depto_ine ?? (l.muni_ine != null ? Math.floor(l.muni_ine / 100) : null);
     // 1. la misma locación: se completan solo sus cifras vacías
     let match = abroad
       ? existing.locations.find((l) => isAbroad(l) && normalize(l.country ?? "") === normalize(nl.country ?? "") && normalize(l.city ?? "") === normalize(nl.city ?? ""))
-      : existing.locations.find((l) => !isAbroad(l) && (nl.muni_ine != null ? l.muni_ine === nl.muni_ine : l.muni_ine == null && lDepto(l) === deptoOf) && normalize(l.site ?? "") === site);
+      : existing.locations.find((l) => !isAbroad(l) && (nl.muni_ine != null ? l.muni_ine === nl.muni_ine : l.muni_ine == null && lDepto(l) === deptoOf) && siteIs(l.site));
     let completesPlace = false;
     // 2. una locación existente sin municipio que este archivo sí ubica
     if (!match && !abroad && nl.muni_ine != null) {
       match = existing.locations.find(
-        (l) => !isAbroad(l) && l.muni_ine == null && !claimed.has(l.id) && normalize(l.site ?? "") === site && (lDepto(l) == null || lDepto(l) === deptoOf),
+        (l) => !isAbroad(l) && l.muni_ine == null && !claimed.has(l.id) && siteIs(l.site) && (lDepto(l) == null || lDepto(l) === deptoOf),
       );
       completesPlace = !!match;
     }
@@ -339,6 +366,9 @@ function orgItems(existing: Org, incoming: OrgInput, names?: PlaceNames): Item<O
     else if (Math.abs(existing.lat - incoming.lat) > 0.001 || Math.abs(existing.lng - incoming.lng) > 0.001)
       push({ id: "conflict:coords", group: "conflict", label: "Coordenadas", current: `${existing.lat}, ${existing.lng}`, incoming: `${incoming.lat}, ${incoming.lng}`, apply });
   }
+
+  // logo: solo si no había
+  if (!existing.logo_url && incoming.logo_url) push({ id: "fill:logo", group: "fill", label: "Logo", incoming: "Imagen del archivo", apply: (d) => (d.logo_url = incoming.logo_url) });
 
   // categorías: se suman las nuevas (la principal solo se llena si estaba vacía)
   const have = new Set(orgCategories(existing).map(normalize));

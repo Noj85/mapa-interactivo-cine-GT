@@ -3,7 +3,7 @@ import type { Feature, FeatureCollection, GeometryCollection, LineString, Point,
 import type { Agg, Aggregates } from "@/lib/aggregate";
 import { buildStops, levelOf, metricValue } from "@/lib/aggregate";
 import { metricText } from "@/lib/format";
-import { hasPlace, isAbroad } from "@/lib/completeness";
+import { hasPlace, isAbroad, isUnlocated } from "@/lib/completeness";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import type { Dataset, Film, LayerId, MetricId } from "@/lib/types";
 
@@ -188,11 +188,11 @@ export function buildMask(pais: GeometryCollection): FeatureCollection<Polygon> 
  */
 export const NOWHERE = { lng: -93.6, lat: 12.7, radius: 0.72 };
 
-/** Las producciones con locaciones en otro país tienen su propia zona, debajo de «Sin ubicación». */
+/** Las producciones con locaciones en otro país tienen su propia zona, debajo de «Sin locación». */
 export const ABROAD = { lng: -93.6, lat: 10.75, radius: 0.72 };
 
 /** Sin ninguna locación que diga dónde se rodó (ni en Guatemala ni afuera). */
-export const isUnlocated = (f: Pick<Film, "locations">) => !f.locations.some(hasPlace);
+export { isUnlocated };
 export const unlocatedFilms = <F extends Pick<Film, "locations">>(films: F[]) => films.filter(isUnlocated);
 
 /** Con al menos una locación fuera de Guatemala (puede tener otras dentro: aparece en ambos lados). */
@@ -243,5 +243,5 @@ function buildZone(z: Zone, id: "nowhere" | "abroad", title: string, count: numb
   };
 }
 
-export const buildNowhere = (count: number, selected: boolean) => buildZone(NOWHERE, "nowhere", "Sin ubicación", count, selected);
+export const buildNowhere = (count: number, selected: boolean) => buildZone(NOWHERE, "nowhere", "Sin locación", count, selected);
 export const buildAbroad = (count: number, selected: boolean) => buildZone(ABROAD, "abroad", "Fuera de Guatemala", count, selected);

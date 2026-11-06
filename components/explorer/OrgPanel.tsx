@@ -93,7 +93,7 @@ export default function OrgPanel({ ctx }: { ctx: PanelCtx }) {
           }
         >
           <MapPin className="h-4 w-4 text-muted" />
-          {[org.city, muni?.name, depto?.name].filter((v, i, a) => v && a.indexOf(v) === i).join(", ") || "Ubicación pendiente"}
+          {[org.city, muni?.name, depto?.name].filter((v, i, a) => v && a.indexOf(v) === i).join(", ") || "Locación pendiente"}
         </button>
         {org.web && (
           <a className="flex items-center gap-2 text-ink transition hover:text-accent" href={href(org.web)} target="_blank" rel="noreferrer">

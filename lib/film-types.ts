@@ -1,4 +1,4 @@
-import { normalize } from "@/lib/utils";
+import { normalize, upperTitle } from "@/lib/utils";
 
 /**
  * Cómo se describe una producción:
@@ -254,12 +254,18 @@ export function genreOptions(custom: string[]): { value: string; label: string; 
   ];
 }
 
-/** Aportes guardados antes del cambio traen «kind»: se convierten a formato y naturaleza. */
+/**
+ * Aportes guardados antes de cambios anteriores: «kind» se convierte a formato y naturaleza,
+ * y el título se lleva a mayúsculas (así se ve igual al revisarlo que cuando se publique).
+ */
 export function upgradeFilmPayload<T extends object>(payload: T): T {
-  const p = payload as { kind?: string | null; format?: unknown; nature?: unknown };
-  if (!("kind" in p) || p.format !== undefined || p.nature !== undefined) return payload;
-  const { kind, ...rest } = p;
-  return { ...rest, ...legacyKind(kind) } as T;
+  let p = payload as { kind?: string | null; format?: unknown; nature?: unknown; title?: unknown };
+  if ("kind" in p && p.format === undefined && p.nature === undefined) {
+    const { kind, ...rest } = p;
+    p = { ...rest, ...legacyKind(kind) };
+  }
+  if (typeof p.title === "string" && p.title !== upperTitle(p.title)) p = { ...p, title: upperTitle(p.title) };
+  return p as T;
 }
 
 /** Duración máxima aceptada, en minutos (incluye series largas). */

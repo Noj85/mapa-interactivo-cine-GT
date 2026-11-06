@@ -4,7 +4,7 @@ import { CheckCircle2, Clapperboard, Landmark, Loader2, Send } from "lucide-reac
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { submitCollectedAction } from "@/app/completar/actions";
-import { filmDraft, filmPayload, orgContactErrors, orgDraft, orgPayload, type FilmDraft, type OrgDraft } from "@/components/records/drafts";
+import { filmDraft, filmPayload, orgContactErrors, orgDraft, orgPayload, type FilmDraft, type OrgDraft, type OrgLayerId } from "@/components/records/drafts";
 import { FestivalsEditor } from "@/components/records/FestivalsEditor";
 import { FilmFields } from "@/components/records/FilmFields";
 import { ImageField } from "@/components/records/ImageField";
@@ -26,6 +26,7 @@ export function ContributeForm({
   film,
   org,
   initialKind,
+  defaultLayer,
   collect,
   onBack,
   onSent,
@@ -34,6 +35,8 @@ export function ContributeForm({
   film?: Film;
   org?: Org;
   initialKind?: Kind;
+  /** Capa de entidades con la que arranca el formulario (la que se veía en el mapa). */
+  defaultLayer?: OrgLayerId;
   /** Enlace privado de una solicitud de información: el aporte llega como «recopilación». */
   collect?: { token: string; password: string; targetId?: string | null };
   /** Solo en un enlace con varias producciones: volver a la lista. */
@@ -50,7 +53,7 @@ export function ContributeForm({
   const [error, setError] = useState<string | null>(null);
 
   const [f, setF] = useState<FilmDraft>(() => filmDraft(film));
-  const [o, setO] = useState<OrgDraft>(() => orgDraft(org));
+  const [o, setO] = useState<OrgDraft>(() => orgDraft(org, defaultLayer));
   const setFilm = (patch: Partial<FilmDraft>) => setF((x) => ({ ...x, ...patch }));
   const setOrg = (patch: Partial<OrgDraft>) => setO((x) => ({ ...x, ...patch }));
 
@@ -183,7 +186,7 @@ export function ContributeForm({
           ) : (
             <>
               <Link href="/" className="btn-primary">Volver al mapa</Link>
-              <button className="btn-outline" onClick={() => window.location.assign("/aportar")}>Enviar otro aporte</button>
+              <button className="btn-outline" onClick={() => window.location.assign(defaultLayer ? `/aportar?capa=${defaultLayer}` : "/aportar")}>Enviar otro aporte</button>
             </>
           )}
         </div>

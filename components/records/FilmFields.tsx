@@ -12,7 +12,7 @@ export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange:
     <section className="space-y-4">
       <div>
         <label className="label" htmlFor="f-title">Título *</label>
-        <input id="f-title" className="field text-base" maxLength={300} value={d.title} onChange={(e) => onChange({ title: e.target.value })} />
+        <input id="f-title" className="field text-base uppercase" maxLength={300} value={d.title} onChange={(e) => onChange({ title: e.target.value })} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div>

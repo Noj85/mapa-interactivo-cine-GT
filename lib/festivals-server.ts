@@ -1,6 +1,7 @@
 import "server-only";
 import type { Store } from "@/lib/data/store";
 import { orgCategories } from "@/lib/categories";
+import { festivalCore, sameFestivalName } from "@/lib/import/diff";
 import type { Festival, Org } from "@/lib/types";
 import { normalize } from "@/lib/utils";
 
@@ -52,7 +53,13 @@ export async function linkFestivals<T extends FestivalRef>(store: Store, list: T
     let city = f.city ?? null;
     if (!id) {
       const { rows } = await store.searchFestivals(name, { limit: 25 });
-      const hit = rows.find((r) => normalize(r.name) === key || r.aliases.some((a) => normalize(a) === key));
+      // el nombre puede venir más largo o más corto que el del catálogo («Festival Internacional de Cine de Sundance» / «Sundance»):
+      // se busca también por su palabra más distintiva
+      const probe = festivalCore(name).split(" ").sort((a, b) => b.length - a.length)[0];
+      if (probe && probe.length >= 4) for (const r of (await store.searchFestivals(probe, { limit: 25 })).rows) if (!rows.some((x) => x.id === r.id)) rows.push(r);
+      const hit =
+        rows.find((r) => normalize(r.name) === key || r.aliases.some((a) => normalize(a) === key)) ??
+        rows.find((r) => [r.name, ...r.aliases].some((n) => sameFestivalName(n, name)));
       if (hit) {
         id = hit.id;
         country = country ?? hit.country;

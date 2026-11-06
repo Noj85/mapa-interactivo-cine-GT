@@ -8,6 +8,7 @@ import { serverGazetteer } from "@/lib/geo/server";
 import { deletePublicImages } from "@/lib/posters";
 import { filmSchema, orgSchema } from "@/lib/schemas";
 import { isAbroad } from "@/lib/completeness";
+import { applyFilmFields, applyOrgFields, createFilmFromImport, createOrgFromImport, planFilmUpdate, planOrgUpdate } from "@/lib/import/apply-server";
 import type { FilmInput, OrgInput, QuestionStatus, RecordStatus } from "@/lib/types";
 
 type Result = { ok: true; id: string } | { ok: false; error: string };
@@ -200,6 +201,7 @@ export async function approveSubmissionAction(
     const sub = await store.getSubmission(id);
     if (!sub) return { ok: false, error: "Aporte no encontrado" };
     if (sub.status !== "pending") return { ok: false, error: "Este aporte ya fue revisado" };
+    if (sub.origin === "carga") return { ok: false, error: "Este aporte viene de una carga de archivo: se revisa campo por campo." };
     const newStatus: RecordStatus = opts.publish ? "published" : "draft";
     let recordId: string;
 
@@ -235,6 +237,72 @@ export async function approveSubmissionAction(
       if (current?.logo_url && logo !== current.logo_url) await deletePublicImages([current.logo_url]);
       await syncOrgFestivalSafe(store, org);
       recordId = org.id;
+    }
+
+    await store.reviewSubmission(id, { status: "approved", reviewer_note: opts.note ?? null, result_id: recordId });
+    refresh();
+    revalidatePath("/admin/aportes");
+    return { ok: true, kind: sub.kind, recordId };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/**
+ * Aprueba un aporte «Carga de archivo». Siempre se recalcula contra el registro tal como está HOY:
+ *  - `update`: se aplican solo los campos marcados (`accepted`, ids del plan); lo demás del registro no se toca;
+ *  - `create`: la persona decidió que no existía y se crea como registro nuevo.
+ */
+export async function approveImportSubmissionAction(
+  id: string,
+  opts: { mode: "update"; targetId: string; accepted: string[]; show?: boolean; note?: string | null } | { mode: "create"; publish: boolean; note?: string | null },
+): Promise<{ ok: true; kind: "film" | "org"; recordId: string } | { ok: false; error: string }> {
+  await requireSession();
+  try {
+    const store = await adminStore();
+    const sub = await store.getSubmission(id);
+    if (!sub) return { ok: false, error: "Aporte no encontrado" };
+    if (sub.origin !== "carga") return { ok: false, error: "Este aporte no viene de una carga de archivo." };
+    if (sub.status !== "pending") return { ok: false, error: "Este aporte ya fue revisado" };
+    let recordId: string;
+
+    if (opts.mode === "create") {
+      const status: RecordStatus = opts.publish ? "published" : "draft";
+      if (sub.kind === "film") {
+        const parsed = filmSchema.safeParse(sub.payload);
+        if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+        recordId = (await createFilmFromImport(store, parsed.data as unknown as FilmInput, status, sub.import_id)).id;
+      } else {
+        const parsed = orgSchema.safeParse(sub.payload);
+        if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+        recordId = (await createOrgFromImport(store, parsed.data as unknown as OrgInput, status, sub.import_id)).id;
+      }
+    } else {
+      if (!opts.accepted.length) return { ok: false, error: "No marcaste nada para aplicar. Si no hay nada que aplicar, rechaza el aporte." };
+      if (sub.kind === "film") {
+        const parsed = filmSchema.safeParse(sub.payload);
+        if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+        const current = await store.getFilm(opts.targetId);
+        if (!current) return { ok: false, error: "El registro ya no existe" };
+        const incoming = parsed.data as unknown as FilmInput;
+        // solo ids que existan hoy en el plan (el registro pudo cambiar desde la carga)
+        const valid = new Set(planFilmUpdate(current, incoming).items.map((i) => i.id));
+        const res = await applyFilmFields(store, current, incoming, opts.accepted.filter((x) => valid.has(x)), sub.import_id);
+        if (!res.saved) return { ok: false, error: "Eso ya no cambia nada: el registro cambió desde la carga. Recarga la página." };
+        recordId = res.saved.id;
+        if (opts.show && current.status === "draft") await store.setRecordsStatus("film", [recordId], "published");
+      } else {
+        const parsed = orgSchema.safeParse(sub.payload);
+        if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+        const current = await store.getOrg(opts.targetId);
+        if (!current) return { ok: false, error: "El registro ya no existe" };
+        const incoming = parsed.data as unknown as OrgInput;
+        const valid = new Set(planOrgUpdate(current, incoming).items.map((i) => i.id));
+        const res = await applyOrgFields(store, current, incoming, opts.accepted.filter((x) => valid.has(x)), sub.import_id);
+        if (!res.saved) return { ok: false, error: "Eso ya no cambia nada: el registro cambió desde la carga. Recarga la página." };
+        recordId = res.saved.id;
+        if (opts.show && current.status === "draft") await store.setRecordsStatus("org", [recordId], "published");
+      }
     }
 
     await store.reviewSubmission(id, { status: "approved", reviewer_note: opts.note ?? null, result_id: recordId });

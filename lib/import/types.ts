@@ -9,6 +9,10 @@ export interface ParsedSheet {
   rows: Record<string, string>[];
   /** Cantidad real de filas del archivo (rows puede estar recortado). */
   totalRows: number;
+  /** Cómo venía armada la hoja si no era una tabla simple: encabezados en dos filas o una ficha «etiqueta | valor». */
+  layout?: "dos filas" | "ficha";
+  /** Con encabezados en dos filas: encabezado completo («Locación Días») -> el de la fila de abajo («Días»). */
+  subHeaders?: Record<string, string>;
 }
 
 export interface ParsedFile {
@@ -75,6 +79,7 @@ export const ORG_FIELDS: FieldDef[] = [
   { id: "instagram", label: "Instagram" },
   { id: "contact", label: "Contacto" },
   { id: "description", label: "Descripción" },
+  { id: "logo", label: "Logo (enlace)", hint: "URL de una imagen; se descarga y se guarda al confirmar" },
 ];
 
 // ───────────────────────── plan (lo que "entendimos") ─────────────────────────
@@ -87,6 +92,8 @@ export interface SheetPlan {
   layer?: "circulacion" | "industria";
   /** La capa se dedujo de las categorías del archivo (no hace falta preguntar). */
   layerGuessed?: boolean;
+  /** La hoja mezcla entidades de las dos capas: cada fila va a la capa que indica su categoría (`layer` es la de respaldo). */
+  layer_by_row?: boolean;
   /** Producciones: una fila por producción o una fila por locación o festival (producción repetida). */
   grain: "row_per_film" | "row_per_location";
   /** campo destino -> encabezado de columna */
@@ -138,18 +145,30 @@ export interface PlaceResolution {
   via: "gazetteer" | "claude" | "user";
 }
 
+/**
+ * Qué tan segura es una coincidencia con un registro existente:
+ *  - seguro: mismo título y además el mismo año o director/a (o lugar, en entidades), sin contradicciones;
+ *  - probable: título muy parecido y nada que lo contradiga;
+ *  - dudoso: título parecido pero el año, el director/a o el lugar no cuadran. No se decide solo.
+ */
+export type MatchLevel = "seguro" | "probable" | "dudoso";
+
 export interface DuplicateMatch {
   id: string;
   title: string;
   year: number | null;
   score: number;
+  level: MatchLevel;
+  /** Otras coincidencias posibles (hasta 2 más), de mayor a menor parecido. */
+  alternatives?: DuplicateMatch[];
   /** Copia del registro que ya existe (con borradores), para mostrar qué se completaría. */
   record?: Film | Org;
 }
 
 // ───────────────────────── candidatos a publicar ─────────────────────────
 
-export type DuplicateDecision = "update" | "create" | "skip";
+/** update: completar el existente · create: crear uno nuevo · review: mandarlo a Aportes para decidir · skip: omitir. */
+export type DuplicateDecision = "update" | "create" | "review" | "skip";
 
 export interface Issue {
   /** film: "title" | "year" | "location:<i>" ... */
@@ -180,6 +199,26 @@ export interface ResolveItem {
   type: "film" | "org";
   title: string;
   year: number | null;
+  /** Producciones: director/a (ayuda a distinguir dos con el mismo título). */
+  director?: string | null;
+  /** Entidades: capa y lugar (el mismo nombre en otra capa o municipio no es la misma entidad). */
+  layer?: "circulacion" | "industria" | null;
+  muni_ine?: number | null;
+  depto_ine?: number | null;
+  /** Textos de lugar del renglón; el servidor los resuelve y completa muni_ine/depto_ine. */
+  placeTexts?: string[];
+}
+
+/** Un registro que ya existe, con lo necesario para compararlo. */
+export interface ExistingRef {
+  id: string;
+  type: "film" | "org";
+  title: string;
+  year: number | null;
+  director?: string | null;
+  layer?: "circulacion" | "industria" | null;
+  muni_ine?: number | null;
+  depto_ine?: number | null;
 }
 
 export interface ResolveResponse {

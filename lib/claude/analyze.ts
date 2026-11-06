@@ -15,6 +15,7 @@ const planSchema = z.object({
       sheet: z.string(),
       entity: z.enum(["film", "org", "ignore"]),
       layer: z.enum(["circulacion", "industria"]).nullish(),
+      layer_by_row: z.boolean().nullish(),
       grain: z.enum(["row_per_film", "row_per_location"]).default("row_per_film"),
       columns: z.record(z.string(), z.string()).default({}),
       confidence: z.record(z.string(), z.number()).default({}),
@@ -57,11 +58,13 @@ const TOOL = {
           properties: {
             sheet: { type: "string", description: "Nombre exacto de la hoja." },
             entity: { type: "string", enum: ["film", "org", "ignore"] },
-            layer: { type: "string", enum: ["circulacion", "industria"], description: "Solo si entity=org." },
+            layer: { type: "string", enum: ["circulacion", "industria"], description: "Solo si entity=org. Si la hoja mezcla las dos capas, la más frecuente." },
+            layer_by_row: { type: "boolean", description: "Solo si entity=org: true si la hoja mezcla entidades de Circulación y de Industria y cada fila debe ir a la capa que indica su categoría." },
             grain: { type: "string", enum: ["row_per_film", "row_per_location"] },
             columns: {
               type: "object",
-              description: "campo destino -> encabezado EXACTO de la columna del archivo.",
+              description:
+                "campo destino -> encabezado EXACTO de la columna del archivo. Si cada fila trae VARIAS locaciones en grupos de columnas repetidos, el primer grupo usa los campos normales (place, muni, depto, site, lat, lng, days, local_spend, jobs) y los siguientes añaden el sufijo __2, __3… (por ejemplo place__2, days__2).",
               additionalProperties: { type: "string" },
             },
             confidence: { type: "object", description: "campo destino -> confianza 0 a 1.", additionalProperties: { type: "number" } },
@@ -98,18 +101,22 @@ const TOOL = {
   },
 };
 
+const LOCATION_FIELDS = ["place", "muni", "depto", "site", "lat", "lng", "days", "local_spend", "jobs"];
+
 const cut = (s: string, n = 140) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
 function sample(file: ParsedFile, distinct?: DistinctMap) {
   return file.sheets.map((s) => {
     const d = distinct?.[s.name] ?? {};
-    const head = s.rows.slice(0, 18);
-    const tail = s.rows.length > 30 ? s.rows.slice(-4) : [];
     return {
       sheet: s.name,
       totalRows: s.totalRows,
       headers: s.headers,
-      sampleRows: [...head, ...tail].map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, cut(v)]))),
+      // cómo venía armada la hoja si no era una tabla simple
+      ...(s.layout === "ficha" ? { formato_de_la_hoja: "ficha: una columna de etiquetas y otra de valores; cada fila de aquí es una ficha ya pivotada" } : {}),
+      ...(s.layout === "dos filas" ? { formato_de_la_hoja: "encabezados en dos filas; el encabezado completo une el grupo y la columna («Locación Días»)" } : {}),
+      // el navegador manda filas del inicio, del medio y del final del archivo
+      sampleRows: s.rows.slice(0, 60).map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, cut(v, 110)]))),
       // valores distintos de las columnas tipo lista, contados sobre TODAS las filas (la muestra no los trae todos)
       valores_distintos: Object.fromEntries(Object.entries(d).map(([h, list]) => [h, list.map((x) => `${cut(x.v, 80)} (${x.n})`)])),
     };
@@ -128,6 +135,11 @@ Reglas:
 - En "columns" usa SIEMPRE el encabezado exacto del archivo. Si una columna no corresponde a ningún campo, no la incluyas. No inventes columnas.
 - Si el lugar incluye un país distinto de Guatemala (ej. «Oaxaca, México»), es una locación fuera de Guatemala: déjalo en "place" tal cual, sin mapearlo a municipio ni a departamento.
 - Si hay una sola columna con el lugar completo (ej. "Panajachel, Sololá" o "Antigua; Flores"), mapea "place". Si hay columnas separadas, mapea "muni" y "depto".
+- Varias locaciones en la misma fila: si hay grupos de columnas repetidos («Lugar 1», «Días 1», «Lugar 2», «Días 2», o «Locación 1: Municipio», «Locación 2: Municipio»), mapea el primer grupo con los campos normales y los siguientes con sufijo: "place__2", "muni__2", "site__2", "days__2", "local_spend__2", "jobs__2", "lat__2", "lng__2" (y "__3"… si hay más). Con encabezados en dos filas, el encabezado completo ya une grupo y columna.
+- Fichas: si la hoja viene como ficha (etiquetas y valores ya pivotados), cada fila de la muestra es una producción o entidad; mapea sus encabezados como cualquier otra columna.
+- Hojas mezcladas: si una hoja de entidades trae filas de Circulación y de Industria, entrega entity "org", layer_by_row true y como "layer" la capa más frecuente; el código decide la capa de cada fila por su categoría.
+- Entidades: "logo" es un enlace (URL) a la imagen del logo, solo si hay una columna así.
+- La muestra de filas trae filas del inicio, del medio y del final del archivo: úsala para distinguir lo que cambia a lo largo de él.
 - "confidence" es honesta: baja (<0.6) si dudas.
 - En "value_maps" normaliza los valores de columnas de lista (tipo de producción, nacionalidad, naturaleza de la iniciativa, categoría) hacia los valores canónicos. Cubre TODOS los valores que aparezcan en "valores_distintos" de esa columna (la muestra de filas es parcial), con el texto exacto del archivo como llave.
 - Los valores canónicos de formato, naturaleza, nacionalidad y naturaleza de la iniciativa son cerrados: usa solo los del catálogo (por ejemplo la etiqueta "Cortometraje"). Nunca inventes un valor que no esté en el catálogo. Si un valor de formato no encaja en ninguno, no lo mapees a "Otro": déjalo fuera de value_maps y, si es relevante, hazlo una pregunta (con "value" y field "format").
@@ -200,6 +212,9 @@ export async function analyzeFile(file: ParsedFile, opts: AnalyzeOptions = {}): 
         const confidence: Record<string, number> = {};
         for (const [field, header] of Object.entries(sp.columns)) {
           if (!headers.has(header)) continue;
+          // sufijos de grupo de locación: solo para los campos de lugar y en grupos del 2 al 9
+          const suffix = field.match(/^(.+)__(\d)$/);
+          if (suffix && (!LOCATION_FIELDS.includes(suffix[1]) || Number(suffix[2]) < 2)) continue;
           columns[field] = header;
           confidence[field] = Math.max(0, Math.min(1, sp.confidence[field] ?? 0.6));
         }
@@ -207,6 +222,7 @@ export async function analyzeFile(file: ParsedFile, opts: AnalyzeOptions = {}): 
           sheet: sp.sheet,
           entity: sp.entity,
           layer: sp.entity === "org" ? (sp.layer ?? "circulacion") : undefined,
+          layer_by_row: sp.entity === "org" && sp.layer_by_row ? true : undefined,
           grain: sp.grain,
           columns,
           confidence,
@@ -215,6 +231,22 @@ export async function analyzeFile(file: ParsedFile, opts: AnalyzeOptions = {}): 
           note: sp.note ?? undefined,
         };
       });
+    // Lo que el reconocimiento de encabezados detectó con certeza y el modelo pudo pasar por alto.
+    const base = heuristicPlan(file);
+    for (const sp of sheets) {
+      const h = base.sheets.find((x) => x.sheet === sp.sheet);
+      if (!h) continue;
+      if (sp.entity === "film" && h.entity === "film") {
+        const used = new Set(Object.values(sp.columns));
+        for (const [k, header] of Object.entries(h.columns)) {
+          if (k.includes("__") && !sp.columns[k] && !used.has(header)) {
+            sp.columns[k] = header;
+            sp.confidence[k] = h.confidence[k] ?? 0.7;
+          }
+        }
+      }
+      if (sp.entity === "org" && h.entity === "org" && h.layer_by_row) sp.layer_by_row = true;
+    }
     // Hojas que el modelo omitió: ignorar explícitamente.
     for (const s of file.sheets) {
       if (!sheets.some((x) => x.sheet === s.name))

@@ -168,7 +168,7 @@ export function LocationsEditor({ locs, onChange }: { locs: LocDraft[]; onChange
         </datalist>
         {locs.length === 0 && (
           <div className="rounded-2xl border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
-            Sin locaciones todavía. La producción se muestra en la zona «Sin ubicación» del mapa hasta que agregues dónde se rodó.
+            Sin locaciones todavía. La producción se muestra en la zona «Sin locación» del mapa hasta que agregues dónde se rodó.
           </div>
         )}
       </div>

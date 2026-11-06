@@ -25,7 +25,7 @@ export interface RecordRow {
   missing: string[];
   /** Puede mostrarse en el mapa (título; en entidades, categoría y lugar). */
   publishable: boolean;
-  /** Sin lugar de rodaje / sin ubicación. */
+  /** Sin lugar de rodaje / sin locación. */
   unlocated: boolean;
   /** Solo producciones. */
   noFestivals?: boolean;
@@ -37,13 +37,15 @@ export interface RecordRow {
 
 type Estado = "todos" | "mapa" | "oculto";
 type Comp = "todas" | "completa" | "incompleta" | "baja";
-type Flag = "sinubicacion" | "sinfestivales" | "solicitud";
+type Flag = "solicitud";
+/** Con o sin un dato (locación, festivales): «todos» no filtra. */
+type Tri = "todos" | "con" | "sin";
 
 const FLAG_LABEL: Record<Flag, string> = {
-  sinubicacion: "Sin ubicación",
-  sinfestivales: "Sin festivales",
   solicitud: "Con solicitud abierta",
 };
+
+const tri = (v: string | null | undefined): Tri => (v === "con" || v === "sin" ? v : "todos");
 
 const PAGE = 100;
 
@@ -87,7 +89,11 @@ export function RecordsTable({
   const [estado, setEstado] = useState<Estado>((sp.get("estado") as Estado) || "todos");
   const [comp, setComp] = useState<Comp>((sp.get("comp") as Comp) || "todas");
   const [tipo, setTipo] = useState(sp.get("tipo") ?? "");
-  const [flags, setFlags] = useState<Flag[]>(() => (sp.get("f") ?? "").split(",").filter((x): x is Flag => x in FLAG_LABEL));
+  // enlaces anteriores: ?f=sinubicacion,sinfestivales
+  const legacy = (sp.get("f") ?? "").split(",");
+  const [loc, setLoc] = useState<Tri>(() => tri(sp.get("loc")) !== "todos" ? tri(sp.get("loc")) : legacy.includes("sinubicacion") ? "sin" : "todos");
+  const [fest, setFest] = useState<Tri>(() => tri(sp.get("fest")) !== "todos" ? tri(sp.get("fest")) : legacy.includes("sinfestivales") ? "sin" : "todos");
+  const [flags, setFlags] = useState<Flag[]>(() => legacy.filter((x): x is Flag => x in FLAG_LABEL));
   const [limit, setLimit] = useState(PAGE);
 
   useEffect(() => {
@@ -96,10 +102,12 @@ export function RecordsTable({
     if (estado !== "todos") p.set("estado", estado);
     if (comp !== "todas") p.set("comp", comp);
     if (tipo) p.set("tipo", tipo);
+    if (loc !== "todos") p.set("loc", loc);
+    if (fest !== "todos") p.set("fest", fest);
     if (flags.length) p.set("f", flags.join(","));
     const qs = p.toString();
     window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
-  }, [q, estado, comp, tipo, flags]);
+  }, [q, estado, comp, tipo, loc, fest, flags]);
 
   // estado "al instante": se aplica antes de que el servidor confirme
   const [overrides, setOverrides] = useState<Record<string, RecordStatus>>({});
@@ -128,24 +136,28 @@ export function RecordsTable({
         if (comp === "incompleta" && r.completeness >= 100) return false;
         if (comp === "baja" && r.completeness >= 50) return false;
         if (tipo && !r.types.includes(tipo)) return false;
-        if (flags.includes("sinubicacion") && !r.unlocated) return false;
-        if (flags.includes("sinfestivales") && !r.noFestivals) return false;
+        if (loc === "sin" && !r.unlocated) return false;
+        if (loc === "con" && r.unlocated) return false;
+        if (isFilm && fest === "sin" && !r.noFestivals) return false;
+        if (isFilm && fest === "con" && r.noFestivals) return false;
         if (flags.includes("solicitud") && r.openRequests === 0) return false;
         if (nq && !r.search.includes(nq)) return false;
         return true;
       }),
-    [rows, overrides, estado, comp, tipo, flags, nq],
+    [rows, overrides, estado, comp, tipo, loc, fest, flags, isFilm, nq],
   );
   const visible = filtered.slice(0, limit);
 
   const total = rows.length;
   const inMap = rows.filter((r) => statusOf(r) === "published").length;
-  const filtersOn = !!q.trim() || estado !== "todos" || comp !== "todas" || !!tipo || flags.length > 0;
+  const filtersOn = !!q.trim() || estado !== "todos" || comp !== "todas" || !!tipo || loc !== "todos" || (isFilm && fest !== "todos") || flags.length > 0;
   const clearFilters = () => {
     setQ("");
     setEstado("todos");
     setComp("todas");
     setTipo("");
+    setLoc("todos");
+    setFest("todos");
     setFlags([]);
   };
 
@@ -163,7 +175,7 @@ export function RecordsTable({
       router.refresh();
       const name = targets.length === 1 ? `«${targets[0].name}»` : `${res.count} registros`;
       const done = status === "published" ? `Ahora se muestra en el mapa: ${name}.` : `Se ocultó del mapa: ${name}.`;
-      const skipped = res.skipped > 0 ? ` ${res.skipped} no se pudo${res.skipped === 1 ? "" : "ieron"} publicar (les falta categoría o ubicación).` : "";
+      const skipped = res.skipped > 0 ? ` ${res.skipped} no se pudo${res.skipped === 1 ? "" : "ieron"} publicar (les falta categoría o locación).` : "";
       say(done + skipped, {
         undo: () =>
           start(async () => {
@@ -191,7 +203,6 @@ export function RecordsTable({
   const selRows = rows.filter((r) => selected.has(r.id));
 
   const flagBtn = (f: Flag) => {
-    if (f === "sinfestivales" && !isFilm) return null;
     const on = flags.includes(f);
     return (
       <button
@@ -260,7 +271,19 @@ export function RecordsTable({
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
-          {(["sinubicacion", "sinfestivales", "solicitud"] as Flag[]).map(flagBtn)}
+          <select className="field !w-auto !py-1.5 text-xs" aria-label="Locación" value={loc} onChange={(e) => setLoc(tri(e.target.value))}>
+            <option value="todos">Locación: todas</option>
+            <option value="con">Con locación registrada</option>
+            <option value="sin">Sin locación</option>
+          </select>
+          {isFilm && (
+            <select className="field !w-auto !py-1.5 text-xs" aria-label="Festivales" value={fest} onChange={(e) => setFest(tri(e.target.value))}>
+              <option value="todos">Festivales: todos</option>
+              <option value="con">Con festivales</option>
+              <option value="sin">Sin festivales</option>
+            </select>
+          )}
+          {(["solicitud"] as Flag[]).map(flagBtn)}
           {filtersOn && (
             <button type="button" className="btn-ghost !min-h-0 !px-2 !py-1 text-xs" onClick={clearFilters}>
               <X className="h-3.5 w-3.5" /> Limpiar

@@ -11,7 +11,7 @@ const FILM_SYN: Syn[] = [
   ["festival_result", [/^(resultado|result|reconocimiento|estatus|seleccion|premiada?|ganadora?)( (en )?(el )?(festival|premio))?$/]],
   ["festival_section", [/^(seccion|section|competencia|categoria de (festival|seleccion))( del festival)?$/]],
   ["festival_award", [/^(premio|premios|award|awards|galardon|distincion|premio obtenido)$/]],
-  ["festival_url", [/^(enlace|url|link|sitio)( del| de)? (festival|premio)$/]],
+  ["festival_url", [/^(enlace|url|link|sitio)( del| de)? (festival|premio)( o (festival|premio))?$/]],
   ["festival", [/^(festival|festivales|festival(es)? (de seleccion|donde participo|y premios?)|selecciones|festival name)$/]],
   ["title", [/^(titulo|title|nombre( de la)?( pelicula| produccion| proyecto| obra)?|pelicula|produccion|proyecto|obra)$/]],
   ["year", [/^(ano|year|anio|ano de (estreno|produccion|rodaje|lanzamiento)|estreno|fecha)$/]],
@@ -55,6 +55,7 @@ const ORG_SYN: Syn[] = [
   ["instagram", [/^(instagram|ig|redes|redes sociales|red social)$/]],
   ["contact", [/^(contacto|correo( electronico)?|email|e mail|telefono|celular|movil|tel|whatsapp|contact)$/]],
   ["description", [/^(descripcion|description|resumen|sobre|acerca|detalle|observaciones)$/]],
+  ["logo", [/^(logo|logotipo|logo url|logo enlace|enlace del logo|url del logo|imagen|escudo|isotipo)$/]],
 ];
 
 /** Segunda pasada, más tolerante: encabezados largos como "Nombre del proyecto" o "Dónde se filmó". */
@@ -91,9 +92,13 @@ const ORG_LOOSE: Syn[] = [
   ["instagram", [/\b(instagram|redes)\b/]],
   ["contact", [/\b(contacto|correo|email|telefono)\b/]],
   ["description", [/\b(descripcion|detalle|observaciones)\b/]],
+  ["logo", [/\blogo(tipo)?\b/]],
 ];
 
-function mapColumns(headers: string[], syn: Syn[], loose: Syn[]) {
+/** Textos que se prueban de un encabezado: completo y, si venía en dos filas, el de la fila de abajo. */
+const forms = (h: string, subs?: Record<string, string>) => (subs?.[h] ? [normalize(h), normalize(subs[h])] : [normalize(h)]);
+
+function mapColumns(headers: string[], syn: Syn[], loose: Syn[], subs?: Record<string, string>) {
   const columns: Record<string, string> = {};
   const confidence: Record<string, number> = {};
   const taken = new Set<string>();
@@ -102,8 +107,7 @@ function mapColumns(headers: string[], syn: Syn[], loose: Syn[]) {
       if (columns[field]) continue;
       for (const h of headers) {
         if (taken.has(h)) continue;
-        const n = normalize(h);
-        if (pats.some((p) => p.test(n))) {
+        if (forms(h, subs).some((n) => pats.some((p) => p.test(n)))) {
           columns[field] = h;
           confidence[field] = conf;
           taken.add(h);
@@ -157,9 +161,68 @@ function unknownFormatQuestions(sp: SheetPlan, sheet: ParsedSheet): PlanQuestion
     }));
 }
 
+/** Campo al que corresponde una etiqueta («Director/a», «Municipio»…), o null si no se reconoce. Sirve para leer fichas. */
+export function recognizedField(label: string): string | null {
+  const n = normalize(label);
+  if (!n) return null;
+  for (const table of [FILM_SYN, FILM_LOOSE, ORG_SYN]) for (const [field, pats] of table) if (pats.some((p) => p.test(n))) return field;
+  return null;
+}
+
+// ───────────────────────── varias locaciones por fila ─────────────────────────
+
+/** Campos que se repiten en cada grupo de locación, del más específico al más general. */
+const LOC_PATTERNS: [field: string, re: RegExp][] = [
+  ["days", /\b(dias|days)\b/],
+  ["local_spend", /\b(inversion|gasto|spend)\b/],
+  ["jobs", /\b(empleos?|contrataciones|jobs)\b/],
+  ["lat", /\b(lat|latitud|latitude)\b/],
+  ["lng", /\b(lng|lon|long|longitud|longitude)\b/],
+  ["depto", /\b(departamento|depto|dpto|department)\b/],
+  ["muni", /\b(municipio|muni|municipality)\b/],
+  ["site", /\b(sitio|escenario|set|punto)\b/],
+  ["place", /\b(lugar|lugares|locacion|locaciones|ubicacion|ubicaciones|place|location|donde|filmo|rodo)\b/],
+];
+const ORDINAL: Record<string, number> = { segund: 2, tercer: 3, cuart: 4, quint: 5, second: 2, third: 3 };
+
+/** «Locación 2 Días» -> { base: «locacion dias», idx: 2 }. null si el encabezado no trae número de grupo. */
+export function splitIndex(h: string): { base: string; idx: number } | null {
+  let n = normalize(h).replace(/([a-z])(\d)$/, "$1 $2");
+  let idx = 0;
+  n = n.replace(/\b(segund|tercer|cuart|quint|second|third)[oa]?\b/, (_, k: string) => ((idx = ORDINAL[k]), " "));
+  if (!idx) n = n.replace(/(?:^|\s)(?:no|n|num|numero)?\s*([1-9])(?=\s|$)/, (_, d: string) => ((idx = Number(d)), " "));
+  return idx ? { base: n.replace(/\s+/g, " ").trim(), idx } : null;
+}
+
+/**
+ * Detecta grupos de columnas de locación repetidos en una misma fila («Lugar 1», «Días 1», «Lugar 2», «Días 2»…).
+ * Si hay al menos dos grupos, saca esas columnas del mapeo normal y las devuelve como `campo` (grupo 1) y `campo__N`.
+ */
+function locationGroups(headers: string[], subs?: Record<string, string>): { rest: string[]; columns: Record<string, string> } {
+  const groups = new Map<number, Record<string, string>>();
+  const claimed: string[] = [];
+  for (const h of headers) {
+    const sp = splitIndex(h);
+    if (!sp) continue;
+    const bases = [sp.base, ...(subs?.[h] ? [normalize(subs[h])] : [])];
+    const field = LOC_PATTERNS.find(([, re]) => bases.some((b) => re.test(b)))?.[0];
+    if (!field) continue;
+    const g = groups.get(sp.idx) ?? {};
+    if (g[field]) continue;
+    g[field] = h;
+    groups.set(sp.idx, g);
+    claimed.push(h);
+  }
+  if (groups.size < 2) return { rest: headers, columns: {} };
+  const columns: Record<string, string> = {};
+  for (const [idx, g] of groups) for (const [field, h] of Object.entries(g)) columns[idx === 1 ? field : `${field}__${idx}`] = h;
+  return { rest: headers.filter((h) => !claimed.includes(h)), columns };
+}
+
 function planSheet(sheet: ParsedSheet, fromPdf = false): SheetPlan {
-  const film = mapColumns(sheet.headers, FILM_SYN, FILM_LOOSE);
-  const org = mapColumns(sheet.headers, ORG_SYN, ORG_LOOSE);
+  const loc = locationGroups(sheet.headers, sheet.subHeaders);
+  const film = mapColumns(loc.rest, FILM_SYN, FILM_LOOSE, sheet.subHeaders);
+  const org = mapColumns(sheet.headers, ORG_SYN, ORG_LOOSE, sheet.subHeaders);
 
   const filmScore = (film.columns.title ? 3 : 0) + (film.columns.year ? 1 : 0) + (film.columns.director ? 1 : 0) + (film.columns.days ? 1 : 0);
   const orgScore = (org.columns.name ? 2 : 0) + (org.columns.category ? 2 : 0) + (org.columns.web ? 1 : 0) + (org.columns.instagram ? 1 : 0);
@@ -167,6 +230,11 @@ function planSheet(sheet: ParsedSheet, fromPdf = false): SheetPlan {
   const isFilm = filmScore >= 3 && filmScore >= orgScore;
   if (isFilm) {
     shareColumns(film, sheet);
+    // los grupos de locación indexados mandan sobre lo que haya mapeado la pasada normal
+    for (const [k, h] of Object.entries(loc.columns)) {
+      film.columns[k] = h;
+      film.confidence[k] = 0.7;
+    }
     // Si el título se repite en varias filas, hay una fila por locación.
     const col = film.columns.title;
     const titles = sheet.rows.map((r) => normalize(r[col] ?? "")).filter(Boolean);
@@ -180,15 +248,24 @@ function planSheet(sheet: ParsedSheet, fromPdf = false): SheetPlan {
       columns: film.columns,
       confidence: film.confidence,
       multi_place: !!film.columns.place,
+      ...(Object.keys(loc.columns).some((k) => k.includes("__")) ? { note: "Cada fila trae varias locaciones (columnas repetidas con número); se leen todas." } : {}),
     };
   }
   if (orgScore >= 3 || (org.columns.name && org.columns.category)) {
-    const guessed = org.columns.category ? guessLayer(sheet.rows.map((r) => r[org.columns.category] ?? "")) : null;
+    const catCol = org.columns.category;
+    const guessed = catCol ? guessLayer(sheet.rows.map((r) => r[catCol] ?? "")) : null;
+    // una hoja con entidades de las dos capas: la capa se decide por la categoría de cada fila
+    const perRow = catCol ? sheet.rows.map((r) => guessLayer((r[catCol] ?? "").split(/\s*[;/|\n]+\s*/))) : [];
+    const nCirc = perRow.filter((x) => x === "circulacion").length;
+    const nInd = perRow.filter((x) => x === "industria").length;
+    const mixed = nCirc > 0 && nInd > 0;
+    const layer = guessed ?? (mixed ? (nCirc >= nInd ? "circulacion" : "industria") : null);
     return {
       sheet: sheet.name,
       entity: "org",
-      layer: guessed ?? "circulacion",
-      layerGuessed: !!guessed,
+      layer: layer ?? "circulacion",
+      layerGuessed: !!layer,
+      ...(mixed ? { layer_by_row: true, note: `La hoja trae entidades de Circulación (${nCirc}) y de Industria (${nInd}): cada fila va a la capa que indica su categoría.` } : {}),
       grain: "row_per_film",
       columns: org.columns,
       confidence: org.confidence,

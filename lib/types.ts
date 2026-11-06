@@ -314,17 +314,30 @@ export type SubmissionKind = "film" | "org";
  * Propuesta enviada desde el mapa público. Nunca toca los registros publicados:
  * el equipo la revisa y, al aprobarla, se crea o actualiza el registro.
  */
-export type SubmissionOrigin = "publico" | "recopilacion";
+export type SubmissionOrigin = "publico" | "recopilacion" | "carga";
+
+/** Registro existente que podría ser el mismo que el de una carga de archivo (aportes «Carga de archivo» dudosos). */
+export interface SubmissionCandidate {
+  id: string;
+  title: string;
+  year: number | null;
+  score: number;
+  level: "seguro" | "probable" | "dudoso";
+}
 
 export interface Submission {
   id: string;
   kind: SubmissionKind;
-  /** "publico" = formulario abierto; "recopilacion" = enlace privado de una solicitud de información. */
+  /** "publico" = formulario abierto; "recopilacion" = enlace privado de una solicitud de información; "carga" = lo que una carga de archivo no pudo decidir sola. */
   origin: SubmissionOrigin;
   /** Solicitud de información desde la que se envió (solo recopilación). */
   request_id: string | null;
-  /** Nombre y rol de quien envía (solo recopilación). */
+  /** Nombre y rol de quien envía (recopilación) o archivo de donde viene (carga). */
   submitter: string | null;
+  /** Carga de archivo de la que viene el aporte (solo carga). */
+  import_id?: string | null;
+  /** Coincidencias posibles cuando la carga no supo si el registro ya existía (solo carga). */
+  candidates?: SubmissionCandidate[] | null;
   /** Registro que se propone corregir; null si es un registro nuevo. */
   target_id: string | null;
   /** Nombre del registro al enviar el aporte (para mostrarlo en la lista). */
@@ -344,6 +357,14 @@ export interface Submission {
 }
 
 export type SubmissionInput = Pick<Submission, "kind" | "target_id" | "label" | "payload" | "note" | "contact">;
+
+/** Aporte creado por una carga de archivo (solo el equipo lo puede crear). */
+export type ImportSubmissionInput = SubmissionInput & {
+  import_id: string;
+  /** Nombre del archivo. */
+  submitter: string;
+  candidates: SubmissionCandidate[] | null;
+};
 
 // ───────────────────────── solicitudes de información ─────────────────────────
 

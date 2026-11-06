@@ -16,6 +16,11 @@ export function fmtMoney(n: number | null | undefined, currency = "GTQ") {
   return `${sym} ${nf.format(n)}`;
 }
 
+/** Los títulos de producciones se guardan y se muestran siempre en mayúsculas (con acentos: «ÚLTIMO»). */
+export function upperTitle(s: string | null | undefined): string {
+  return (s ?? "").replace(/\s+/g, " ").trim().toLocaleUpperCase("es");
+}
+
 /** Quita acentos, minúsculas y espacios extra: base de toda búsqueda. */
 export function normalize(s: string) {
   return s

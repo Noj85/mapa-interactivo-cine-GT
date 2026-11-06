@@ -6,7 +6,7 @@ import { metricText } from "@/lib/format";
 import { LAYERS, type LayerId } from "@/lib/types";
 import { fmtInt, fmtMoney } from "@/lib/utils";
 import { downloadHref } from "@/lib/view";
-import { BarRow, DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid } from "./parts";
+import { BarRow, DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid, LocacionFilter } from "./parts";
 
 const ZERO: Agg = { films: 0, days: 0, spend: 0, jobs: 0, orgs: 0 };
 
@@ -104,6 +104,7 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
       <SectionTitle aside={view.layer === "produccion" ? films.length : orgs.length}>
         {view.layer === "produccion" ? "Producciones rodadas aquí" : "Registros aquí"}
       </SectionTitle>
+      {view.layer === "produccion" && <LocacionFilter value={view.filmFilter.locacion} onChange={go.locacion} />}
       <div className="-mx-2 space-y-0.5">
         {view.layer === "produccion" ? (
           films.length ? (

@@ -14,6 +14,7 @@ const ORIGINS: { id: "todos" | SubmissionOrigin; label: string }[] = [
   { id: "todos", label: "Todos" },
   { id: "publico", label: "Del público" },
   { id: "recopilacion", label: "Recopilación" },
+  { id: "carga", label: "Carga de archivo" },
 ];
 
 export default async function AportesPage({ searchParams }: { searchParams: Promise<{ estado?: string; origen?: string }> }) {
@@ -30,7 +31,7 @@ export default async function AportesPage({ searchParams }: { searchParams: Prom
     <div>
       <h1 className="font-display text-4xl tracking-tight">Aportes</h1>
       <p className="mt-1 max-w-2xl text-sm text-muted">
-        Propuestas del público y datos que envió el equipo de una producción desde un enlace de recopilación. No se publican hasta que las revises: puedes aprobarlas tal cual, editarlas antes o rechazarlas.
+        Propuestas del público, datos que envió el equipo de una producción desde un enlace de recopilación y lo que una carga de archivo no pudo decidir sola (diferencias con un registro existente o coincidencias dudosas). Nada se publica ni se cambia hasta que lo revises.
       </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -78,9 +79,10 @@ export default async function AportesPage({ searchParams }: { searchParams: Prom
                   <span className="flex items-center gap-2">
                     <span className="truncate font-display text-[15px]">{x.label}</span>
                     {x.origin === "recopilacion" && <span className="chip !py-0 text-[11px] text-accent">Recopilación</span>}
+                    {x.origin === "carga" && <span className="chip !py-0 text-[11px] text-accent">Carga de archivo</span>}
                   </span>
                   <span className="block truncate text-xs text-muted">
-                    {x.target_id ? "Corrección" : "Registro nuevo"} · {x.kind === "film" ? "Producción" : "Entidad"} ·{" "}
+                    {x.origin === "carga" ? (x.target_id ? "Diferencias con el registro" : "Coincidencia dudosa") : x.target_id ? "Corrección" : "Registro nuevo"} · {x.kind === "film" ? "Producción" : "Entidad"} ·{" "}
                     {new Date(x.created_at).toLocaleString("es-GT", { dateStyle: "medium", timeStyle: "short" })}
                     {x.submitter ? ` · ${x.submitter}` : x.contact ? ` · ${x.contact}` : ""}
                   </span>

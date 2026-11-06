@@ -133,11 +133,14 @@ async function assertPublicHost(u: URL) {
   if (!addrs.length || addrs.some((a) => isPrivateIp(a.address))) throw new PosterError("Enlace no permitido.");
 }
 
+/** Descarga una imagen por URL y la guarda como póster. */
+export const posterFromUrl = (raw: string) => imageFromUrl(raw, "poster");
+
 /**
- * Descarga una imagen por URL y la guarda como póster.
+ * Descarga una imagen por URL y la guarda (póster o logo).
  * Devuelve null si la descarga falla; nunca interrumpe una carga.
  */
-export async function posterFromUrl(raw: string): Promise<string | null> {
+export async function imageFromUrl(raw: string, kind: ImageKind): Promise<string | null> {
   const url = raw.trim();
   if (!url) return null;
   try {
@@ -157,7 +160,7 @@ export async function posterFromUrl(raw: string): Promise<string | null> {
       const len = Number(res.headers.get("content-length") ?? 0);
       if (len > POSTER_MAX_BYTES) return null;
       const buf = Buffer.from(await res.arrayBuffer());
-      return await storePoster(buf);
+      return await storeImage(buf, kind);
     }
     return null;
   } catch {

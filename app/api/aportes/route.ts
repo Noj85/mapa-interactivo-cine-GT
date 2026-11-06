@@ -3,6 +3,7 @@ import { publicStore } from "@/lib/auth";
 import { sanitizeFestivalIds } from "@/lib/festivals-server";
 import { rateLimit } from "@/lib/rate-limit";
 import { submissionMetaSchema, submissionSchema } from "@/lib/schemas";
+import { upperTitle } from "@/lib/utils";
 import type { FilmInput, OrgInput } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
     await store.createSubmission({
       kind: d.kind,
       target_id: target,
-      label: d.kind === "film" ? d.data.title : d.data.name,
+      label: d.kind === "film" ? upperTitle(d.data.title) : d.data.name,
       payload: d.data as unknown as FilmInput | OrgInput,
       note: m.note,
       contact: m.contact,

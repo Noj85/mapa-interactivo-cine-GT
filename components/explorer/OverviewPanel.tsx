@@ -13,7 +13,7 @@ import type { StatKey } from "@/lib/site-settings";
 import type { Film } from "@/lib/types";
 import { Globe2, MapPinOff } from "lucide-react";
 import { abroadFilms, unlocatedFilms } from "@/lib/map/features";
-import { BarRow, DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid } from "./parts";
+import { BarRow, DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid, LocacionFilter } from "./parts";
 
 export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
   const { data, gaz, aggs, view, go } = ctx;
@@ -104,7 +104,7 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
         >
           <MapPinOff className="h-4 w-4 shrink-0" />
           <span>
-            <b className="font-medium text-ink">{fmtInt(unlocated)}</b> {unlocated === 1 ? "producción no tiene" : "producciones no tienen"} lugar de rodaje. Están en la zona «Sin ubicación».
+            <b className="font-medium text-ink">{fmtInt(unlocated)}</b> {unlocated === 1 ? "producción no tiene" : "producciones no tienen"} lugar de rodaje. Están en la zona «Sin locación».
           </span>
         </button>
       )}
@@ -129,7 +129,7 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
 
       <SectionTitle aside={METRICS[view.metric].label}>Más actividad por departamento</SectionTitle>
       {top.length === 0 ? (
-        <Empty>Aún no hay registros con ubicación en esta capa.</Empty>
+        <Empty>Aún no hay registros con locación en esta capa.</Empty>
       ) : (
         <div className="-mx-1">
           {top.map(({ e, v }) => (
@@ -146,11 +146,12 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
       )}
 
       <SectionTitle aside={`${list.length}`}>{view.layer === "produccion" ? "Producciones" : "Registros"}</SectionTitle>
+      {view.layer === "produccion" && (films.length > 0 || view.filmFilter.locacion) && <LocacionFilter value={view.filmFilter.locacion} onChange={go.locacion} />}
       <div className="-mx-2 space-y-0.5">
         {view.layer === "produccion"
           ? (shown as typeof films).map((f) => <FilmCard key={f.id} film={f} gaz={gaz} onClick={() => go.film(f.slug)} />)
           : (shown as typeof orgs).map((o) => <OrgCard key={o.id} org={o} gaz={gaz} onClick={() => go.org(o.slug)} />)}
-        {list.length === 0 && <Empty>Sin registros todavía.</Empty>}
+        {list.length === 0 && <Empty>{view.layer === "produccion" && view.filmFilter.locacion ? "Ninguna producción coincide con este filtro." : "Sin registros todavía."}</Empty>}
       </div>
       {list.length > 6 && (
         <button className="btn-ghost mt-2 w-full text-xs" onClick={() => setShowAll((s) => !s)}>

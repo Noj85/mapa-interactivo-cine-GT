@@ -19,9 +19,12 @@ export const isAbroad = (l: { country?: string | null }) => {
 /** La locación dice dónde se rodó: un lugar de Guatemala o un país de afuera. */
 export const hasPlace = (l: Pick<FilmLocation, "depto_ine" | "muni_ine" | "lat" | "lng"> & { country?: string | null }) => hasAnchor(l) || isAbroad(l);
 
+/** Sin ninguna locación que diga dónde se rodó (ni en Guatemala ni afuera). */
+export const isUnlocated = (f: { locations: (Pick<FilmLocation, "depto_ine" | "muni_ine" | "lat" | "lng"> & { country?: string | null })[] }) => !f.locations.some(hasPlace);
+
 /**
  * Una producción se puede publicar con solo el título. Si todavía no tiene lugar de rodaje,
- * el mapa la muestra en el punto «Sin ubicación», fuera del territorio.
+ * el mapa la muestra en el punto «Sin locación», fuera del territorio.
  * Todo lo demás suma al porcentaje y a la lista de faltantes.
  */
 export function filmCompleteness(
@@ -82,7 +85,7 @@ export function orgCompleteness(
   };
   check(!!o.name?.trim(), "Nombre", 2);
   check(!!o.category, "Categoría", 2);
-  check(o.depto_ine != null || o.muni_ine != null || (o.lat != null && o.lng != null), "Ubicación", 3);
+  check(o.depto_ine != null || o.muni_ine != null || (o.lat != null && o.lng != null), "Locación", 3);
   check(o.muni_ine != null || (o.lat != null && o.lng != null), "Municipio por confirmar", 2);
   check(!!o.initiative_type, "Tipo de iniciativa");
   check(!!o.web || !!o.instagram, "Web o Instagram");

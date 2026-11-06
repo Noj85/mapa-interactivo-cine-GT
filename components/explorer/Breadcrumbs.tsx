@@ -21,7 +21,7 @@ export function Breadcrumbs({
   const crumbs: { label: string; onClick: () => void; current?: boolean }[] = [
     { label: "Guatemala", onClick: onClear, current: !view.place && !view.film && !view.org && !view.noloc && !view.abroad },
   ];
-  if (view.noloc) crumbs.push({ label: "Sin ubicación", onClick: () => {}, current: true });
+  if (view.noloc) crumbs.push({ label: "Sin locación", onClick: () => {}, current: true });
   if (view.abroad) crumbs.push({ label: "Fuera de Guatemala", onClick: () => {}, current: true });
   const place = view.place;
   if (place) {
@@ -40,7 +40,7 @@ export function Breadcrumbs({
     if (o) crumbs.push({ label: o.name, onClick: () => {}, current: true });
   }
   return (
-    <nav aria-label="Ubicación" className="flex min-w-0 items-center gap-0.5 text-[13px]">
+    <nav aria-label="Ruta en el mapa" className="flex min-w-0 items-center gap-0.5 text-[13px]">
       {crumbs.map((c, i) => (
         <span key={i} className="flex min-w-0 items-center gap-0.5">
           {i > 0 && <ChevronRight className="h-3 w-3 shrink-0 text-muted/60" />}

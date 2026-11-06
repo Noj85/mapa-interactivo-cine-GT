@@ -279,6 +279,14 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
                   <label className="label" htmlFor="f-q">Buscar</label>
                   <input id="f-q" className="field" placeholder="Título, director/a, productor/a, guionista o casa productora" value={ff.q} onChange={(e) => patchFilm({ q: e.target.value })} />
                 </div>
+                <div className="sm:col-span-2">
+                  <label className="label" htmlFor="f-locacion">Locación registrada</label>
+                  <select id="f-locacion" className="field" value={ff.locacion ?? ""} onChange={(e) => patchFilm({ locacion: e.target.value === "con" || e.target.value === "sin" ? e.target.value : null })}>
+                    <option value="">Todas</option>
+                    <option value="con">Solo con locación</option>
+                    <option value="sin">Solo sin locación</option>
+                  </select>
+                </div>
                 <label className="flex cursor-pointer items-center gap-2.5 text-sm sm:col-span-2">
                   <input type="checkbox" className="h-4 w-4 accent-[rgb(var(--accent))]" checked={ff.soloCompletas} onChange={(e) => patchFilm({ soloCompletas: e.target.checked })} />
                   Solo producciones con todas sus locaciones ubicadas en un municipio

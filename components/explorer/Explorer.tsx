@@ -30,10 +30,10 @@ import type { PanelCtx } from "./parts";
 
 const PANEL_W = 400;
 
-/** La vista pública no tiene filtros: un enlace con filtros o con otra métrica se abre con el mapa completo. */
+/** La vista pública solo filtra por locación: un enlace con otros filtros o con otra métrica los ignora. */
 function forMode(v: ViewState, canEdit: boolean): ViewState {
   if (canEdit) return v;
-  return { ...v, metric: LAYER_METRICS[v.layer][0], filmFilter: EMPTY_FILM_FILTER, orgFilter: EMPTY_ORG_FILTER };
+  return { ...v, metric: LAYER_METRICS[v.layer][0], filmFilter: { ...EMPTY_FILM_FILTER, locacion: v.filmFilter.locacion }, orgFilter: EMPTY_ORG_FILTER };
 }
 
 /**
@@ -103,6 +103,9 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
         commit({ ...view, place: null });
       },
       clear: () => commit({ ...view, place: null, film: null, org: null, noloc: false, abroad: false }),
+      locacion: (locacion: "con" | "sin" | null) =>
+        // en «Sin locación» no hay territorio que ver: se sale del lugar o de la producción abiertos
+        commit({ ...view, filmFilter: { ...view.filmFilter, locacion }, film: null, ...(locacion === "sin" ? { place: null } : {}), noloc: false, abroad: false }),
     }),
     [view, commit, data.orgs, geo],
   );
@@ -169,7 +172,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
     : view.org
       ? `Entidad: ${data.orgs.find((o) => o.slug === view.org)?.name ?? ""}`
       : view.noloc
-        ? "Producciones sin ubicación"
+        ? "Producciones sin locación"
         : view.abroad
           ? "Producciones rodadas fuera de Guatemala"
       : view.place
@@ -250,7 +253,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
         </div>
         {!canEdit && (
           <Link
-            href="/aportar"
+            href={`/aportar?capa=${view.layer}`}
             className="btn-primary pointer-events-auto h-11 w-full justify-center gap-2 rounded-2xl text-[15px] shadow-soft"
             title="Aporta una producción o entidad que falta en el mapa"
           >

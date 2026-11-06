@@ -5,7 +5,7 @@ import { describeFestival, sortFestivals } from "@/lib/festivals";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { durationLabel, formatLabel, natureLabel } from "@/lib/film-types";
 import { INITIATIVE_TYPES, LAYERS, NATIONALITIES, type Film, type FilmInput, type Org, type OrgInput, type Submission } from "@/lib/types";
-import { fmtInt, fmtMoney } from "@/lib/utils";
+import { fmtInt, fmtMoney, upperTitle } from "@/lib/utils";
 
 export interface DiffRow {
   label: string;
@@ -56,7 +56,7 @@ export function diffSubmission(sub: Submission, current: Film | Org | null, gaz:
     const nat = (k: string | null | undefined) => NATIONALITIES.find((x) => x.id === k)?.label ?? null;
     const money = (v: number | null | undefined, cur?: string) => (v == null ? null : `${cur === "USD" ? "US$" : "Q"} ${fmtInt(v)}`);
     const rows = [
-      row("Título", c?.title ?? null, p.title, isNew),
+      row("Título", c?.title ?? null, upperTitle(p.title), isNew),
       row("Año", c?.year != null ? String(c.year) : null, p.year != null ? String(p.year) : null, isNew),
       row("Formato", fmt(c?.format), fmt(p.format), isNew),
       row("Naturaleza", natu(c?.nature), natu(p.nature), isNew),

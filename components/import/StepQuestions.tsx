@@ -102,9 +102,9 @@ export function StepQuestions({
       orgs: live.filter((c) => c.type === "org").length,
       complete,
       incomplete: live.length - complete,
-      // Solo las entidades sin ubicación (o registros sin título) quedan como borrador.
+      // Solo las entidades sin locación (o registros sin título) quedan como borrador.
       drafts: st.filter((s) => !s.publishable).length,
-      // Producciones sin lugar de rodaje: se publican en la zona «Sin ubicación» del mapa.
+      // Producciones sin lugar de rodaje: se publican en la zona «Sin locación» del mapa.
       nowhere: live.filter(
         (c) => c.type === "film" && !(c.film?.locations ?? []).some((l) => l.muni_ine || l.depto_ine || (l.lat != null && l.lng != null) || isAbroad(l)),
       ).length,
@@ -115,8 +115,17 @@ export function StepQuestions({
         if (!rec) return true;
         const plan = c.type === "film" && c.film ? planFilmUpdate(rec as Film, c.film) : c.org ? planOrgUpdate(rec as Org, c.org) : null;
         if (!plan) return true;
-        const on = new Set(c.accept ?? plan.items.filter((i) => i.defaultOn).map((i) => i.id));
+        // los conflictos nunca se aplican desde la carga
+        const on = new Set((c.accept ?? plan.items.filter((i) => i.defaultOn).map((i) => i.id)).filter((id) => plan.items.find((i) => i.id === id)?.group !== "conflict"));
         return plan.items.some((i) => on.has(i.id));
+      }).length,
+      // lo que no se puede decidir solo (coincidencia dudosa o diferencias con el registro existente) queda en Aportes
+      toAportes: live.filter((c) => {
+        if (c.decision === "review") return true;
+        if (!c.duplicate || c.decision !== "update") return false;
+        const rec = c.duplicate.record;
+        const plan = !rec ? null : c.type === "film" && c.film ? planFilmUpdate(rec as Film, c.film) : c.org ? planOrgUpdate(rec as Org, c.org) : null;
+        return !!plan?.items.some((i) => i.group === "conflict");
       }).length,
       deferred: questions.filter((q) => q.status === "deferred").length,
     };
@@ -165,6 +174,7 @@ export function StepQuestions({
           created: all.filter((r) => r.action === "created").length,
           updated: all.filter((r) => r.action === "updated").length,
           unchanged: all.filter((r) => r.action === "unchanged").length,
+          queued: all.filter((r) => r.queuedAportes).length,
           failed: all.filter((r) => r.action === "failed").length,
           pending_questions: deferred.length,
         },
@@ -232,7 +242,7 @@ export function StepQuestions({
                       </button>
                     ) : (
                       <div>
-                        <p className="mb-2 text-xs text-muted">Se mostrará en la zona «Fuera de Guatemala» del mapa, no como «Sin ubicación».</p>
+                        <p className="mb-2 text-xs text-muted">Se mostrará en la zona «Fuera de Guatemala» del mapa, no como «Sin locación».</p>
                         <div className="grid gap-2 sm:grid-cols-2">
                           <input className="field" list="q-countries" placeholder="País" aria-label="País" value={country} onChange={(e) => setCountry(e.target.value)} />
                           <input className="field" placeholder="Ciudad o lugar (opcional)" aria-label="Ciudad o lugar" value={city} onChange={(e) => setCity(e.target.value)} />
@@ -303,6 +313,8 @@ export function StepQuestions({
     // qué campos se completaron en los registros existentes, sumados
     const totals = new Map<string, number>();
     for (const r of results) for (const f of r.filled ?? []) totals.set(f.replace(/ \((\d+)\)$/, ""), (totals.get(f.replace(/ \((\d+)\)$/, "")) ?? 0) + Number(f.match(/\((\d+)\)$/)?.[1] ?? 1));
+    const queuedAportes = results.filter((r) => r.queuedAportes).length;
+    const conflictFields = results.reduce((n, r) => n + (r.conflicts ?? 0), 0);
     const filledTotals = [...totals].sort((a, b) => b[1] - a[1]);
     return (
       <div className="mx-auto max-w-xl text-center">
@@ -311,7 +323,8 @@ export function StepQuestions({
         </span>
         <h2 className="mt-5 font-display text-3xl tracking-tight">Listo, información cargada</h2>
         <p className="mt-2 text-sm text-muted">
-          {count("created")} nuevos · {count("updated")} actualizados · {count("unchanged")} sin cambios
+          {count("created")} nuevos · {count("updated")} completados · {count("unchanged")} sin cambios
+          {queuedAportes > 0 && <> · <b className="text-ink">{queuedAportes} enviados a Aportes</b></>}
           {failed.length > 0 && <> · <span className="text-danger">{failed.length} con error</span></>}
           {summary.deferred > 0 && <> · {summary.deferred} {summary.deferred === 1 ? "pregunta pendiente" : "preguntas pendientes"}</>}
         </p>
@@ -319,6 +332,17 @@ export function StepQuestions({
           <p className="mx-auto mt-3 max-w-md text-xs leading-relaxed text-muted">
             <span className="font-medium text-ink">Se completó en los existentes:</span> {filledTotals.map(([k, n]) => `${k} (${n})`).join(", ")}.
           </p>
+        )}
+        {queuedAportes > 0 && (
+          <div className="mx-auto mt-4 max-w-md rounded-2xl border border-warn/30 bg-warn/5 p-4 text-left text-xs leading-relaxed">
+            <p className="font-medium text-ink">Quedó para revisar en Aportes («Carga de archivo»)</p>
+            <p className="mt-1 text-muted">
+              {conflictFields > 0 && <>{conflictFields} {conflictFields === 1 ? "dato que traía otro valor" : "datos que traían otro valor"} que el registro existente (no se cambió nada). </>}
+              {results.filter((r) => r.action === "queued").length > 0 && <>{results.filter((r) => r.action === "queued").length} {results.filter((r) => r.action === "queued").length === 1 ? "registro con coincidencia dudosa" : "registros con coincidencia dudosa"} (no se creó ni se cambió nada). </>}
+              Ahí decides qué se aplica.
+            </p>
+            <Link href="/admin/aportes?origen=carga" className="mt-2 inline-block text-accent hover:underline">Ir a los aportes →</Link>
+          </div>
         )}
         {failed.length > 0 && (
           <ul className="mx-auto mt-4 max-w-md space-y-1 rounded-2xl border border-danger/30 bg-danger/5 p-4 text-left text-xs text-danger">
@@ -360,15 +384,20 @@ export function StepQuestions({
         {summary.films === 0 && <li>{summary.orgs} entidades</li>}
         {summary.drafts > 0 && (
           <li className="text-warn">
-            {summary.drafts} no tienen lo mínimo para publicarse (título, o ubicación en el caso de entidades): se guardan como borrador y solo las ve el equipo.
+            {summary.drafts} no tienen lo mínimo para publicarse (título, o locación en el caso de entidades): se guardan como borrador y solo las ve el equipo.
           </li>
         )}
         {summary.nowhere > 0 && (
           <li>
-            {summary.nowhere === 1 ? "1 producción no tiene" : `${summary.nowhere} producciones no tienen`} lugar de rodaje: se muestran en la zona «Sin ubicación», fuera del territorio, hasta que agregues sus locaciones.
+            {summary.nowhere === 1 ? "1 producción no tiene" : `${summary.nowhere} producciones no tienen`} lugar de rodaje: se muestran en la zona «Sin locación», fuera del territorio, hasta que agregues sus locaciones.
           </li>
         )}
-        {summary.updates > 0 && <li>{summary.updates} completan registros que ya existían: solo lo vacío o lo que tú aceptaste, sin pisar nada más.</li>}
+        {summary.updates > 0 && <li>{summary.updates} completan registros que ya existían: solo lo vacío o lo que se agrega, sin pisar nada.</li>}
+        {summary.toAportes > 0 && (
+          <li className="text-warn">
+            {summary.toAportes} {summary.toAportes === 1 ? "queda" : "quedan"} en Aportes («Carga de archivo») para que el equipo lo revise: datos distintos a los guardados o coincidencias dudosas. No se cambia ni se crea nada de eso ahora.
+          </li>
+        )}
         {summary.deferred > 0 && (
           <li>
             {summary.deferred === 1 ? "1 pregunta queda pendiente" : `${summary.deferred} preguntas quedan pendientes`} para después.

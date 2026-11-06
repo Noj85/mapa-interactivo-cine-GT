@@ -205,8 +205,25 @@ export function FilterPanel(p: Props) {
           node: <Range label="Empleos" min={ff.empleosMin} max={ff.empleosMax} hints={["Mínimo", "Máximo"]} onChange={(empleosMin, empleosMax) => pf({ empleosMin, empleosMax })} />,
         },
         {
+          id: "locacion",
+          label: "Locación registrada",
+          ownLabel: true,
+          active: ff.locacion != null,
+          clear: () => pf({ locacion: null }),
+          node: (
+            <div>
+              <div className="label pr-8">Locación registrada</div>
+              <select aria-label="Locación registrada" className="field" value={ff.locacion ?? ""} onChange={(e) => pf({ locacion: e.target.value === "con" || e.target.value === "sin" ? e.target.value : null })}>
+                <option value="">Todas</option>
+                <option value="con">Con locación</option>
+                <option value="sin">Sin locación</option>
+              </select>
+            </div>
+          ),
+        },
+        {
           id: "completas",
-          label: "Locaciones ubicadas",
+          label: "Locaciones con municipio",
           active: ff.soloCompletas,
           clear: () => pf({ soloCompletas: false }),
           node: (

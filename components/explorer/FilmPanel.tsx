@@ -180,7 +180,7 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
                   <span className="block text-sm text-ink">{abroad ? l.site ?? l.city ?? l.country : l.site ?? muni?.name ?? depto?.name ?? "Lugar por confirmar"}</span>
                   <span className="flex items-center gap-1 text-xs text-muted">
                     <MapPin className="h-3 w-3" />
-                    {abroad ? abroadWhere : [muni?.name, depto?.name].filter(Boolean).join(", ") || "Sin ubicación"}
+                    {abroad ? abroadWhere : [muni?.name, depto?.name].filter(Boolean).join(", ") || "Sin locación"}
                     {!abroad && !muni && depto && <span className="text-warn"> · municipio por confirmar</span>}
                   </span>
                   <span className="mt-1 block text-xs text-muted/90">
@@ -197,7 +197,7 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
             </li>
           );
         })}
-        {film.locations.length === 0 && <li className="text-sm text-muted">Sin lugar de rodaje registrado: aparece en la zona «Sin ubicación», fuera del territorio.</li>}
+        {film.locations.length === 0 && <li className="text-sm text-muted">Sin lugar de rodaje registrado: aparece en la zona «Sin locación», fuera del territorio.</li>}
       </ol>
 
       {fests.length > 0 && (

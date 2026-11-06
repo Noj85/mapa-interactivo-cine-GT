@@ -5,7 +5,8 @@ import { claudeEnabled } from "@/lib/claude/client";
 import { resolveWithClaude } from "@/lib/claude/places";
 import { serverGazetteer } from "@/lib/geo/server";
 import { findDuplicates } from "@/lib/import/duplicates";
-import type { PlaceResolution, ResolveResponse } from "@/lib/import/types";
+import { existingRefs } from "@/lib/import/existing";
+import type { DuplicateMatch, PlaceResolution, ResolveResponse } from "@/lib/import/types";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -13,7 +14,19 @@ export const dynamic = "force-dynamic";
 const body = z.object({
   places: z.array(z.string().max(300)).max(3000),
   items: z
-    .array(z.object({ key: z.string(), type: z.enum(["film", "org"]), title: z.string(), year: z.number().nullable() }))
+    .array(
+      z.object({
+        key: z.string(),
+        type: z.enum(["film", "org"]),
+        title: z.string(),
+        year: z.number().nullable(),
+        director: z.string().nullable().optional(),
+        layer: z.enum(["circulacion", "industria"]).nullable().optional(),
+        muni_ine: z.number().nullable().optional(),
+        depto_ine: z.number().nullable().optional(),
+        placeTexts: z.array(z.string().max(300)).max(10).optional(),
+      }),
+    )
     .max(8000),
 });
 
@@ -65,17 +78,30 @@ export async function POST(req: Request) {
   // Duplicados contra lo ya guardado (incluye borradores)
   const store = await adminStore();
   const [films, orgs] = await Promise.all([store.listFilms({ drafts: true }), store.listOrgs({ drafts: true })]);
-  const duplicates = findDuplicates(items, [
-    ...films.map((f) => ({ id: f.id, title: f.title, year: f.year, type: "film" as const })),
-    ...orgs.map((o) => ({ id: o.id, title: o.name, year: null, type: "org" as const })),
-  ]);
+  for (const it of items) {
+    if (it.type !== "org" || it.muni_ine != null || !it.placeTexts?.length) continue;
+    for (const t of it.placeTexts) {
+      const p = places_out[t];
+      if (p?.status === "ok") {
+        it.muni_ine = p.muni_ine;
+        it.depto_ine = p.depto_ine;
+        break;
+      }
+    }
+  }
+  const duplicates = findDuplicates(items, existingRefs(films, orgs));
 
   // cada coincidencia lleva una copia del registro existente: el navegador calcula con ella qué se completaría
   const filmById = new Map(films.map((f) => [f.id, f]));
   const orgById = new Map(orgs.map((o) => [o.id, o]));
+  const withRecord = (type: "film" | "org", d: DuplicateMatch) => {
+    d.record = (type === "org" ? orgById.get(d.id) : filmById.get(d.id)) ?? undefined;
+  };
+  const typeOf = new Map(items.map((i) => [i.key, i.type]));
   for (const [key, d] of Object.entries(duplicates)) {
-    const item = items.find((i) => i.key === key);
-    d.record = (item?.type === "org" ? orgById.get(d.id) : filmById.get(d.id)) ?? undefined;
+    const type = typeOf.get(key) ?? "film";
+    withRecord(type, d);
+    d.alternatives?.forEach((a) => withRecord(type, a));
   }
 
   const res: ResolveResponse = { places: places_out, duplicates, engine };

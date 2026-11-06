@@ -28,7 +28,7 @@ Copia `.env.example` a `.env.local` (o configúralas en Vercel).
 ## Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0016`, ver cada sección) de `supabase/migrations/`:
+2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0018`, ver cada sección) de `supabase/migrations/`:
    - `0001_init.sql`: tablas, políticas RLS y perfiles.
    - `0002_posters.sql`: campo del póster y bucket público `posters` en Storage.
    - `0003_submissions.sql`: aportes del público.
@@ -73,19 +73,52 @@ También se aceptan documentos de **Word** (`.docx`, hasta 15 MB; `/api/import/d
 
 La columna «Tipo», «Formato» o «Categoría» va a formato; «Naturaleza» o «Clase», a naturaleza; y «Género» o «Géneros», a géneros (ya no al tipo de obra). Una misma columna puede alimentar varios campos: un «Tipo» con «Largometraje documental» llena formato y naturaleza, y una columna de géneros que trae «Documental» o «Ficción» pone eso en la naturaleza. Los géneros se separan por `;`, `,`, `/` o `|`, se traducen a la lista estándar (también del inglés: sci-fi, horror, thriller…) y los que no están se conservan como propios. Un formato que no se reconoce no se guarda como «Otro»: se pregunta («¿Qué formato es “Telefilme”?»). En el paso «Lo que entendimos» un aviso lista las columnas del archivo que no se van a usar. En los PDF, Claude también entrega los festivales y los lugares de rodaje como listas (cada uno extra es otra fila con el mismo título) y el país de la casa productora.
 
+### Cómo se interpreta el archivo
+
+Antes de revisar, el asistente deja el archivo en una **tabla normalizada** con las columnas del sistema (`lib/import/normalized.ts`): **Producción** (una fila por locación, con casas productoras, equipo, presupuesto…), **Festivales**, **Circulación** e **Industria**, cada una con las columnas «Origen (filas del archivo)» y «Estado de la carga». En la revisión se ve en **«Vista normalizada»** y se baja con **«Descargar Excel normalizado»**; sus encabezados son los que la carga reconoce sola, así que ese mismo Excel se puede volver a cargar sin ajustes.
+
+Además de tablas simples, la lectura entiende (`lib/import/parse.ts`, `lib/import/heuristic.ts`; funciona sin Claude):
+
+- **Encabezados en dos filas** (grupo arriba, columna abajo, también con celdas combinadas): «Locación 1 | Lugar», «Locación 1 | Días»… Una fila de título encima se ignora.
+- **Fichas clave/valor** en Excel (una columna de etiquetas, otra de valores): cada ficha pasa a ser una fila; si la etiqueta del título se repite, hay varias fichas en la hoja. Una etiqueta repetida dentro de una ficha junta sus valores con «; ».
+- **Varias locaciones por fila** con grupos de columnas repetidos y numerados («Lugar 1», «Días 1», «Lugar 2», «Días 2», «Segundo lugar»…). El primer grupo usa los campos normales y los siguientes `place__2`, `days__2`, etc.
+- **Entidades de Circulación e Industria en la misma hoja**: la capa se decide por la categoría de cada fila.
+- **Logo (enlace)** de las entidades y **enlace del festival o premio** (también en PDF/Word con Claude).
+
+A Claude se le manda una muestra de ~60 filas del inicio, el medio y el final del archivo (no solo las primeras), con el catálogo de campos, categorías y formatos y avisos de si la hoja venía en dos filas o como ficha.
+
+### Coincidencias, colisiones y «nunca pisar»
+
+Cada renglón del archivo se compara con lo guardado (incluidos borradores) y con el resto del archivo (`lib/import/duplicates.ts`, `lib/import/transform.ts → mergeInFile`):
+
+- **Producciones**: título sin tildes, sin artículo inicial («La casa» = «Casa») y sin subtítulo; año (±1 cuenta como distinto pero cercano) y director/a (comparten al menos un nombre). **Entidades**: nombre sin artículo ni sufijo legal (S.A.), **misma capa** y municipio.
+- Nivel de la coincidencia: **segura** (título casi idéntico y además mismo año, director/a o municipio, sin contradicciones), **probable** (título muy parecido y nada que lo contradiga) y **dudosa** (el año, el director/a o el municipio no cuadran, o hay dos candidatos igual de buenos). Se muestran hasta 3 candidatos.
+- Dentro del archivo, lo repetido (otra fila, u otra hoja como «Festivales») se **fusiona** en un solo registro: nunca se crea dos veces. Si dos filas traen valores distintos para lo mismo, se usa el primero y se avisa.
+- Locaciones, festivales y casas productoras también se comparan: una locación es la misma si coincide el municipio (o el país y la ciudad) y el sitio es igual o casi (similitud 0,85); un festival es el mismo aunque se escriba más largo o corto («Festival Internacional de Cine de Sundance» = «Sundance») y se une al del catálogo en vez de crear uno parecido; una casa productora se compara sin sufijos legales.
+
+Qué pasa al confirmar (`lib/import/commit-server.ts`; el servidor **vuelve a cotejar** contra lo guardado en ese momento, así que reintentar una carga o subir el mismo archivo dos veces no crea nada nuevo):
+
+- **Nuevo**: se crea.
+- **Coincidencia segura o probable**: solo se **completa lo vacío** y se **agregan** elementos (locaciones, festivales, casas, géneros, categorías, póster/logo si no había). Un valor que ya existe **nunca se cambia desde la carga**, y una celda vacía nunca borra.
+- **Diferencias** (el archivo trae otro valor que el guardado) y **coincidencias dudosas**: no se aplica ni se crea nada; quedan como aporte de tipo **«Carga de archivo»** en `/admin/aportes` (filtro «Carga de archivo»). La revisión también deja elegir «Enviar a Aportes» o «No, crear nueva».
+
+En Aportes, un aporte «Carga de archivo» se revisa campo por campo: la página recalcula contra el registro **tal como está hoy**, con una casilla por campo (valor actual → valor del archivo, **todo desmarcado**) y solo se aplica lo marcado. En una coincidencia dudosa se elige con cuál de los candidatos se corresponde (o «Es nuevo»). Requiere `supabase/migrations/0017_submission_import.sql` (después de 0016): permite el origen `carga` y agrega `import_id` y `candidates` a `submissions`; solo el equipo los crea. Sin ella, la carga falla al crear aportes (los registros nuevos y los completados se guardan igual, pero conviene aplicarla antes de cargar).
+
+El resumen final dice «N nuevos · N completados · N sin cambios · N enviados a Aportes» y enlaza a los aportes.
+
 ### Actualizar producciones que ya existen
 
-Si el archivo trae una producción o entidad parecida a una guardada, la revisión muestra **«Qué se actualizaría»** y no cambia nada sin que lo veas:
+Si el archivo trae una producción o entidad parecida a una guardada, la revisión muestra **«Qué se completaría»**:
 
-- **Completa**: campos que estaban vacíos y el archivo llena (la moneda viaja con el presupuesto; el póster solo si no había; una locación sin municipio se completa en vez de duplicarse).
+- **Completa**: campos que estaban vacíos y el archivo llena (la moneda viaja con el presupuesto; el póster y el logo solo si no había; una locación sin municipio se completa en vez de duplicarse).
 - **Agrega**: locaciones, festivales, casas productoras y géneros nuevos.
-- **Ya tiene otro valor**: nunca se cambia solo; aparece «actual → archivo» con la casilla «Usar el del archivo» apagada.
+- **Ya tiene otro valor**: se muestra «en el sistema / en el archivo» sin casilla; no se cambia y va a Aportes (ver arriba).
 
-Cada elemento tiene su casilla. Una celda vacía nunca borra nada, y el título y el estado no cambian. Si el archivo no trae nada nuevo, la coincidencia queda en «Omitir» y, aunque se fuerce, el registro no se guarda. Al confirmar, el servidor vuelve a leer el registro y recalcula lo que cambia (solo toma del navegador la lista de casillas marcadas). El resumen final dice «N nuevos · N actualizados · N sin cambios» y qué campos se completaron.
+Cada elemento que completa o agrega tiene su casilla. El título y el estado no cambian. Si el archivo no trae nada nuevo, la coincidencia queda en «Omitir» y, aunque se fuerce, el registro no se guarda.
 
 ### Primera carga
 
-El mapa arranca vacío y se llena desde cero: entra a `/admin/agregar` y sube un archivo (CSV, Excel, Word o PDF) o registra una producción o entidad a mano. El proyecto no trae datos de producciones ni entidades; solo trae el catálogo base de festivales (ver «Festivales y premios»). Las producciones sin lugar de rodaje salen en la zona **«Sin ubicación»** del mapa (ver abajo) hasta que les agregues sus locaciones desde `/admin/peliculas`; el botón «Publicar todas» de esa pantalla publica de una vez los borradores que ya tienen título.
+El mapa arranca vacío y se llena desde cero: entra a `/admin/agregar` y sube un archivo (CSV, Excel, Word o PDF) o registra una producción o entidad a mano. El proyecto no trae datos de producciones ni entidades; solo trae el catálogo base de festivales (ver «Festivales y premios»). Las producciones sin lugar de rodaje salen en la zona **«Sin locación»** del mapa (ver abajo) hasta que les agregues sus locaciones desde `/admin/peliculas`; el botón «Publicar todas» de esa pantalla publica de una vez los borradores que ya tienen título.
 
 ## Dos partes: mapa público y equipo
 
@@ -96,7 +129,7 @@ La app es una sola, con dos áreas separadas. **`/` siempre es el mapa público*
 | Quién | Cualquier persona, sin cuenta | Solo el equipo (login) |
 | Qué hace | Explorar el mapa, descargar datos filtrados, **aportar** | Revisar aportes, cargar archivos (CSV/Excel/Word/PDF), editar producciones y entidades, preguntas pendientes, pósters, exportar para informes |
 
-**Aportes del público.** En `/aportar` cualquiera puede sugerir una producción o entidad nueva (con varias locaciones), y desde la ficha de cada registro, «Sugerir corrección» abre el mismo formulario con los datos actuales. Nada se publica de inmediato: el aporte queda **pendiente** en `/admin/aportes`, donde el equipo ve los datos propuestos (en una corrección, lo que cambia frente al registro actual) y puede **aprobar y publicar**, **aprobar como borrador y editar**, **aplicar la corrección** o **rechazar** con una nota. El número de pendientes aparece en el menú y en el resumen.
+**Aportes del público.** El botón «Aportar al mapa» lleva la capa que se estaba viendo (`/aportar?capa=circulacion`): con Producción abre el formulario de producción; con Circulación o Industria abre el de entidad con esa capa ya elegida. En `/aportar` cualquiera puede sugerir una producción o entidad nueva (con varias locaciones), y desde la ficha de cada registro, «Sugerir corrección» abre el mismo formulario con los datos actuales. Nada se publica de inmediato: el aporte queda **pendiente** en `/admin/aportes`, donde el equipo ve los datos propuestos (en una corrección, lo que cambia frente al registro actual) y puede **aprobar y publicar**, **aprobar como borrador y editar**, **aplicar la corrección** o **rechazar** con una nota. El número de pendientes aparece en el menú y en el resumen.
 
 - Solo registros individuales: el público no puede subir archivos (Excel, CSV, PDF). `/api/aportes` rechaza todo lo que no sea JSON, y las cargas masivas exigen sesión del equipo. Quien quiera aportar una base de datos escribe a contacto@academiadecinegt.org.
 - Sin cuenta: la **fuente** (un enlace, un catálogo o cómo se sabe) y un **correo** son obligatorios para enviar, de modo que la curaduría pueda corroborar los datos; el correo solo lo ve el equipo. Protecciones: campo trampa, tiempo mínimo, límite de 10 aportes por hora por IP, texto sin HTML y enlaces solo http(s). Los aportes **nunca** tocan los registros publicados hasta que se aprueban.
@@ -108,17 +141,17 @@ La app es una sola, con dos áreas separadas. **`/` siempre es el mapa público*
 - **Categorías**: una entidad puede tener varias (por ejemplo, producción, posproducción y efectos especiales). La primera es la principal; es la que usan el color y el resumen, y el resto cuenta en filtros y descargas. En archivos importados se pueden separar con «;», «,» o «/».
 - **Contacto**: teléfono y/o correo, en campos separados. Los teléfonos de Guatemala se guardan como `+502 5555 1234`; los extranjeros con su código de país. En archivos importados se extraen y estandarizan, y lo que no sea teléfono ni correo (nombres, notas) se avisa en la revisión y no se guarda.
 
-## Varias locaciones, «Sin ubicación» y «Fuera de Guatemala»
+## Varias locaciones, «Sin locación» y «Fuera de Guatemala»
 
 - Una producción puede tener **todas las locaciones que haga falta** (cada una con su lugar, sitio, días, inversión local y empleos). En el editor: «Agregar locación», o «Pegar varios lugares» para escribir una lista (uno por línea o separados por «;») que se resuelve con los códigos del INE. En un archivo importado, una fila por locación.
-- Las producciones **sin lugar de rodaje** ya no quedan ocultas: con tener título se publican y se muestran en una zona punteada «Sin ubicación» en el Pacífico, fuera del territorio de Guatemala, para que se entienda que no tienen ubicación. Tocarla abre la lista de esas producciones (`?sinlugar=1`), y la vista general avisa cuántas son. Al agregarles un lugar pasan solas al mapa.
-- Una producción guatemalteca puede haberse rodado **en otro país**, y eso **no es «Sin ubicación»**: sí dice dónde se rodó. En el editor, cada locación tiene la casilla **«Fuera de Guatemala»**, que cambia departamento y municipio por **País** (con sugerencias) y **Ciudad o lugar**. Esas producciones salen en una segunda zona punteada del Pacífico, bajo «Sin ubicación», con la etiqueta «Fuera de Guatemala» y su conteo; tocarla abre la lista agrupada por país (`?fuera=1`) y la vista general avisa cuántas son. Una producción con locaciones dentro y fuera aparece en el territorio y en la zona. Las locaciones de afuera no suman a departamentos ni a los totales de Guatemala, pero **sí cuentan** para la completitud («Locaciones» deja de faltar y «Municipio por confirmar» las ignora). Las descargas traen las columnas «País (si fue fuera de Guatemala)» y «Ciudad (fuera de Guatemala)».
+- Las producciones **sin lugar de rodaje** ya no quedan ocultas: con tener título se publican y se muestran en una zona punteada «Sin locación» en el Pacífico, fuera del territorio de Guatemala, para que se entienda que no tienen locación. Tocarla abre la lista de esas producciones (`?sinlugar=1`), y la vista general avisa cuántas son. Al agregarles un lugar pasan solas al mapa.
+- Una producción guatemalteca puede haberse rodado **en otro país**, y eso **no es «Sin locación»**: sí dice dónde se rodó. En el editor, cada locación tiene la casilla **«Fuera de Guatemala»**, que cambia departamento y municipio por **País** (con sugerencias) y **Ciudad o lugar**. Esas producciones salen en una segunda zona punteada del Pacífico, bajo «Sin locación», con la etiqueta «Fuera de Guatemala» y su conteo; tocarla abre la lista agrupada por país (`?fuera=1`) y la vista general avisa cuántas son. Una producción con locaciones dentro y fuera aparece en el territorio y en la zona. Las locaciones de afuera no suman a departamentos ni a los totales de Guatemala, pero **sí cuentan** para la completitud («Locaciones» deja de faltar y «Municipio por confirmar» las ignora). Las descargas traen las columnas «País (si fue fuera de Guatemala)» y «Ciudad (fuera de Guatemala)».
 - Al **importar** (Excel, CSV, Word, PDF), un lugar que nombra otro país («Oaxaca, México», «Madrid - España») se reconoce solo como locación fuera de Guatemala; si el asistente pregunta dónde se rodó una producción, hay una opción «Está fuera de Guatemala» que pide el país.
 - Requiere `supabase/migrations/0014_location_country.sql` (después de 0013): agrega `country` y `city` a `film_locations`. Sin ella todo lo demás sigue funcionando; solo falla guardar locaciones con país.
 
 ## Publicar o no en el mapa
 
-En **Registros** (`/admin/peliculas` y `/admin/entidades`) cada fila tiene un interruptor **En el mapa**, hay búsqueda, filtros (estado, completitud, categoría, origen…) y casillas para aplicar «Publicar» o «Ocultar» a varias filas a la vez. Lo que ves como registrado en el equipo puede ser más que lo que se muestra en el mapa público: solo aparece lo publicado.
+En **Registros** (`/admin/peliculas` y `/admin/entidades`) cada fila tiene un interruptor **En el mapa**, hay búsqueda, filtros (estado, completitud, categoría, origen, **locación** con/sin y, en producciones, **festivales** con/sin…) y casillas para aplicar «Publicar» o «Ocultar» a varias filas a la vez. Lo que ves como registrado en el equipo puede ser más que lo que se muestra en el mapa público: solo aparece lo publicado.
 
 ## Solicitar información (recopilación)
 
@@ -152,6 +185,10 @@ Requiere `supabase/migrations/0011_film_format_genres.sql` (después de 0009 y 0
 
 **Director/a de fotografía y Guionista** son dos campos de texto más por producción, opcionales: se editan junto a Director/a y Productor/a (equipo, aportes públicos y enlaces de /completar), se ven en la ficha, se buscan, salen como columnas en las descargas y se importan desde columnas como «Director/a de fotografía», «DP», «Fotografía», «Guionista» o «Guion» (y los reconoce Claude en PDF y Word). **No cuentan en el porcentaje de completitud** ni se piden en el mensaje de solicitud de información. Requieren `supabase/migrations/0016_film_crew.sql` (después de 0015); sin ella, guardar producciones falla.
 
+**Títulos en mayúsculas.** Los títulos de las producciones se guardan y se ven siempre en MAYÚSCULAS (con sus acentos: «ÚLTIMO»). La app los estandariza al guardar (editor, aportes, archivos y enlaces de /completar), y `supabase/migrations/0018_film_title_upper.sql` hace dos cosas en la base: pasa a mayúsculas los títulos que ya existían y crea un trigger que lo exige en cada insert o update. Los slugs no cambian y la búsqueda sigue ignorando mayúsculas y acentos. En modo local, `.data/db.json` se estandariza al leerlo.
+
+**Locación, no «ubicación».** En todo el sitio se dice «locación» («Sin locación», «Locación pendiente»). Los sinónimos «ubicación» siguen reconociéndose como encabezado al importar archivos.
+
 ## Festivales y premios
 
 Cada producción puede tener **varias entradas de festival** (festival, año, resultado —selección, premio, mención…—, sección, premio, enlace, país y ciudad), igual que las locaciones. Se ven en la ficha y en las descargas, no en los filtros del mapa, y no cuentan en la completitud. Al escribir el nombre aparecen sugerencias de un **catálogo** de festivales, pero se puede escribir cualquiera a mano: al aprobar un aporte, los festivales nuevos se agregan al catálogo. Administra el catálogo en **Ajustes → Festivales**, `/admin/ajustes/festivales` (buscar, editar, fusionar duplicados). El catálogo es una lista de referencia y **no es la capa Circulación**; aun así, cada entrada puede vincularse a una entidad de Circulación con categoría «Festivales» (ver abajo).
@@ -182,7 +219,8 @@ En el mapa público y en `/admin`, el desplegable «Todo el país» (debajo de l
 
 Solo en `/admin`, junto al departamento hay un botón **«Filtros»** que abre un panel compacto. Sin filtros el mapa no muestra nada más; los filtros se **añaden a la carta** («+ Añadir filtro») y se quitan con la «×»:
 
-- **Producción:** formato, naturaleza, género, nacionalidad, año, presupuesto (con moneda), días de rodaje, inversión local, empleos, «solo con todas las locaciones ubicadas» y búsqueda por texto.
+- **Producción:** formato, naturaleza, género, nacionalidad, año, presupuesto (con moneda), días de rodaje, inversión local, empleos, «locación registrada» (con o sin), «solo con todas las locaciones en un municipio» y búsqueda por texto.
+- **Mapa público:** no tiene el panel de filtros, pero en la tarjeta de la derecha (capa Producción) hay un selector **Todas / Con locación / Sin locación** que recorta a la vez la lista y el mapa (`?locacion=con` o `?locacion=sin`). «Sin locación» deja solo la zona punteada del Pacífico; «Con locación» la oculta. Una producción rodada solo fuera de Guatemala cuenta como «con locación».
 - **Circulación e Industria:** categoría (varias), naturaleza y búsqueda por texto.
 - **Medir por** (solo Producción): producciones, días de rodaje, inversión local o empleos; cambia los colores del mapa.
 - Los filtros se aplican al mapa y los paneles, y viven en la URL con los mismos parámetros que `/descargas` (`formato_obra`, `naturaleza`, `genero`, `desde`, `presupuesto_min`, `dias_min`, `categoria`…, más `metrica`), así que «Copiar enlace de esta vista» y «Descargar estos datos» llevan exactamente lo que se ve. Los enlaces anteriores con `?categoria=` o `?clase=` (el antiguo «tipo de obra») siguen funcionando: se convierten a formato y naturaleza.
@@ -228,7 +266,8 @@ La página `/descargas` es pública: cualquiera elige entre **Producciones**, **
 | `nacionalidad` | `guatemalteca`, `coproduccion`, `extranjera` |
 | `desde`, `hasta` | año |
 | `presupuesto_min`, `presupuesto_max`, `moneda` | monto y `GTQ` o `USD` (otra moneda se compara a Q 7.70 por dólar); solo salen producciones con presupuesto registrado |
-| `completas=1` | solo producciones con todas las locaciones ubicadas en un municipio |
+| `locacion` | `con` o `sin`: solo producciones con o sin locación registrada (dentro o fuera de Guatemala) |
+| `completas=1` | solo producciones con todas las locaciones en un municipio |
 | `q` | texto en título, director/a, productor/a o casa productora (o nombre y descripción en entidades) |
 | `categoria`, `iniciativa` | solo para `tipo=circulacion` y `tipo=entidades` |
 | `borradores=1` | incluye borradores; solo con sesión del equipo |

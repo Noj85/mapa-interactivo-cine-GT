@@ -1,7 +1,7 @@
 import { orgCategories } from "@/lib/categories";
 import { companyNames } from "@/lib/companies";
 import { cleanGenres, FORMATS, formatLabel, legacyKind, NATURES, natureLabel, type FilmFormat, type FilmNature } from "@/lib/film-types";
-import { isAbroad } from "@/lib/completeness";
+import { isAbroad, isUnlocated } from "@/lib/completeness";
 import { CIRC_CATEGORIES, IND_CATEGORIES, INITIATIVE_TYPES, NATIONALITIES, type Film, type InitiativeType, type Nationality, type Org } from "@/lib/types";
 import { normalize } from "@/lib/utils";
 
@@ -48,6 +48,8 @@ export interface FilmFilter {
   q: string;
   /** Solo producciones con todas las locaciones ubicadas en un municipio. */
   soloCompletas: boolean;
+  /** Con o sin locación registrada (dentro o fuera de Guatemala); null no filtra. */
+  locacion: "con" | "sin" | null;
 }
 
 export interface OrgFilter {
@@ -78,6 +80,7 @@ export const EMPTY_FILM_FILTER: FilmFilter = {
   empleosMax: null,
   q: "",
   soloCompletas: false,
+  locacion: null,
 };
 
 export const EMPTY_ORG_FILTER: OrgFilter = { capa: null, categoria: [], iniciativa: [], depto: [], q: "" };
@@ -157,6 +160,7 @@ export function parseFilmFilter(p: URLSearchParams): FilmFilter {
     empleosMax: num(p, "empleos_max"),
     q: (p.get("q") ?? "").trim().slice(0, 120),
     soloCompletas: p.get("completas") === "1",
+    locacion: p.get("locacion") === "con" || p.get("locacion") === "sin" ? (p.get("locacion") as "con" | "sin") : null,
   };
 }
 
@@ -191,6 +195,7 @@ export function filmFilterToParams(f: FilmFilter, into = new URLSearchParams()) 
   if (f.empleosMax != null) into.set("empleos_max", String(f.empleosMax));
   if (f.q) into.set("q", f.q);
   if (f.soloCompletas) into.set("completas", "1");
+  if (f.locacion) into.set("locacion", f.locacion);
   return into;
 }
 
@@ -252,6 +257,8 @@ export function filmMatches(f: Film, flt: FilmFilter): boolean {
     if (min != null && total < min) return false;
     if (max != null && total > max) return false;
   }
+  if (flt.locacion === "con" && isUnlocated(f)) return false;
+  if (flt.locacion === "sin" && !isUnlocated(f)) return false;
   if (flt.soloCompletas && !(f.locations.length > 0 && f.locations.every((l) => isAbroad(l) || l.muni_ine != null))) return false;
   if (flt.q && !norm(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${f.cinematographer ?? ""} ${f.screenwriter ?? ""} ${companyNames(f.companies).join(" ")}`).includes(norm(flt.q))) return false;
   return true;
@@ -307,6 +314,7 @@ export function describeFilmFilter(f: FilmFilter, deptoName: (code: number) => s
   range("Días de rodaje", f.diasMin, f.diasMax);
   range("Inversión local", f.inversionMin, f.inversionMax);
   range("Empleos", f.empleosMin, f.empleosMax);
+  if (f.locacion) out.push(f.locacion === "con" ? "Con locación registrada" : "Sin locación registrada");
   if (f.soloCompletas) out.push("Solo con todas las locaciones ubicadas en un municipio");
   if (f.q) out.push(`Búsqueda: “${f.q}”`);
   return out;

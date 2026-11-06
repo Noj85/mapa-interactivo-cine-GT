@@ -96,7 +96,7 @@ export function FilmEditor({ film }: { film?: Film }) {
               <span className="block text-xs text-muted">
                 {comp.publishable
                   ? payload.locations.length === 0
-                    ? "Se publicará en la zona «Sin ubicación», fuera del mapa, hasta que tenga un lugar de rodaje."
+                    ? "Se publicará en la zona «Sin locación», fuera del mapa, hasta que tenga un lugar de rodaje."
                     : comp.completeness < 100
                       ? "Se verá marcada como incompleta."
                       : "Lista para publicar."

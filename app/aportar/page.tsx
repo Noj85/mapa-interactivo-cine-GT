@@ -17,7 +17,10 @@ export default async function AportarPage({ searchParams }: { searchParams: Prom
   const data = await loadDataset();
   const film = one("pelicula") ? data.films.find((f) => f.slug === one("pelicula")) : undefined;
   const org = !film && one("entidad") ? data.orgs.find((o) => o.slug === one("entidad")) : undefined;
-  const initialKind = one("tipo") === "entidad" ? "org" : "film";
+  // la capa que se estaba viendo en el mapa: Producción abre «Producción»; Circulación o Industria abren «Entidad» con esa capa
+  const capa = one("capa");
+  const layer = capa === "circulacion" || capa === "industria" ? capa : null;
+  const initialKind = one("tipo") === "entidad" || layer ? "org" : "film";
 
   return (
     <div className="min-h-dvh bg-bg">
@@ -52,7 +55,7 @@ export default async function AportarPage({ searchParams }: { searchParams: Prom
           </aside>
         </div>
         <div className="mt-8">
-          <ContributeForm key={film?.id ?? org?.id ?? "nuevo"} film={film} org={org} initialKind={initialKind} />
+          <ContributeForm key={film?.id ?? org?.id ?? `nuevo-${layer ?? initialKind}`} film={film} org={org} initialKind={initialKind} defaultLayer={layer ?? undefined} />
         </div>
       </main>
       <BrandFooter />

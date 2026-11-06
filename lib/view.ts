@@ -31,7 +31,7 @@ export interface ViewState {
   filmFilter: FilmFilter;
   /** Filtros de entidades de Circulación e Industria (la capa la fija `layer`). */
   orgFilter: OrgFilter;
-  /** mostrando las producciones sin lugar de rodaje (el punto «Sin ubicación») */
+  /** mostrando las producciones sin lugar de rodaje (el punto «Sin locación») */
   noloc: boolean;
   /** mostrando las producciones rodadas fuera de Guatemala (la zona «Fuera de Guatemala») */
   abroad: boolean;
