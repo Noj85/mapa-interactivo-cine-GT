@@ -8,7 +8,7 @@ import { Download, HandHeart, Moon, Search, Sun } from "lucide-react";
 import { DepartmentFilter } from "./DepartmentFilter";
 import AbroadPanel from "./AbroadPanel";
 import UnlocatedPanel from "./UnlocatedPanel";
-import { AcademiaLogo, BrandName, MapMark, ProcineLogo } from "@/components/site/Brand";
+import { AcademiaLogo, MapLogo, ProcineLogo } from "@/components/site/Brand";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MapCanvas, { type MapHandle } from "@/components/map/MapCanvas";
@@ -215,8 +215,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
               <p className="text-sm text-muted">No pudimos cargar los límites del mapa. Recarga la página.</p>
             ) : (
               <>
-                <MapMark className="h-20 animate-pulse" />
-                <p className="font-display text-lg text-ink">Mapa del Cine de Guatemala</p>
+                <MapLogo className="h-20 max-w-[85vw] animate-pulse object-contain sm:h-24" />
                 <div className="flex items-center gap-5 opacity-80">
                   <AcademiaLogo className="h-9" />
                   <ProcineLogo className="h-6" />
@@ -230,10 +229,9 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       {/* columna superior izquierda */}
       <div className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex flex-col gap-2.5 sm:left-4 sm:right-auto sm:top-4 sm:w-[440px]">
         <div className="pointer-events-auto glass flex items-center gap-2 rounded-2xl border border-line p-2 shadow-soft">
-          <MapMark className="h-9 pl-1" />
-          <div className="min-w-0 flex-1">
-            <BrandName />
-          </div>
+          <h1 className="m-0 flex min-w-0 flex-1 items-center pl-1.5">
+            <MapLogo className="h-10 max-w-full object-contain object-left sm:h-12" />
+          </h1>
           <button className="btn-ghost h-9 w-9 !p-0" onClick={() => setSearchOpen(true)} aria-label="Buscar (⌘K)" title="Buscar (⌘K)">
             <Search className="h-4 w-4" />
           </button>

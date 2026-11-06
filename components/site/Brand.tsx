@@ -17,12 +17,15 @@ function ThemedLogo({ name, alt, className, width, height }: { name: string; alt
 }
 
 /**
- * Logo del mapa: un marcador de mapa con la estrella de PROCINE, entre el «play» cian y el abanico de luz amarillo.
- * Lleva sus propios colores, así que sirve igual en modo claro y oscuro (ver scripts/brand-map.mjs).
+ * Logo del Mapa del Cine de Guatemala: cinta de película con el pin y el nombre. Con `markOnly` solo la cinta y el pin.
+ * Tiene variantes para fondo claro y oscuro (ver scripts/brand-mapa.mjs).
  */
-export function MapMark({ className }: { className?: string }) {
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src="/brand/mapa-mark.svg" alt="" aria-hidden width={160} height={120} className={cn("block h-9 w-auto shrink-0", className)} />;
+export function MapLogo({ className, markOnly }: { className?: string; markOnly?: boolean }) {
+  return markOnly ? (
+    <ThemedLogo name="mapa-mark" alt="Mapa del Cine de Guatemala" width={657} height={355} className={cn("h-9 shrink-0", className)} />
+  ) : (
+    <ThemedLogo name="mapa-logo" alt="Mapa del Cine de Guatemala" width={1575} height={355} className={cn("h-10 shrink-0", className)} />
+  );
 }
 
 /** Logo completo de la Academia (sello + nombre). */
@@ -32,15 +35,6 @@ export function AcademiaLogo({ className }: { className?: string }) {
 
 export function ProcineLogo({ className }: { className?: string }) {
   return <ThemedLogo name="procine" alt="PROCINE" width={1193} height={302} className={cn("h-8", className)} />;
-}
-
-export function BrandName({ compact }: { compact?: boolean }) {
-  return (
-    <span className="min-w-0 leading-tight">
-      <span className="line-clamp-2 block font-display text-[15px] font-semibold leading-[1.15] tracking-tight text-ink">Mapa del Cine de Guatemala</span>
-      {!compact && <span className="mt-0.5 line-clamp-2 block text-[9.5px] uppercase leading-[1.2] tracking-[0.04em] text-muted">Academia Guatemalteca de Artes y Ciencias Cinematográficas</span>}
-    </span>
-  );
 }
 
 /** Pie institucional: Academia + PROCINE. */
