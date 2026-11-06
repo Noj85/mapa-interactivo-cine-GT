@@ -59,6 +59,7 @@ export function RequestsPanel({ kind, id, title, requests }: { kind: SubmissionK
                 </span>
                 <span className="min-w-0 flex-1 text-muted">
                   <span className="text-ink">{r.recipient || "Sin destinatario"}</span>
+                  {r.target_ids.length > 1 ? ` · incluye ${r.target_ids.length} producciones` : ""}
                   {" · "}creada {fmt(r.created_at)} · vence {fmt(r.expires_at)}
                   {r.last_used_at ? ` · último uso ${fmt(r.last_used_at)}` : " · sin usar"}
                 </span>

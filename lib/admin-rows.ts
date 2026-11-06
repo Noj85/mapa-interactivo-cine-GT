@@ -14,7 +14,7 @@ import type { Gazetteer } from "@/lib/geo/gazetteer";
 /** Solicitudes activas por registro. */
 export function openRequestCounts(requests: InfoRequest[]) {
   const out: Record<string, number> = {};
-  for (const r of requests) if (requestState(r) === "active") out[r.target_id] = (out[r.target_id] ?? 0) + 1;
+  for (const r of requests) if (requestState(r) === "active") for (const id of r.target_ids ?? [r.target_id]) out[id] = (out[id] ?? 0) + 1;
   return out;
 }
 

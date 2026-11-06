@@ -27,12 +27,21 @@ export function ContributeForm({
   org,
   initialKind,
   collect,
+  onBack,
+  onSent,
+  identity,
 }: {
   film?: Film;
   org?: Org;
   initialKind?: Kind;
   /** Enlace privado de una solicitud de información: el aporte llega como «recopilación». */
-  collect?: { token: string; password: string };
+  collect?: { token: string; password: string; targetId?: string | null };
+  /** Solo en un enlace con varias producciones: volver a la lista. */
+  onBack?: () => void;
+  /** Se llama al enviar con éxito, con el nombre y el correo escritos (para no pedirlos otra vez). */
+  onSent?: (who: { submitter: string; email: string }) => void;
+  /** Nombre, rol y correo ya escritos en otra producción del mismo enlace. */
+  identity?: { submitter: string; email: string };
 }) {
   const correcting = !!(film || org);
   const [kind, setKind] = useState<Kind>(film ? "film" : org ? "org" : (initialKind ?? "film"));
@@ -47,8 +56,8 @@ export function ContributeForm({
 
   // ---- comunes
   const [note, setNote] = useState("");
-  const [submitter, setSubmitter] = useState("");
-  const [email, setEmail] = useState("");
+  const [submitter, setSubmitter] = useState(identity?.submitter ?? "");
+  const [email, setEmail] = useState(identity?.email ?? "");
   const [trap, setTrap] = useState("");
 
   const filmData = useMemo(() => filmPayload(f), [f]);
@@ -120,12 +129,14 @@ export function ContributeForm({
         const r = await submitCollectedAction({
           token: collect.token,
           password: collect.password,
+          targetId: collect.targetId ?? null,
           data,
           note: note.trim() || `Información aportada por el equipo de ${kind === "film" ? "la producción" : "la entidad"} (${submitter.trim()}), mediante enlace de recopilación.`,
           contact: email.trim(),
           submitter: submitter.trim(),
         });
         if (!r.ok) throw new Error(r.error);
+        onSent?.({ submitter: submitter.trim(), email: email.trim() });
         setStatus("done");
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
@@ -165,7 +176,10 @@ export function ContributeForm({
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           {collect ? (
-            <button className="btn-primary" onClick={() => setStatus("idle")}>Seguir editando</button>
+            <>
+              {onBack && <button className="btn-primary" onClick={onBack}>Volver a la lista</button>}
+              <button className={onBack ? "btn-outline" : "btn-primary"} onClick={() => setStatus("idle")}>Seguir editando</button>
+            </>
           ) : (
             <>
               <Link href="/" className="btn-primary">Volver al mapa</Link>

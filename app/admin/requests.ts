@@ -3,11 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { adminStore, requireSession } from "@/lib/auth";
-import { addDays, buildRequestMessage, DEFAULT_REQUEST_DAYS, generatePassword, generateToken, REQUEST_DAYS } from "@/lib/info-requests";
-import type { InfoRequest, SubmissionKind } from "@/lib/types";
+import { openRequestCounts } from "@/lib/admin-rows";
+import { directorKeys, groupByDirector, sameDirector } from "@/lib/directors";
+import { addDays, buildRequestMessage, generatePassword, generateToken, REQUEST_DAYS } from "@/lib/info-requests";
+import type { Film, InfoRequest, SubmissionKind } from "@/lib/types";
 
 export interface CreatedRequest {
+  /** La principal; en una solicitud consolidada hay más en `target_ids`. */
   target_id: string;
+  target_ids: string[];
+  /** Títulos de todo lo que incluye el enlace (para mostrarlo en el cuadro). */
+  titles: string[];
   title: string;
   request: InfoRequest;
   link: string;
@@ -24,19 +30,96 @@ async function siteUrl() {
   return `${proto}://${host}`;
 }
 
+/** Una producción tal como la ve el cuadro de solicitud. */
+export interface RequestFilm {
+  id: string;
+  title: string;
+  year: number | null;
+  director: string | null;
+  completeness: number;
+  /** Lo que falta (nombres de los campos). */
+  missing: string[];
+  /** No se muestra en el mapa (borrador). */
+  hidden: boolean;
+  /** Solicitudes activas que ya la incluyen. */
+  activeRequests: number;
+}
+
+const toRequestFilm = (f: Film, open: Record<string, number>): RequestFilm => ({
+  id: f.id,
+  title: f.title,
+  year: f.year,
+  director: f.director,
+  completeness: f.completeness,
+  missing: f.missing_fields,
+  hidden: f.status !== "published",
+  activeRequests: open[f.id] ?? 0,
+});
+
 /**
- * Crea una solicitud (enlace + contraseña) por cada registro. La contraseña solo se devuelve aquí:
- * en la base queda únicamente su huella.
+ * Prepara el cuadro de solicitud de producciones:
+ * - `films`: las elegidas.
+ * - `groups`: entre las elegidas, las que comparten director/a (2 o más), para ofrecer un solo enlace.
+ * - `related`: con una sola elegida, las demás producciones de la misma persona.
+ */
+export async function loadRequestContextAction(
+  ids: string[],
+): Promise<{ ok: true; films: RequestFilm[]; groups: { director: string; ids: string[] }[]; related: RequestFilm[] } | { ok: false; error: string }> {
+  await requireSession();
+  const list = [...new Set(ids)].filter((x) => typeof x === "string" && x.length > 0 && x.length <= 80).slice(0, 60);
+  if (!list.length) return { ok: false, error: "No hay registros seleccionados" };
+  try {
+    const store = await adminStore();
+    const [all, requests] = await Promise.all([store.listFilms({ drafts: true }), store.listInfoRequests({ kind: "film" }).catch(() => [])]);
+    const open = openRequestCounts(requests);
+    const byId = new Map(all.map((f) => [f.id, f]));
+    const chosen = list.map((id) => byId.get(id)).filter((f): f is Film => !!f);
+    const films = chosen.map((f) => toRequestFilm(f, open));
+    const groups = groupByDirector(chosen)
+      .filter((g) => g.length > 1)
+      .map((g) => ({ director: g[0].director ?? "", ids: g.map((f) => f.id) }));
+    const related =
+      chosen.length === 1 && directorKeys(chosen[0].director).length
+        ? all
+            .filter((f) => f.id !== chosen[0].id && sameDirector(chosen[0].director, f.director))
+            .sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.title.localeCompare(b.title))
+            .slice(0, 19)
+            .map((f) => toRequestFilm(f, open))
+        : [];
+    return { ok: true, films, groups, related };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/** Hasta cuántos enlaces y cuántas producciones por enlace se crean de una vez. */
+const MAX_LINKS = 20;
+const MAX_PER_LINK = 20;
+
+/**
+ * Crea una solicitud (enlace + contraseña) por cada grupo de registros. En un grupo de producciones, todas
+ * comparten el mismo enlace y la misma clave; las entidades van siempre de una en una. El enlace vale 30 días.
+ * La contraseña solo se devuelve aquí: en la base queda únicamente su huella.
  */
 export async function createInfoRequestsAction(
   kind: SubmissionKind,
-  ids: string[],
-  opts: { recipient?: string | null; email?: string | null; days?: number },
+  groups: string[][],
+  opts: { recipient?: string | null; email?: string | null },
 ): Promise<{ ok: true; items: CreatedRequest[] } | { ok: false; error: string }> {
   await requireSession();
-  const list = [...new Set(ids)].slice(0, 20);
+  const seen = new Set<string>();
+  const list: string[][] = [];
+  for (const g of Array.isArray(groups) ? groups : []) {
+    const ids = [...new Set(Array.isArray(g) ? g : [])].filter((x) => typeof x === "string" && x.length > 0 && x.length <= 80 && !seen.has(x));
+    // las entidades no se consolidan: cada una tiene su enlace
+    const chunks = kind === "film" ? [ids.slice(0, MAX_PER_LINK)] : ids.map((x) => [x]);
+    for (const c of chunks) {
+      if (!c.length) continue;
+      c.forEach((x) => seen.add(x));
+      list.push(c);
+    }
+  }
   if (!list.length) return { ok: false, error: "No hay registros seleccionados" };
-  const days = (REQUEST_DAYS as readonly number[]).includes(opts.days ?? 0) ? (opts.days as number) : DEFAULT_REQUEST_DAYS;
   const email = opts.email?.trim() || null;
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "El correo del destinatario no parece válido." };
   const recipient = opts.recipient?.trim().slice(0, 200) || null;
@@ -45,26 +128,34 @@ export async function createInfoRequestsAction(
     const store = await adminStore();
     const base = await siteUrl();
     const items: CreatedRequest[] = [];
-    for (const id of list) {
-      const rec = kind === "film" ? await store.getFilm(id) : await store.getOrg(id);
-      if (!rec) continue;
-      const title = "title" in rec ? rec.title : rec.name;
+    for (const group of list.slice(0, MAX_LINKS)) {
+      const recs = (await Promise.all(group.map((id) => (kind === "film" ? store.getFilm(id) : store.getOrg(id))))).filter((r): r is NonNullable<typeof r> => !!r);
+      if (!recs.length) continue;
+      const nameOf = (r: (typeof recs)[number]) => ("title" in r ? r.title : r.name);
+      const yearOf = (r: (typeof recs)[number]) => ("year" in r ? r.year : null);
       const token = generateToken();
       const password = generatePassword();
-      const expires_at = addDays(days);
-      const request = await store.createInfoRequest({ kind, target_id: id, recipient, recipient_email: email, expires_at, token, password });
+      const request = await store.createInfoRequest({
+        kind,
+        target_id: recs[0].id,
+        extra_ids: recs.slice(1).map((r) => r.id),
+        recipient,
+        recipient_email: recs.length === 1 ? email : null,
+        expires_at: addDays(REQUEST_DAYS),
+        token,
+        password,
+      });
       const link = `${base}/completar/${token}`;
       const msg = buildRequestMessage({
         kind,
-        title,
-        year: "year" in rec ? rec.year : null,
+        title: nameOf(recs[0]),
+        year: yearOf(recs[0]),
         link,
         password,
-        expiresAt: expires_at,
-        missing: rec.missing_fields,
         recipient,
+        films: recs.length > 1 ? recs.map((r) => ({ title: nameOf(r), year: yearOf(r) })) : undefined,
       });
-      items.push({ target_id: id, title, request, link, password, ...msg });
+      items.push({ target_id: recs[0].id, target_ids: recs.map((r) => r.id), titles: recs.map(nameOf), title: nameOf(recs[0]), request, link, password, ...msg });
     }
     if (!items.length) return { ok: false, error: "No se encontraron los registros" };
     revalidatePath("/admin/peliculas");

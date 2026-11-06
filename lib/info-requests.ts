@@ -2,9 +2,8 @@ import "server-only";
 import { createHash, randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
 import type { SubmissionKind } from "@/lib/types";
 
-/** Días de vigencia que se ofrecen al crear una solicitud. */
-export const REQUEST_DAYS = [15, 30, 60] as const;
-export const DEFAULT_REQUEST_DAYS = 30;
+/** Los enlaces duran siempre 30 días; después hay que pedir uno nuevo. */
+export const REQUEST_DAYS = 30;
 
 /** Enlace secreto: 24 bytes aleatorios en base64url (imposible de adivinar). */
 export const generateToken = () => randomBytes(24).toString("base64url");
@@ -41,9 +40,6 @@ export function verifyPassword(password: string, stored: string) {
 
 export const addDays = (days: number, from = new Date()) => new Date(from.getTime() + days * 86_400_000).toISOString();
 
-const dateEs = (iso: string) =>
-  new Intl.DateTimeFormat("es-GT", { day: "numeric", month: "long", year: "numeric", timeZone: "America/Guatemala" }).format(new Date(iso));
-
 export interface RequestMessageInput {
   kind: SubmissionKind;
   title: string;
@@ -51,40 +47,48 @@ export interface RequestMessageInput {
   link: string;
   /** La clave de acceso (5 caracteres). */
   password: string;
-  expiresAt: string;
-  missing: string[];
   recipient?: string | null;
+  /** Varias producciones en un mismo enlace (incluye la principal). Con una sola, se usa `title` y `year`. */
+  films?: { title: string; year?: number | null }[];
 }
 
+/** Hasta cuántos títulos se listan en un mensaje consolidado. */
+const MAX_LISTED = 6;
+
 /**
- * Mensaje listo para pegar en WhatsApp o en un correo. Texto plano, sin formato propio de WhatsApp,
- * para que se vea igual en los dos. Breve y cordial; deja claro quién escribe (PROCINE, proyecto que
- * ejecuta la Academia) y no incluye la dirección del mapa: solo el enlace privado.
+ * Mensaje listo para pegar en WhatsApp o en un correo. Texto plano, de tú y corto. Deja claro quién
+ * escribe (PROCINE, proyecto que ejecuta la Academia) y no incluye la dirección del mapa: solo el
+ * enlace privado, solo en su línea (para que WhatsApp lo reconozca), y la clave aparte. No menciona la
+ * vigencia: si el enlace venció, la página lo explica.
  */
 export function buildRequestMessage(i: RequestMessageInput): { subject: string; body: string } {
   const isFilm = i.kind === "film";
-  const label = isFilm ? `«${i.title}»${i.year ? ` (${i.year})` : ""}` : `«${i.title}»`;
-  const what = isFilm ? "la producción" : "la entidad";
+  const films = i.films && i.films.length > 1 ? i.films : null;
+  const label = (t: string, y?: number | null) => `«${t}»${isFilm && y ? ` (${y})` : ""}`;
   const greeting = i.recipient?.trim() ? `Hola, ${i.recipient.trim()}.` : "Hola.";
-  const missing = i.missing.length
-    ? `Nos falta o necesitamos confirmar: ${i.missing.join(", ")}.`
-    : "Le pedimos revisar la información que tenemos y completar lo que haga falta.";
-  const subject = `Solicitud de información: ${label} · PROCINE`;
+
+  let ask: string;
+  let subject: string;
+  if (films) {
+    const shown = films.slice(0, MAX_LISTED).map((f) => `• ${label(f.title, f.year)}`);
+    if (films.length > MAX_LISTED) shown.push(`• y ${films.length - MAX_LISTED} más`);
+    ask = `¿Nos ayudas a completar la información de tus ${films.length} producciones?\n${shown.join("\n")}`;
+    subject = "Información de tus producciones · PROCINE";
+  } else {
+    ask = `¿Nos ayudas a completar la información de ${isFilm ? "" : "la entidad "}${label(i.title, i.year)}?`;
+    subject = `Información de ${label(i.title, i.year)} · PROCINE`;
+  }
+
   const body = [
     greeting,
     "",
-    `Le escribimos desde PROCINE, proyecto de fortalecimiento del sector cinematográfico de Guatemala que ejecuta la Academia de Cine de Guatemala. Como parte de su eje de investigación estamos documentando el cine nacional en el Mapa del Cine de Guatemala, y queremos incluir correctamente ${what} ${label}.`,
+    `Desde PROCINE, proyecto que ejecuta la Academia de Cine de Guatemala, estamos documentando el cine nacional. ${ask}`,
     "",
-    missing,
+    i.link,
     "",
-    "¿Nos ayuda a completarla? Es solo un formulario breve:",
-    `Enlace privado: ${i.link}`,
     `Clave: ${i.password}`,
     "",
-    `Es solo para ${what} ${label} y es válido hasta el ${dateEs(i.expiresAt)}. Revisamos toda la información antes de publicarla. Si tiene dudas, puede responder a este mensaje.`,
-    "",
-    "Muchas gracias.",
-    "PROCINE · Academia de Cine de Guatemala",
+    "Revisamos todo antes de publicar. ¡Gracias!",
   ].join("\n");
   return { subject, body };
 }

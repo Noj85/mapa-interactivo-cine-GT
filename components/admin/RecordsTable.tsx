@@ -298,8 +298,8 @@ export function RecordsTable({
           <button
             className="btn-outline !min-h-0 !py-1.5 text-xs"
             disabled={pending}
-            onClick={() => setRequestFor(selRows.slice(0, 20).map((r) => ({ id: r.id, title: r.name })))}
-            title={selRows.length > 20 ? "Se preparan las primeras 20" : undefined}
+            onClick={() => setRequestFor(selRows.slice(0, 60).map((r) => ({ id: r.id, title: r.name })))}
+            title={selRows.length > 60 ? "Se preparan las primeras 60" : isFilm ? "Las producciones del mismo director/a pueden ir en un solo enlace" : undefined}
           >
             <Send className="h-3.5 w-3.5" /> Solicitar información
           </button>

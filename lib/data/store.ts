@@ -44,6 +44,8 @@ export interface FestivalInput {
 export interface NewInfoRequest {
   kind: SubmissionKind;
   target_id: string;
+  /** Otras producciones que comparten el mismo enlace (solo producciones; máx. 19). */
+  extra_ids?: string[];
   recipient?: string | null;
   recipient_email?: string | null;
   expires_at: string;
@@ -125,11 +127,19 @@ export interface Store {
   submitInfoRequest(
     token: string,
     password: string,
-    data: { payload: FilmInput | OrgInput; note: string; contact: string; submitter: string | null },
+    data: { payload: FilmInput | OrgInput; note: string; contact: string; submitter: string | null; target_id?: string | null },
   ): Promise<SubmitInfoResult>;
 }
 
 // ───────────────────────── Local ─────────────────────────
+
+/** Producciones de una solicitud: la principal y, si es consolidada, las demás (sin repetir, máx. 20). */
+function allTargets(kind: SubmissionKind, target: string, extra?: string[]) {
+  if (kind !== "film" || !extra?.length) return [target];
+  return [...new Set([target, ...extra])].slice(0, 20);
+}
+/** Solicitudes guardadas antes de las consolidadas no traen `target_ids`. */
+const requestTargets = (r: { target_id: string; target_ids?: string[] }) => (r.target_ids?.length ? r.target_ids : [r.target_id]);
 
 interface LocalInfoRequest extends InfoRequest {
   token_hash: string;
@@ -432,7 +442,7 @@ export class LocalStore implements Store {
   private publicRequest(r: LocalInfoRequest, db: LocalDb): InfoRequest {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { token_hash, password_hash, ...rest } = r;
-    return { ...rest, submissions_count: db.submissions.filter((s) => s.request_id === r.id).length };
+    return { ...rest, target_ids: requestTargets(r), submissions_count: db.submissions.filter((s) => s.request_id === r.id).length };
   }
 
   async createInfoRequest(input: NewInfoRequest) {
@@ -441,6 +451,7 @@ export class LocalStore implements Store {
       id: newId(),
       kind: input.kind,
       target_id: input.target_id,
+      target_ids: allTargets(input.kind, input.target_id, input.extra_ids),
       recipient: input.recipient?.trim() || null,
       recipient_email: input.recipient_email?.trim() || null,
       expires_at: input.expires_at,
@@ -459,7 +470,7 @@ export class LocalStore implements Store {
   async listInfoRequests(opts?: { kind?: SubmissionKind; target_id?: string }) {
     const db = await readDb();
     return db.info_requests
-      .filter((r) => (!opts?.kind || r.kind === opts.kind) && (!opts?.target_id || r.target_id === opts.target_id))
+      .filter((r) => (!opts?.kind || r.kind === opts.kind) && (!opts?.target_id || requestTargets(r).includes(opts.target_id)))
       .map((r) => this.publicRequest(r, db));
   }
   async revokeInfoRequest(id: string) {
@@ -491,22 +502,29 @@ export class LocalStore implements Store {
     const db = await readDb();
     const v = await this.verifyRequest(db, token, password);
     if (!v.ok) return v;
-    const film = v.request.kind === "film" ? db.films.find((f) => f.id === v.request.target_id) : undefined;
+    const films =
+      v.request.kind === "film"
+        ? requestTargets(v.request).map((id) => db.films.find((f) => f.id === id)).filter((f): f is Film => !!f)
+        : [];
     const org = v.request.kind === "org" ? db.orgs.find((o) => o.id === v.request.target_id) : undefined;
-    if (!film && !org) return { ok: false, reason: "not_found" };
-    return { ok: true, request: this.publicRequest(v.request, db), film, org };
+    if (!films.length && !org) return { ok: false, reason: "not_found" };
+    const submitted = [...new Set(db.submissions.filter((s) => s.request_id === v.request.id && s.target_id).map((s) => s.target_id as string))];
+    return { ok: true, request: this.publicRequest(v.request, db), film: films[0], films, org, submitted };
   }
 
   async submitInfoRequest(
     token: string,
     password: string,
-    data: { payload: FilmInput | OrgInput; note: string; contact: string; submitter: string | null },
+    data: { payload: FilmInput | OrgInput; note: string; contact: string; submitter: string | null; target_id?: string | null },
   ): Promise<SubmitInfoResult> {
     const db = await readDb();
     const v = await this.verifyRequest(db, token, password);
     if (!v.ok) return v;
     const r = v.request;
-    const label = r.kind === "film" ? db.films.find((f) => f.id === r.target_id)?.title : db.orgs.find((o) => o.id === r.target_id)?.name;
+    // el enlace solo sirve para las producciones que incluye
+    const target = r.kind === "film" ? (data.target_id ?? r.target_id) : r.target_id;
+    if (!requestTargets(r).includes(target)) return { ok: false, reason: "not_found" };
+    const label = r.kind === "film" ? db.films.find((f) => f.id === target)?.title : db.orgs.find((o) => o.id === target)?.name;
     if (!label) return { ok: false, reason: "not_found" };
     db.submissions.unshift({
       id: newId(),
@@ -514,7 +532,7 @@ export class LocalStore implements Store {
       origin: "recopilacion",
       request_id: r.id,
       submitter: data.submitter,
-      target_id: r.target_id,
+      target_id: target,
       label,
       payload: data.payload,
       note: data.note,
@@ -578,6 +596,7 @@ const rowToInfoRequest = (r: any): InfoRequest => ({
   id: r.id,
   kind: r.kind,
   target_id: r.target_id,
+  target_ids: [r.target_id, ...(Array.isArray(r.target_ids) ? r.target_ids : []).filter((x: string) => x !== r.target_id)],
   recipient: r.recipient ?? null,
   recipient_email: r.recipient_email ?? null,
   expires_at: r.expires_at,
@@ -990,9 +1009,11 @@ export class SupabaseStore implements Store {
         p_recipient: input.recipient ?? null,
         p_email: input.recipient_email ?? null,
         p_expires: input.expires_at,
+        // sin la migración 0013 solo funcionan las solicitudes de una producción
+        ...(input.kind === "film" && input.extra_ids?.length ? { p_extra: input.extra_ids.filter((x) => x !== input.target_id).slice(0, 19) } : {}),
       }),
     ) as string;
-    const list = await this.listInfoRequests({ target_id: input.target_id });
+    const list = await this.listInfoRequests({ kind: input.kind, target_id: input.target_id });
     const rec = list.find((r) => r.id === id);
     if (!rec) throw new Error("No se pudo crear la solicitud");
     return rec;
@@ -1000,7 +1021,10 @@ export class SupabaseStore implements Store {
   async listInfoRequests(opts?: { kind?: SubmissionKind; target_id?: string }) {
     let q = this.db.from("info_requests").select("*").order("created_at", { ascending: false });
     if (opts?.kind) q = q.eq("kind", opts.kind);
-    if (opts?.target_id) q = q.eq("target_id", opts.target_id);
+    if (opts?.target_id) {
+      // la principal o una de las producciones extra de una solicitud consolidada
+      q = q.or(`target_id.eq.${opts.target_id},target_ids.cs.{${opts.target_id}}`);
+    }
     const rows = must(await q) as any[];
     const counts: Record<string, number> = {};
     if (rows.length) {
@@ -1019,15 +1043,16 @@ export class SupabaseStore implements Store {
     const j = res.data as any;
     if (!j || j.status !== "ok") return { ok: false, reason: (j?.status ?? "not_found") as never };
     const request = rowToInfoRequest(j.request);
-    return j.request.kind === "film"
-      ? { ok: true, request, film: rowToFilm(j.record) }
-      : { ok: true, request, org: rowToOrg(j.record) };
+    if (j.request.kind !== "film") return { ok: true, request, org: rowToOrg(j.record) };
+    // sin la migración 0013 solo viene `record`
+    const films = (Array.isArray(j.records) && j.records.length ? j.records : [j.record]).map(rowToFilm);
+    return { ok: true, request, film: films[0], films, submitted: Array.isArray(j.submitted) ? j.submitted.map(String) : [] };
   }
 
   async submitInfoRequest(
     token: string,
     password: string,
-    data: { payload: FilmInput | OrgInput; note: string; contact: string; submitter: string | null },
+    data: { payload: FilmInput | OrgInput; note: string; contact: string; submitter: string | null; target_id?: string | null },
   ): Promise<SubmitInfoResult> {
     const res = await this.db.rpc("info_request_submit", {
       p_token_hash: hashToken(token),
@@ -1036,6 +1061,8 @@ export class SupabaseStore implements Store {
       p_note: data.note,
       p_contact: data.contact,
       p_submitter: data.submitter,
+      // sin la migración 0013 no existe este parámetro
+      ...(data.target_id ? { p_target: data.target_id } : {}),
     });
     if (res.error) throw new Error(res.error.message);
     const status = (res.data as any)?.status;

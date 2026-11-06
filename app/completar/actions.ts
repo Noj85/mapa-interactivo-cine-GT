@@ -12,7 +12,7 @@ type Reason = "not_found" | "bad_password" | "expired" | "revoked" | "locked";
 const MESSAGES: Record<Reason, string> = {
   not_found: "Este enlace no es válido o ya no existe. Revisa que esté completo o pide uno nuevo al equipo de PROCINE y la Academia.",
   bad_password: "La clave no es correcta. Revisa el mensaje que recibiste (no importa si usas mayúsculas).",
-  expired: "Este enlace venció. Pide uno nuevo al equipo de PROCINE y la Academia.",
+  expired: "Este enlace ya venció. Pide uno nuevo al equipo de PROCINE.",
   revoked: "Este enlace ya no está disponible. Pide uno nuevo al equipo de PROCINE y la Academia.",
   locked: "Hubo demasiados intentos con clave incorrecta y el enlace se bloqueó por seguridad. Pide uno nuevo al equipo de PROCINE y la Academia.",
 };
@@ -20,7 +20,7 @@ const MESSAGES: Record<Reason, string> = {
 const clientIp = async () => ((await headers()).get("x-forwarded-for") ?? "").split(",")[0].trim() || "local";
 
 export type OpenResult =
-  | { ok: true; request: InfoRequest; film?: Film; org?: Org }
+  | { ok: true; request: InfoRequest; film?: Film; films?: Film[]; org?: Org; submitted?: string[] }
   | { ok: false; error: string };
 
 /** Abre el enlace privado con su clave y devuelve el registro (aunque esté oculto del mapa). */
@@ -34,7 +34,7 @@ export async function openRequestAction(token: string, password: string): Promis
   try {
     const res = await publicStore().openInfoRequest(token, password);
     if (!res.ok) return { ok: false, error: MESSAGES[res.reason] };
-    return { ok: true, request: res.request, film: res.film, org: res.org };
+    return { ok: true, request: res.request, film: res.film, films: res.films, org: res.org, submitted: res.submitted };
   } catch (e) {
     console.error("[completar:open]", e);
     return { ok: false, error: "No pudimos abrir el enlace. Intenta de nuevo en un momento." };
@@ -45,12 +45,16 @@ export async function openRequestAction(token: string, password: string): Promis
 export async function submitCollectedAction(input: {
   token: string;
   password: string;
+  /** Producción a la que corresponde el aporte (obligatoria si el enlace incluye varias). */
+  targetId?: string | null;
   data: unknown;
   note: string;
   contact: string;
   submitter: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!rateLimit(`completar-envio:${await clientIp()}`, 15, 60 * 60 * 1000).ok) {
+  // por enlace y por IP: un enlace con varias producciones necesita más de unos pocos envíos por hora
+  const link = typeof input.token === "string" ? input.token.slice(0, 16) : "";
+  if (!rateLimit(`completar-envio:${await clientIp()}:${link}`, 40, 60 * 60 * 1000).ok) {
     return { ok: false, error: "Has enviado varios aportes seguidos. Intenta de nuevo en un rato." };
   }
   const submitter = (input.submitter ?? "").replace(/[\u0000-\u001f\u007f<>]/g, "").trim().slice(0, 200);
@@ -62,7 +66,12 @@ export async function submitCollectedAction(input: {
     const store = publicStore();
     const opened = await store.openInfoRequest(input.token, input.password);
     if (!opened.ok) return { ok: false, error: MESSAGES[opened.reason] };
-    const kind = opened.film ? "film" : "org";
+    const films = opened.films?.length ? opened.films : opened.film ? [opened.film] : [];
+    const kind = films.length ? "film" : "org";
+    // el aporte va a una de las producciones del enlace; si el enlace trae varias hay que decir cuál
+    const multi = opened.request.target_ids.length > 1;
+    const target = kind === "film" ? (input.targetId ?? (multi ? null : films[0]?.id)) : null;
+    if (kind === "film" && (!target || !films.some((f) => f.id === target))) return { ok: false, error: "Elige a qué producción corresponde el aporte." };
     const parsed = submissionSchema.safeParse({ kind, data: input.data });
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     if (parsed.data.kind === "film") parsed.data.data.festivals = await sanitizeFestivalIds(store, parsed.data.data.festivals);
@@ -71,6 +80,8 @@ export async function submitCollectedAction(input: {
       note: meta.data.note,
       contact: meta.data.contact,
       submitter,
+      // sin la migración 0013 no existe el parámetro: solo se manda cuando hay varias producciones
+      target_id: multi ? target : null,
     });
     if (!res.ok) return { ok: false, error: MESSAGES[res.reason] };
     return { ok: true };

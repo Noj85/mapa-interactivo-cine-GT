@@ -339,6 +339,8 @@ export interface InfoRequest {
   id: string;
   kind: SubmissionKind;
   target_id: string;
+  /** Todas las producciones del enlace, la principal primero (una sola salvo en solicitudes consolidadas). */
+  target_ids: string[];
   /** Nombre o rol de la persona a quien se envía (opcional). */
   recipient: string | null;
   recipient_email: string | null;
@@ -354,5 +356,15 @@ export interface InfoRequest {
 export type InfoRequestState = "active" | "expired" | "revoked" | "locked";
 
 export type OpenInfoResult =
-  | { ok: true; request: InfoRequest; film?: Film; org?: Org }
+  | {
+      ok: true;
+      request: InfoRequest;
+      /** La producción principal (o la primera que exista). */
+      film?: Film;
+      /** Todas las producciones del enlace (una sola salvo en solicitudes consolidadas). */
+      films?: Film[];
+      org?: Org;
+      /** Producciones que ya recibieron un aporte por este enlace. */
+      submitted?: string[];
+    }
   | { ok: false; reason: "not_found" | "bad_password" | "expired" | "revoked" | "locked" };

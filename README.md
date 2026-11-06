@@ -27,7 +27,7 @@ Copia `.env.example` a `.env.local` (o configúralas en Vercel).
 ## Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0012`, ver cada sección) de `supabase/migrations/`:
+2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0013`, ver cada sección) de `supabase/migrations/`:
    - `0001_init.sql`: tablas, políticas RLS y perfiles.
    - `0002_posters.sql`: campo del póster y bucket público `posters` en Storage.
    - `0003_submissions.sql`: aportes del público.
@@ -111,6 +111,8 @@ En **Registros** (`/admin/peliculas` y `/admin/entidades`) cada fila tiene un in
 ## Solicitar información (recopilación)
 
 Desde el editor de una producción o entidad, o desde varias filas seleccionadas, el botón **Solicitar información** genera un **enlace privado** (`/completar/<código>`) y una **clave** de 5 caracteres alfanuméricos (sin 0/o ni 1/l/i, se muestra una sola vez) y arma un mensaje corto y cordial, listo para copiar y pegar en WhatsApp o correo, que presenta a PROCINE (proyecto de fortalecimiento del sector cinematográfico) y a la Academia de Cine de Guatemala (que lo ejecuta). El mensaje no incluye la dirección del mapa, solo el enlace privado. El enlace sirve varias veces hasta que venza o lo revoques (panel «Solicitudes» del registro). Quien lo abre escribe la clave y ve el formulario con los datos actuales, resaltando lo que falta. Lo que envía llega a `/admin/aportes` con origen **recopilación**; nada se publica hasta que lo apruebes («Aplicar y poner en el mapa»). Los códigos se guardan con hash y las claves con bcrypt, con bloqueo tras 10 intentos fallidos. Requiere `supabase/migrations/0007_info_requests.sql`.
+
+**Un enlace para varias producciones del mismo director/a.** Al solicitar una producción, si el director/a tiene otras, el cuadro las lista con casillas (vienen marcadas las que tienen datos pendientes) para sumarlas al mismo enlace; con varias filas seleccionadas, el cuadro las agrupa por director/a y ofrece «Un solo enlace para las N de …» (se puede apagar). Se reconoce al mismo director/a por nombre (sin importar tildes o mayúsculas; «Ana López y Luis Paz» coincide con cualquiera de los dos). Quien abre el enlace ve la lista de sus producciones con lo que falta de cada una y la marca «Enviada», completa cada una por separado (nombre, rol y correo se piden una vez) y cada producción llega a Aportes como su propio aporte, que se aprueba por separado. Hasta 20 producciones por enlace. Los enlaces valen siempre 30 días; el mensaje no menciona la fecha y, si alguien abre uno vencido, la página le pide solicitar uno nuevo. El mensaje es corto y de tú, con el enlace y la clave en líneas separadas. Las entidades siguen de una en una. Requiere `supabase/migrations/0013_info_request_multi.sql` (después de 0012); sin ella, las solicitudes de una sola producción siguen funcionando, pero no las consolidadas.
 
 ## Duración en minutos
 
