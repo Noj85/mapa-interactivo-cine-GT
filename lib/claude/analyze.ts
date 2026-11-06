@@ -126,6 +126,7 @@ Reglas:
 - Festivales de una producción: si hay columnas con festivales de selección o premios, mapea "festival" (nombre del festival), y si existen "festival_year", "festival_result" (selección, nominación, premio, mención), "festival_section", "festival_award" y "festival_url". Si cada festival está en una fila distinta del mismo título, usa "row_per_location". Una columna solo con un año de estreno NO es "festival_year".
 - Entidades: "circulacion" (festivales, salas, cineclubs, centros culturales, exhibición, medios, crítica, formación en circulación) o "industria" (productoras, postproducción, renta de equipo, formación, servicios, patrimonio).
 - En "columns" usa SIEMPRE el encabezado exacto del archivo. Si una columna no corresponde a ningún campo, no la incluyas. No inventes columnas.
+- Si el lugar incluye un país distinto de Guatemala (ej. «Oaxaca, México»), es una locación fuera de Guatemala: déjalo en "place" tal cual, sin mapearlo a municipio ni a departamento.
 - Si hay una sola columna con el lugar completo (ej. "Panajachel, Sololá" o "Antigua; Flores"), mapea "place". Si hay columnas separadas, mapea "muni" y "depto".
 - "confidence" es honesta: baja (<0.6) si dudas.
 - En "value_maps" normaliza los valores de columnas de lista (tipo de producción, nacionalidad, naturaleza de la iniciativa, categoría) hacia los valores canónicos. Cubre TODOS los valores que aparezcan en "valores_distintos" de esa columna (la muestra de filas es parcial), con el texto exacto del archivo como llave.

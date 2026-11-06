@@ -20,3 +20,40 @@ function build(): string[] {
 
 /** Nombres de países en español, en orden alfabético. */
 export const COUNTRIES: string[] = build();
+
+const ALIASES: Record<string, string> = {
+  eeuu: "Estados Unidos",
+  "ee uu": "Estados Unidos",
+  usa: "Estados Unidos",
+  "u s a": "Estados Unidos",
+  "estados unidos de america": "Estados Unidos",
+  uk: "Reino Unido",
+  inglaterra: "Reino Unido",
+  mexico: "México",
+  "republica dominicana": "República Dominicana",
+};
+
+let byName: Map<string, string> | null = null;
+const countryIndex = () => {
+  if (!byName) {
+    byName = new Map(COUNTRIES.map((c) => [norm(c), c]));
+    for (const [k, v] of Object.entries(ALIASES)) byName.set(k, COUNTRIES.find((c) => norm(c) === norm(v)) ?? v);
+  }
+  return byName;
+};
+const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+
+/**
+ * Si el texto de un lugar nombra un país (casi siempre al final: «Oaxaca, México»), devuelve ese país y el resto como ciudad o lugar.
+ * Guatemala no cuenta: un lugar de Guatemala se resuelve con el catálogo de municipios.
+ */
+export function detectCountry(text: string): { country: string; city: string } | null {
+  const parts = text.split(/[,;|]|\s[-–—/]\s/).map((p) => p.trim()).filter(Boolean);
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const c = countryIndex().get(norm(parts[i]));
+    if (!c) continue;
+    if (norm(c) === norm(HOME_COUNTRY)) return null;
+    return { country: c, city: parts.filter((_, j) => j !== i).join(", ") };
+  }
+  return null;
+}

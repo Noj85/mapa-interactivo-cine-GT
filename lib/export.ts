@@ -1,4 +1,5 @@
 import { categoriesText } from "@/lib/categories";
+import { isAbroad } from "@/lib/completeness";
 import { companiesText } from "@/lib/companies";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { filmFilterActive, locDepto, locationsMatching, orgFilterActive, type ExportKind, type ExportRows, type FilmFilter, type OrgFilter } from "@/lib/filters";
@@ -37,8 +38,8 @@ export function buildTable(
     return {
       name: "locaciones",
       title: "Locaciones de rodaje",
-      header: ["Producción", "Año", "Duración (min)", "Formato", "Naturaleza", "Géneros", "Departamento", "Municipio", "Sitio", "Latitud", "Longitud", "Días de rodaje", "Inversión local", "Moneda", "Empleos", "Registro completo (%)", "Estado"],
-      widths: [34, 7, 10, 16, 14, 26, 16, 18, 28, 10, 10, 10, 14, 8, 9, 12, 11],
+      header: ["Producción", "Año", "Duración (min)", "Formato", "Naturaleza", "Géneros", "Departamento", "Municipio", "País (si fue fuera de Guatemala)", "Ciudad (fuera de Guatemala)", "Sitio", "Latitud", "Longitud", "Días de rodaje", "Inversión local", "Moneda", "Empleos", "Registro completo (%)", "Estado"],
+      widths: [34, 7, 10, 16, 14, 26, 16, 18, 20, 20, 28, 10, 10, 10, 14, 8, 9, 12, 11],
       rows: films.flatMap((film) => {
         // Si se filtró por lugar, solo salen las locaciones de ese lugar.
         const locs = locationsMatching(film.locations, f);
@@ -49,6 +50,8 @@ export function buildTable(
           ...typeCells(film),
           depto(l ? locDepto(l) : null),
           muni(l?.muni_ine ?? null),
+          l && isAbroad(l) ? l.country : "",
+          l && isAbroad(l) ? l.city : "",
           l?.site,
           l?.lat,
           l?.lng,
@@ -109,8 +112,8 @@ export function buildTable(
   return {
     name: "producciones",
     title: "Producciones",
-    header: ["Título", "Año", "Duración (min)", "Formato", "Naturaleza", "Géneros", "Director/a", "Productor/a", "Casas productoras", "Nacionalidad", "Presupuesto", "Moneda", "Locaciones", "Departamentos", "Días de rodaje", "Inversión local", "Empleos", "Festivales", "Sinopsis", "Registro completo (%)", "Falta", "Estado"],
-    widths: [34, 7, 10, 16, 14, 26, 26, 26, 40, 14, 14, 8, 10, 28, 10, 14, 9, 10, 70, 12, 30, 11],
+    header: ["Título", "Año", "Duración (min)", "Formato", "Naturaleza", "Géneros", "Director/a", "Productor/a", "Casas productoras", "Nacionalidad", "Presupuesto", "Moneda", "Locaciones", "Departamentos", "Fuera de Guatemala", "Días de rodaje", "Inversión local", "Empleos", "Festivales", "Sinopsis", "Registro completo (%)", "Falta", "Estado"],
+    widths: [34, 7, 10, 16, 14, 26, 26, 26, 40, 14, 14, 8, 10, 28, 22, 10, 14, 9, 10, 70, 12, 30, 11],
     rows: films.map((f) => [
       f.title,
       f.year,
@@ -124,6 +127,7 @@ export function buildTable(
       f.currency,
       f.locations.length,
       [...new Set(f.locations.map((l) => depto(locDepto(l))).filter(Boolean))].join("; "),
+      [...new Set(f.locations.filter(isAbroad).map((l) => l.country!.trim()))].join("; "),
       sum(f, "days"),
       sum(f, "local_spend"),
       sum(f, "jobs"),

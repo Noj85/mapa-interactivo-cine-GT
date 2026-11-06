@@ -1,4 +1,5 @@
 import { orgCategories } from "@/lib/categories";
+import { isAbroad } from "@/lib/completeness";
 import { companiesText } from "@/lib/companies";
 import { describeFestival, sortFestivals } from "@/lib/festivals";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
@@ -16,12 +17,13 @@ export interface DiffRow {
 
 const dash = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
 
-type Loc = Partial<{ muni_ine: number | null; depto_ine: number | null; site: string | null; days: number | null; local_spend: number | null; jobs: number | null }>;
+type Loc = Partial<{ muni_ine: number | null; depto_ine: number | null; country: string | null; city: string | null; site: string | null; days: number | null; local_spend: number | null; jobs: number | null }>;
 
 function locText(l: Loc, gaz: Gazetteer) {
   const muni = gaz.muni(l.muni_ine ?? null);
   const depto = gaz.depto(l.depto_ine ?? muni?.depto_ine ?? null);
-  const place = muni ? `${muni.name}, ${muni.depto}` : depto ? `${depto.name} (municipio por confirmar)` : "Sin lugar";
+  const abroad = isAbroad(l);
+  const place = abroad ? [l.city, l.country].filter(Boolean).join(", ") : muni ? `${muni.name}, ${muni.depto}` : depto ? `${depto.name} (municipio por confirmar)` : "Sin lugar";
   const extra = [
     l.days != null ? `${fmtInt(l.days)} d` : null,
     l.local_spend != null ? fmtMoney(l.local_spend) : null,

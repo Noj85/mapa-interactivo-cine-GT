@@ -19,8 +19,10 @@ export function Breadcrumbs({
   onClear(): void;
 }) {
   const crumbs: { label: string; onClick: () => void; current?: boolean }[] = [
-    { label: "Guatemala", onClick: onClear, current: !view.place && !view.film && !view.org },
+    { label: "Guatemala", onClick: onClear, current: !view.place && !view.film && !view.org && !view.noloc && !view.abroad },
   ];
+  if (view.noloc) crumbs.push({ label: "Sin ubicación", onClick: () => {}, current: true });
+  if (view.abroad) crumbs.push({ label: "Fuera de Guatemala", onClick: () => {}, current: true });
   const place = view.place;
   if (place) {
     const e = place.type === "muni" ? gaz.muni(place.code) : gaz.depto(place.code);

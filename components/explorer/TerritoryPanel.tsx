@@ -6,7 +6,7 @@ import { metricText } from "@/lib/format";
 import { LAYERS, type LayerId } from "@/lib/types";
 import { fmtInt, fmtMoney } from "@/lib/utils";
 import { downloadHref } from "@/lib/view";
-import { BarRow, DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat } from "./parts";
+import { BarRow, DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid } from "./parts";
 
 const ZERO: Agg = { films: 0, days: 0, spend: 0, jobs: 0, orgs: 0 };
 
@@ -56,12 +56,17 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
       <h2 className="font-display text-[34px] leading-[1.05] tracking-tight text-ink">{entry?.name}</h2>
 
       {view.layer === "produccion" ? (
-        <div className="mt-4 grid grid-cols-2 gap-2.5">
-          <Stat label={agg.films === 1 ? "Producción" : "Producciones"} value={fmtInt(agg.films)} />
-          <Stat label="Días de rodaje" value={fmtInt(agg.days)} />
-          <Stat label="Inversión local" value={fmtMoney(agg.spend)} />
-          <Stat label="Empleos" value={fmtInt(agg.jobs)} />
-        </div>
+        <StatsGrid
+          className="mt-4"
+          stats={data.publicStats}
+          canEdit={ctx.canEdit}
+          items={[
+            { key: "films", label: agg.films === 1 ? "Producción" : "Producciones", value: fmtInt(agg.films) },
+            { key: "days", label: "Días de rodaje", value: fmtInt(agg.days) },
+            { key: "spend", label: "Inversión local", value: fmtMoney(agg.spend) },
+            { key: "jobs", label: "Empleos", value: fmtInt(agg.jobs) },
+          ]}
+        />
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-2.5">
           <Stat label={LAYERS.find((l) => l.id === view.layer)!.label} value={fmtInt(agg.orgs)} sub="registros" />

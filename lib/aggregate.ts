@@ -1,3 +1,4 @@
+import { isAbroad } from "@/lib/completeness";
 import type { Dataset, Film, LayerId, MetricId, Org } from "@/lib/types";
 
 export interface Agg {
@@ -33,6 +34,8 @@ export function aggregate(data: Dataset, layer: LayerId): Aggregates {
       const mSeen = new Set<number>();
       let counted = false;
       for (const l of f.locations) {
+        // lo rodado fuera de Guatemala no suma a ningún territorio ni al total del país
+        if (isAbroad(l)) continue;
         const dep = l.depto_ine ?? (l.muni_ine != null ? Math.floor(l.muni_ine / 100) : null);
         const mu = l.muni_ine;
         if (dep != null) {

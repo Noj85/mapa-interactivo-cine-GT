@@ -1,4 +1,5 @@
-import { filmCompleteness, orgCompleteness } from "@/lib/completeness";
+import { filmCompleteness, isAbroad, orgCompleteness } from "@/lib/completeness";
+import { detectCountry } from "@/lib/countries";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { FORMATS, NATURES } from "@/lib/film-types";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
@@ -163,7 +164,7 @@ function recompute(c: Candidate): Candidate {
       if (!i.field.startsWith("location:")) return true;
       const idx = Number(i.field.split(":")[1]);
       const l = c.film!.locations[idx];
-      return !(l && (l.muni_ine != null || (l.lat != null && l.lng != null)));
+      return !(l && (l.muni_ine != null || (l.lat != null && l.lng != null) || isAbroad(l)));
     });
   }
   if (c.type === "org" && c.org && (c.org.muni_ine != null || c.org.depto_ine != null)) {
@@ -184,6 +185,16 @@ export function setCandidateLocation(c: Candidate, idx: number, v: { muni_ine: n
   return recompute(next);
 }
 
+/** La locación es fuera de Guatemala: país y ciudad en vez de municipio. */
+export function setCandidateAbroad(c: Candidate, idx: number, v: { country: string; city: string | null }): Candidate {
+  if (c.type !== "film" || !c.film) return c;
+  const next: Candidate = structuredClone(c);
+  const locs = next.film!.locations;
+  if (!locs[idx]) locs[idx] = {};
+  locs[idx] = { ...locs[idx], muni_ine: null, depto_ine: null, lat: null, lng: null, country: v.country, city: v.city, confidence: 1 };
+  return recompute(next);
+}
+
 /** Aplica la respuesta a todos los candidatos afectados. */
 export function applyAnswer(
   candidates: Candidate[],
@@ -197,6 +208,39 @@ export function applyAnswer(
   if (q.kind === "place") {
     // option "muni:301" / "depto:3" o texto libre
     let target: { muni_ine: number | null; depto_ine: number | null } | null = null;
+    // «abroad:País|Ciudad» (o un texto que nombra otro país): la locación es fuera de Guatemala
+    const ab = answer.match(/^abroad:(.*)$/);
+    const abroad = ab
+      ? (() => {
+          const [country, city] = ab[1].split("|").map((x) => x.trim());
+          const d = detectCountry(country ?? "");
+          const name = d?.country ?? (country && country.toLowerCase() !== "guatemala" ? country : "");
+          return name ? { country: name, city: city || null } : null;
+        })()
+      : !/^(muni|depto):\d+$/.test(answer) && !gaz.resolve(answer)[0]
+        ? (() => {
+            const d = detectCountry(answer);
+            return d ? { country: d.country, city: d.city || null } : null;
+          })()
+        : null;
+    if (ab && !abroad) return { candidates, places };
+    if (abroad) {
+      if (q.candidateKey) {
+        return { candidates: candidates.map((c) => (c.key === q.candidateKey ? setCandidateAbroad(c, 0, abroad) : c)), places };
+      }
+      const text = q.placeText!;
+      return {
+        places: { ...places, [text]: { status: "ok", muni_ine: null, depto_ine: null, candidates: [], via: "user" } },
+        candidates: candidates.map((c) => {
+          if (c.type !== "film" || !c.placeTexts.includes(text)) return c;
+          let next = c;
+          c.placeTexts.forEach((t, i) => {
+            if (t === text) next = setCandidateAbroad(next, i, abroad);
+          });
+          return next;
+        }),
+      };
+    }
     const m = answer.match(/^(muni|depto):(\d+)$/);
     if (m) {
       const e = m[1] === "muni" ? gaz.muni(Number(m[2])) : gaz.depto(Number(m[2]));
@@ -275,6 +319,7 @@ export function candidateStatus(c: Candidate) {
         muni_ine: l.muni_ine ?? null,
         lat: l.lat ?? null,
         lng: l.lng ?? null,
+        country: l.country ?? null,
         days: l.days ?? null,
         local_spend: l.local_spend ?? null,
         jobs: l.jobs ?? null,

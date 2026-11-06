@@ -7,6 +7,7 @@ import { linkFestivals, syncOrgFestivalSafe } from "@/lib/festivals-server";
 import { serverGazetteer } from "@/lib/geo/server";
 import { deletePublicImages } from "@/lib/posters";
 import { filmSchema, orgSchema } from "@/lib/schemas";
+import { isAbroad } from "@/lib/completeness";
 import type { FilmInput, OrgInput, QuestionStatus, RecordStatus } from "@/lib/types";
 
 type Result = { ok: true; id: string } | { ok: false; error: string };
@@ -140,7 +141,7 @@ export async function answerQuestionAction(id: string, answer: string | null, st
             const gaz = await serverGazetteer();
             const hit = gaz.resolve(answer)[0];
             if (hit) {
-              const target = input.locations.find((l) => l.muni_ine == null) ?? null;
+              const target = input.locations.find((l) => l.muni_ine == null && !isAbroad(l)) ?? null;
               const loc = {
                 muni_ine: hit.entry.type === "muni" ? hit.entry.code : null,
                 depto_ine: hit.entry.depto_ine,

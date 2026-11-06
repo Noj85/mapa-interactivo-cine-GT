@@ -27,7 +27,7 @@ Copia `.env.example` a `.env.local` (o configúralas en Vercel).
 ## Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0013`, ver cada sección) de `supabase/migrations/`:
+2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0015`, ver cada sección) de `supabase/migrations/`:
    - `0001_init.sql`: tablas, políticas RLS y perfiles.
    - `0002_posters.sql`: campo del póster y bucket público `posters` en Storage.
    - `0003_submissions.sql`: aportes del público.
@@ -88,7 +88,7 @@ El mapa arranca vacío y se llena desde cero: entra a `/admin/agregar` y sube un
 
 ## Dos partes: mapa público y equipo
 
-La app es una sola, con dos áreas separadas. **`/` siempre es el mapa público**, incluso si tienes sesión del equipo. **`/admin` es la única puerta del equipo**: sin sesión muestra el acceso (la URL no cambia, no existe `/login`); con sesión muestra el mismo mapa con borradores, botón «Editar» y la barra de herramientas . El menú del equipo tiene cinco opciones: **Mapa**, **Resumen** (`/admin/resumen`: cifras y lo que falta), **Aportes**, **Agregar datos** (`/admin/agregar`: cargar un archivo, o registrar una producción o entidad a mano, más las cargas recientes) y **Registros** (`/admin/peliculas` y `/admin/entidades`, con pestañas Producciones | Entidades, para revisar, editar y publicar). Aparte, el engranaje **Ajustes** (`/admin/ajustes`, arriba a la derecha, no es una sexta opción del menú) reúne la configuración: hoy el catálogo de **Festivales**; ya se ven, desactivadas y con la etiqueta «Pronto», Categorías y países, Cambiar mi contraseña, Usuarios administradores, Roles y permisos, Vigencia y mensaje de las solicitudes, Respaldo y exportación e Historial de cambios. Los intentos de entrada están limitados por IP y `/admin` no se indexa.
+La app es una sola, con dos áreas separadas. **`/` siempre es el mapa público**, incluso si tienes sesión del equipo. **`/admin` es la única puerta del equipo**: sin sesión muestra el acceso (la URL no cambia, no existe `/login`); con sesión muestra el mismo mapa con borradores, botón «Editar» y la barra de herramientas . El menú del equipo tiene cinco opciones: **Mapa**, **Resumen** (`/admin/resumen`: cifras y lo que falta), **Aportes**, **Agregar datos** (`/admin/agregar`: cargar un archivo, o registrar una producción o entidad a mano, más las cargas recientes) y **Registros** (`/admin/peliculas` y `/admin/entidades`, con pestañas Producciones | Entidades, para revisar, editar y publicar). Aparte, el engranaje **Ajustes** (`/admin/ajustes`, arriba a la derecha, no es una sexta opción del menú) reúne la configuración: hoy el catálogo de **Festivales** y las **Cifras públicas** del mapa; ya se ven, desactivadas y con la etiqueta «Pronto», Categorías y países, Cambiar mi contraseña, Usuarios administradores, Roles y permisos, Vigencia y mensaje de las solicitudes, Respaldo y exportación e Historial de cambios. Los intentos de entrada están limitados por IP y `/admin` no se indexa.
 
 | | Mapa público (`/`, `/descargas`, `/aportar`) | Equipo (`/admin/*`) |
 |---|---|---|
@@ -107,10 +107,13 @@ La app es una sola, con dos áreas separadas. **`/` siempre es el mapa público*
 - **Categorías**: una entidad puede tener varias (por ejemplo, producción, posproducción y efectos especiales). La primera es la principal; es la que usan el color y el resumen, y el resto cuenta en filtros y descargas. En archivos importados se pueden separar con «;», «,» o «/».
 - **Contacto**: teléfono y/o correo, en campos separados. Los teléfonos de Guatemala se guardan como `+502 5555 1234`; los extranjeros con su código de país. En archivos importados se extraen y estandarizan, y lo que no sea teléfono ni correo (nombres, notas) se avisa en la revisión y no se guarda.
 
-## Varias locaciones y producciones «Sin ubicación»
+## Varias locaciones, «Sin ubicación» y «Fuera de Guatemala»
 
 - Una producción puede tener **todas las locaciones que haga falta** (cada una con su lugar, sitio, días, inversión local y empleos). En el editor: «Agregar locación», o «Pegar varios lugares» para escribir una lista (uno por línea o separados por «;») que se resuelve con los códigos del INE. En un archivo importado, una fila por locación.
 - Las producciones **sin lugar de rodaje** ya no quedan ocultas: con tener título se publican y se muestran en una zona punteada «Sin ubicación» en el Pacífico, fuera del territorio de Guatemala, para que se entienda que no tienen ubicación. Tocarla abre la lista de esas producciones (`?sinlugar=1`), y la vista general avisa cuántas son. Al agregarles un lugar pasan solas al mapa.
+- Una producción guatemalteca puede haberse rodado **en otro país**, y eso **no es «Sin ubicación»**: sí dice dónde se rodó. En el editor, cada locación tiene la casilla **«Fuera de Guatemala»**, que cambia departamento y municipio por **País** (con sugerencias) y **Ciudad o lugar**. Esas producciones salen en una segunda zona punteada del Pacífico, bajo «Sin ubicación», con la etiqueta «Fuera de Guatemala» y su conteo; tocarla abre la lista agrupada por país (`?fuera=1`) y la vista general avisa cuántas son. Una producción con locaciones dentro y fuera aparece en el territorio y en la zona. Las locaciones de afuera no suman a departamentos ni a los totales de Guatemala, pero **sí cuentan** para la completitud («Locaciones» deja de faltar y «Municipio por confirmar» las ignora). Las descargas traen las columnas «País (si fue fuera de Guatemala)» y «Ciudad (fuera de Guatemala)».
+- Al **importar** (Excel, CSV, Word, PDF), un lugar que nombra otro país («Oaxaca, México», «Madrid - España») se reconoce solo como locación fuera de Guatemala; si el asistente pregunta dónde se rodó una producción, hay una opción «Está fuera de Guatemala» que pide el país.
+- Requiere `supabase/migrations/0014_location_country.sql` (después de 0013): agrega `country` y `city` a `film_locations`. Sin ella todo lo demás sigue funcionando; solo falla guardar locaciones con país.
 
 ## Publicar o no en el mapa
 
@@ -162,16 +165,24 @@ Con `supabase/migrations/0010_festival_org_link.sql` (después de 0007, 0008 y 0
 - En el mapa público, el nombre de un festival vinculado en la ficha de una producción abre la entidad (si está publicada), y la ficha de la entidad muestra **Producciones que participaron** (año, resultado y sección).
 - Fusionar festivales conserva el vínculo; eliminar la entidad deja la entrada del catálogo sin vínculo.
 
-## Filtros del mapa
+## Mapa público y filtros del equipo
 
-En el mapa, el desplegable «Todo el país» (debajo de las capas) acerca la cámara a un departamento, atenúa el resto del país y deja en el mapa y en el panel solo lo de ese departamento. El filtro vive en la URL (`?lugar=d9`), así que se puede compartir; la «×» o «Todo el país» lo quita.
+**El mapa público no tiene filtros ni leyenda**: se toca un departamento o municipio, una producción o una zona, y se busca con ⌘ K. Los enlaces compartidos con filtros (`formato_obra=…`, `metrica=…`) se abren con el mapa completo. Los filtros siguen existiendo para el equipo en `/admin` (y en `/descargas`, que es pública pero aparte), como herramienta secundaria detrás de un botón.
+
+### Cifras de la tarjeta (Ajustes → Cifras públicas)
+
+La tarjeta de la vista general y la de cada departamento o municipio pueden mostrar cuatro cifras de Producción: **producciones con locación**, **días de rodaje**, **inversión local** y **empleos**. Cuando los datos son pocos, un «0» resta; por eso el equipo decide cuáles se ven en **Ajustes → Cifras públicas** (`/admin/ajustes/cifras`), con un interruptor por cifra, su valor actual y la cobertura («dato en 12 de 80 producciones»). Por defecto solo se muestra «Producciones con locación»; si no hay ninguna cifra encendida, la cuadrícula desaparece. El equipo siempre ve las cuatro en `/admin`, marcadas «Oculta al público» las apagadas y con la cobertura en la vista general. La ficha de una producción muestra días, inversión y empleos solo si tienen dato (sin guiones). Los ajustes se guardan en la tabla `site_settings` (lectura pública, escritura del equipo) con `supabase/migrations/0015_site_settings.sql`; sin ella el mapa usa los valores por defecto y la página avisa que falta aplicarla. En modo local viven en `.data/db.json`.
+
+## Filtros del equipo en el mapa de /admin
+
+En `/admin`, el desplegable «Todo el país» (debajo de las capas) acerca la cámara a un departamento, atenúa el resto del país y deja en el mapa y en el panel solo lo de ese departamento. El filtro vive en la URL (`?lugar=d9`), así que se puede compartir; la «×» o «Todo el país» lo quita.
 
 Junto al departamento hay un botón **«Filtros»** que abre un panel compacto. Sin filtros el mapa no muestra nada más; los filtros se **añaden a la carta** («+ Añadir filtro») y se quitan con la «×»:
 
 - **Producción:** formato, naturaleza, género, nacionalidad, año, presupuesto (con moneda), días de rodaje, inversión local, empleos, «solo con todas las locaciones ubicadas» y búsqueda por texto.
 - **Circulación e Industria:** categoría (varias), naturaleza y búsqueda por texto.
-- **Medir por** (solo Producción): producciones, días de rodaje, inversión local o empleos; cambia los colores y la leyenda.
-- Los filtros se aplican al mapa, la leyenda y los paneles, y viven en la URL con los mismos parámetros que `/descargas` (`formato_obra`, `naturaleza`, `genero`, `desde`, `presupuesto_min`, `dias_min`, `categoria`…, más `metrica`), así que «Copiar enlace de esta vista» y «Descargar estos datos» llevan exactamente lo que se ve. Los enlaces anteriores con `?categoria=` o `?clase=` (el antiguo «tipo de obra») siguen funcionando: se convierten a formato y naturaleza.
+- **Medir por** (solo Producción): producciones, días de rodaje, inversión local o empleos; cambia los colores del mapa.
+- Los filtros se aplican al mapa y los paneles, y viven en la URL con los mismos parámetros que `/descargas` (`formato_obra`, `naturaleza`, `genero`, `desde`, `presupuesto_min`, `dias_min`, `categoria`…, más `metrica`), así que «Copiar enlace de esta vista» y «Descargar estos datos» llevan exactamente lo que se ve. Los enlaces anteriores con `?categoria=` o `?clase=` (el antiguo «tipo de obra») siguen funcionando: se convierten a formato y naturaleza.
 
 ## Pósters
 
@@ -236,7 +247,7 @@ Los límites vienen de `public/geo/` (departamentos, municipios con código INE,
 ## Estructura
 
 - `components/map/`: MapLibre (coropletas, clusters, rutas de rodaje).
-- `components/explorer/`: la experiencia pública (paneles, buscador ⌘K, leyenda, filtros).
+- `components/explorer/`: la experiencia pública (paneles, buscador ⌘K; los filtros solo en /admin).
 - `components/import/` y `lib/import/`: asistente de carga y su lógica.
 - `lib/claude/`: llamadas a Claude (mapeo de columnas y resolución de lugares).
 - `lib/data/`: almacén (Supabase o archivo local).

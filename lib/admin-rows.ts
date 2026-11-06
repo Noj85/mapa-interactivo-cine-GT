@@ -1,6 +1,7 @@
 import "server-only";
 import type { RecordRow } from "@/components/admin/RecordsTable";
 import { categoriesText } from "@/lib/categories";
+import { isAbroad } from "@/lib/completeness";
 import { companyNames } from "@/lib/companies";
 import { isUnlocated } from "@/lib/map/features";
 import { posterThumb } from "@/lib/poster-url";
@@ -20,7 +21,7 @@ export function openRequestCounts(requests: InfoRequest[]) {
 
 export function filmRows(films: Film[], gaz: Gazetteer, open: Record<string, number>): RecordRow[] {
   return films.map((f) => {
-    const places = f.locations.map((l) => gaz.muni(l.muni_ine)?.name ?? gaz.depto(l.depto_ine)?.name ?? l.site ?? "").filter(Boolean);
+    const places = f.locations.map((l) => (isAbroad(l) ? [l.city, l.country].filter(Boolean).join(", ") : gaz.muni(l.muni_ine)?.name ?? gaz.depto(l.depto_ine)?.name ?? l.site ?? "")).filter(Boolean);
     const kind = filmTypeLabel(f);
     return {
       id: f.id,

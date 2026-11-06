@@ -5,10 +5,12 @@ import { posterThumb } from "@/lib/poster-url";
 import { ArrowLeft, Clapperboard, Download, Landmark, X } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { isAbroad } from "@/lib/completeness";
 import type { Aggregates } from "@/lib/aggregate";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { durationLabel, filmTypeLabel } from "@/lib/film-types";
 import type { Dataset, Film, LayerId, Org } from "@/lib/types";
+import type { PublicStats, StatKey } from "@/lib/site-settings";
 import type { Place, ViewState } from "@/lib/view";
 import { cn } from "@/lib/utils";
 import { CompletenessBadge } from "@/components/ui/Badges";
@@ -25,6 +27,7 @@ export interface PanelCtx {
     film(slug: string): void;
     org(slug: string): void;
     unlocated(): void;
+    abroad(): void;
     layer(l: LayerId): void;
     up(): void;
     clear(): void;
@@ -70,6 +73,40 @@ export function Stat({ label, value, sub }: { label: string; value: ReactNode; s
       <div className="font-display text-[26px] leading-none tracking-tight text-ink">{value}</div>
       <div className="mt-1.5 text-xs text-muted">{label}</div>
       {sub && <div className="text-[11px] text-muted/70">{sub}</div>}
+    </div>
+  );
+}
+
+export interface StatItem {
+  key: StatKey;
+  label: string;
+  value: ReactNode;
+  /** Solo para el equipo: en cuántas producciones hay dato, p. ej. «dato en 12 de 80». */
+  coverage?: string;
+}
+
+/**
+ * Las cifras de producción que el equipo decidió mostrar (Ajustes → Cifras públicas). El público ve solo las encendidas
+ * (y nada si no hay ninguna); el equipo ve todas, con las apagadas marcadas y un enlace a Ajustes.
+ */
+export function StatsGrid({ items, stats, canEdit, className }: { items: StatItem[]; stats: PublicStats; canEdit?: boolean; className?: string }) {
+  const shown = canEdit ? items : items.filter((i) => stats[i.key]);
+  if (!shown.length) return null;
+  const hidden = canEdit && shown.some((i) => !stats[i.key]);
+  return (
+    <div className={className}>
+      <div className="grid grid-cols-2 gap-2.5">
+        {shown.map((i) => (
+          <div key={i.key} className={cn(canEdit && !stats[i.key] && "opacity-60")}>
+            <Stat label={i.label} value={i.value} sub={[canEdit && !stats[i.key] ? "Oculta al público" : null, canEdit ? i.coverage : null].filter(Boolean).join(" · ") || undefined} />
+          </div>
+        ))}
+      </div>
+      {hidden && (
+        <Link href="/admin/ajustes/cifras" className="mt-2 inline-block text-xs text-accent underline underline-offset-2">
+          Elegir qué cifras ve el público
+        </Link>
+      )}
     </div>
   );
 }
@@ -135,7 +172,7 @@ export function FilmCard({
     hereMuni != null ? l.muni_ine === hereMuni : hereDepto != null ? (l.depto_ine ?? 0) === hereDepto : false,
   );
   const sites = (here.length ? here : film.locations)
-    .map((l) => l.site ?? gaz.muni(l.muni_ine)?.name ?? gaz.depto(l.depto_ine)?.name)
+    .map((l) => (isAbroad(l) ? [l.city, l.country].filter(Boolean).join(", ") : l.site ?? gaz.muni(l.muni_ine)?.name ?? gaz.depto(l.depto_ine)?.name))
     .filter(Boolean)
     .slice(0, 3)
     .join(" · ");

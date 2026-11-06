@@ -1,3 +1,4 @@
+import { isAbroad } from "@/lib/completeness";
 import { cleanGenres, formatLabel, MAX_GENRES, natureLabel } from "@/lib/film-types";
 import { orgCategories, normalizeCategories } from "@/lib/categories";
 import { NATIONALITIES, type Film, type FilmInput, type Org, type OrgInput } from "@/lib/types";
@@ -54,6 +55,7 @@ const natLabel = (n: string | null | undefined) => NATIONALITIES.find((x) => x.i
 type Loc = NonNullable<FilmInput["locations"]>[number];
 
 const placeText = (l: Partial<Loc>, names?: PlaceNames) => {
+  if (isAbroad(l)) return [l.site, l.city, l.country].filter(Boolean).join(" · ");
   const muni = l.muni_ine != null ? names?.muni?.(l.muni_ine) || `municipio ${l.muni_ine}` : "";
   const depto = !muni && l.depto_ine != null ? names?.depto?.(l.depto_ine) || `departamento ${l.depto_ine}` : "";
   return [l.site, muni || depto].filter(Boolean).join(" · ") || "Sin lugar";
@@ -152,18 +154,21 @@ function filmItems(existing: Film, incoming: FilmInput, names?: PlaceNames): Ite
   // locaciones
   const claimed = new Set<string>();
   for (const nl of incoming.locations ?? []) {
-    const hasAny = nl.muni_ine != null || nl.depto_ine != null || (nl.lat != null && nl.lng != null) || !!(nl.site ?? "").trim();
+    const hasAny = nl.muni_ine != null || nl.depto_ine != null || (nl.lat != null && nl.lng != null) || !!(nl.site ?? "").trim() || isAbroad(nl);
+    const abroad = isAbroad(nl);
     if (!hasAny) continue;
     const site = normalize(nl.site ?? "");
     const deptoOf = nl.depto_ine ?? (nl.muni_ine != null ? Math.floor(nl.muni_ine / 100) : null);
     const lDepto = (l: { depto_ine: number | null; muni_ine: number | null }) => l.depto_ine ?? (l.muni_ine != null ? Math.floor(l.muni_ine / 100) : null);
     // 1. la misma locación: se completan solo sus cifras vacías
-    let match = existing.locations.find((l) => (nl.muni_ine != null ? l.muni_ine === nl.muni_ine : l.muni_ine == null && lDepto(l) === deptoOf) && normalize(l.site ?? "") === site);
+    let match = abroad
+      ? existing.locations.find((l) => isAbroad(l) && normalize(l.country ?? "") === normalize(nl.country ?? "") && normalize(l.city ?? "") === normalize(nl.city ?? ""))
+      : existing.locations.find((l) => !isAbroad(l) && (nl.muni_ine != null ? l.muni_ine === nl.muni_ine : l.muni_ine == null && lDepto(l) === deptoOf) && normalize(l.site ?? "") === site);
     let completesPlace = false;
     // 2. una locación existente sin municipio que este archivo sí ubica
-    if (!match && nl.muni_ine != null) {
+    if (!match && !abroad && nl.muni_ine != null) {
       match = existing.locations.find(
-        (l) => l.muni_ine == null && !claimed.has(l.id) && normalize(l.site ?? "") === site && (lDepto(l) == null || lDepto(l) === deptoOf),
+        (l) => !isAbroad(l) && l.muni_ine == null && !claimed.has(l.id) && normalize(l.site ?? "") === site && (lDepto(l) == null || lDepto(l) === deptoOf),
       );
       completesPlace = !!match;
     }
@@ -211,7 +216,7 @@ function filmItems(existing: Film, incoming: FilmInput, names?: PlaceNames): Ite
       continue;
     }
     // 3. una locación nueva
-    const key = `${nl.muni_ine ?? ""}|${nl.muni_ine == null ? (deptoOf ?? "") : ""}|${site}|${nl.lat ?? ""},${nl.lng ?? ""}`;
+    const key = `${abroad ? `${normalize(nl.country ?? "")}/${normalize(nl.city ?? "")}` : ""}|${nl.muni_ine ?? ""}|${nl.muni_ine == null ? (deptoOf ?? "") : ""}|${site}|${nl.lat ?? ""},${nl.lng ?? ""}`;
     push({ id: `add:location:${key}`, group: "add", label: "Locación", incoming: placeText(nl, names), apply: (d) => (d.locations = [...(d.locations ?? []), { ...nl }]) });
   }
   return uniq(items);

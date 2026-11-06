@@ -9,7 +9,8 @@ import { aggregate, type Stop } from "@/lib/aggregate";
 import { metricText } from "@/lib/format";
 import type { GeoBundle } from "@/lib/geo/load";
 import { LAYER_COLORS, MAP_BG, ramp, type Theme } from "@/lib/map/colors";
-import { buildFilmRoute, buildLabels, buildMask, buildNowhere, buildPins, levels, locationPoint, NOWHERE, NOWHERE_BBOX, isUnlocated, unlocatedFilms } from "@/lib/map/features";
+import { abroadFilms, ABROAD, ABROAD_BBOX, buildAbroad, buildFilmRoute, buildLabels, buildMask, buildNowhere, buildPins, hasAbroad, levels, locationPoint, NOWHERE, NOWHERE_BBOX, isUnlocated, unlocatedFilms, withZones } from "@/lib/map/features";
+import { isAbroad } from "@/lib/completeness";
 import { buildStyle, firstSymbolId } from "@/lib/map/style";
 import type { Dataset } from "@/lib/types";
 import { deptoOf, type Place, type ViewState } from "@/lib/view";
@@ -41,7 +42,8 @@ interface Props {
   onFilm(slug: string): void;
   onOrg(slug: string): void;
   onUnlocated?(): void;
-  onScale(s: ScaleInfo): void;
+  onAbroad?(): void;
+  onScale?(s: ScaleInfo): void;
   onReady?(): void;
 }
 
@@ -91,8 +93,8 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
     if (!map) return;
     // si hay producciones sin lugar, la vista incluye también la zona «Sin ubicación»
     const { data, view } = propsRef.current;
-    const withZone = view.layer === "produccion" && unlocatedFilms(data.films).length > 0;
-    const b = withZone ? [Math.min(COUNTRY_BBOX[0], NOWHERE_BBOX[0]), Math.min(COUNTRY_BBOX[1], NOWHERE_BBOX[1]), COUNTRY_BBOX[2], COUNTRY_BBOX[3]] : COUNTRY_BBOX;
+    const prod = view.layer === "produccion";
+    const b = withZones(COUNTRY_BBOX as [number, number, number, number], { nowhere: prod && unlocatedFilms(data.films).length > 0, abroad: prod && abroadFilms(data.films).length > 0 });
     map.fitBounds(
       [
         [b[0], b[1]],
@@ -418,7 +420,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       source: "nowhere",
       filter: ["==", ["get", "kind"], "label"],
       layout: {
-        "text-field": ["format", "Sin ubicación", { "font-scale": 1 }, "\n", {}, ["get", "text"], { "font-scale": 0.8, "text-font": ["literal", fonts.reg] }],
+        "text-field": ["format", ["get", "title"], { "font-scale": 1 }, "\n", {}, ["get", "text"], { "font-scale": 0.8, "text-font": ["literal", fonts.reg] }],
         "text-font": fonts.bold,
         "text-size": ["interpolate", ["linear"], ["zoom"], 5, 11, 8, 15],
         "text-max-width": 9,
@@ -525,7 +527,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
     for (const c of muniCodes) map.setFeatureState({ source: "muni", id: c }, { t: filmMode ? 0 : m.levels.get(c) ?? 0 });
     const scope = map.getZoom() >= Z_MUNI ? "muni" : "depto";
     scopeRef.current = scope;
-    propsRef.current.onScale({ scope, stops: scope === "muni" ? m.stops : d.stops });
+    propsRef.current.onScale?.({ scope, stops: scope === "muni" ? m.stops : d.stops });
     (map as any).__stops = { depto: d.stops, muni: m.stops };
 
     // colores según capa
@@ -572,7 +574,11 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
     const showZone = view.layer === "produccion" && !view.place && !view.org && (!view.film || (!!selFilm && isUnlocated(selFilm)));
     const unlocatedCount = showZone ? (view.film ? 1 : unlocatedFilms(data.films).length) : 0;
     const zoneTotal = showZone ? unlocatedFilms(data.films).length : 0;
-    (map.getSource("nowhere") as MapLibre.GeoJSONSource | undefined)?.setData(buildNowhere(zoneTotal, view.noloc || (!!view.film && unlocatedCount > 0)) as any);
+    // zona «Fuera de Guatemala»: las producciones con alguna locación en otro país
+    const showAbroad = view.layer === "produccion" && !view.place && !view.org && (!view.film || (!!selFilm && hasAbroad(selFilm)));
+    const abroadTotal = showAbroad ? abroadFilms(data.films).length : 0;
+    const zones = [buildNowhere(zoneTotal, view.noloc || (!!view.film && unlocatedCount > 0)), buildAbroad(abroadTotal, view.abroad || (!!view.film && abroadTotal > 0))];
+    (map.getSource("nowhere") as MapLibre.GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: zones.flatMap((z) => z.features) } as any);
 
     // producción / entidad
     const empty = { type: "FeatureCollection", features: [] } as any;
@@ -587,7 +593,16 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       const film = data.films.find((f) => f.slug === view.film);
       if (film) {
         const route = buildFilmRoute(film, geo.gaz);
-        if (!route.coords.length) {
+        // las locaciones de otro país son un punto dentro de la zona «Fuera de Guatemala»
+        const abroadPts = film.locations
+          .filter(isAbroad)
+          .map((l) => ({
+            type: "Feature",
+            properties: { n: "", site: [l.city, l.country].filter(Boolean).join(", "), approx: true },
+            geometry: { type: "Point", coordinates: [ABROAD.lng, ABROAD.lat - 0.46] },
+          }))
+          .slice(0, 1);
+        if (!route.coords.length && !abroadPts.length) {
           // sin lugar de rodaje: la producción queda dentro de la zona «Sin ubicación»
           filmSrc.setData({
             type: "FeatureCollection",
@@ -595,7 +610,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
           } as any);
           lineSrc.setData(empty);
         } else {
-          filmSrc.setData(route.points as any);
+          filmSrc.setData({ type: "FeatureCollection", features: [...route.points.features, ...abroadPts] } as any);
           lineSrc.setData(route.lines as any);
         }
         for (const l of film.locations) {
@@ -750,7 +765,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
         if (scope !== scopeRef.current) {
           scopeRef.current = scope;
           const st = (map as any).__stops;
-          if (st) propsRef.current.onScale({ scope, stops: st[scope] });
+          if (st) propsRef.current.onScale?.({ scope, stops: st[scope] });
         }
       });
 
@@ -808,9 +823,10 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
             }
             setHover(null);
           } else if (hit.kind === "nowhere") {
-            const n = unlocatedFilms(data.films).length;
-            title = "Sin ubicación";
-            sub = `${n === 1 ? "1 producción" : `${n.toLocaleString("es-GT")} producciones`} sin lugar de rodaje registrado`;
+            const isAbroadZone = (hit.f.properties as any)?.zone === "abroad";
+            const n = (isAbroadZone ? abroadFilms(data.films) : unlocatedFilms(data.films)).length;
+            title = isAbroadZone ? "Fuera de Guatemala" : "Sin ubicación";
+            sub = `${n === 1 ? "1 producción" : `${n.toLocaleString("es-GT")} producciones`} ${isAbroadZone ? "con locaciones en otros países" : "sin lugar de rodaje registrado"}`;
             note = "Clic para ver la lista";
             setHover(null);
           } else {
@@ -857,7 +873,8 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
           return;
         }
         if (hit.kind === "nowhere") {
-          cb.onUnlocated?.();
+          if ((hit.f.properties as any)?.zone === "abroad") cb.onAbroad?.();
+          else cb.onUnlocated?.();
           return;
         }
         cb.onPlace({ type: hit.kind, code: Number(hit.f.id) });
@@ -889,7 +906,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
   // datos y vista
   useEffect(() => {
     applyData();
-  }, [props.data, props.view.layer, props.view.metric, props.view.film, props.view.org, props.view.place, props.view.noloc, props.geo, applyData]);
+  }, [props.data, props.view.layer, props.view.metric, props.view.film, props.view.org, props.view.place, props.view.noloc, props.view.abroad, props.geo, applyData]);
 
   useEffect(() => {
     applySelection();
@@ -905,7 +922,8 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
   // cámara
   const { view, padding, geo, data } = props;
   const zoneOn = view.layer === "produccion" && data.films.some(isUnlocated);
-  const camKey = `${view.place?.type}${view.place?.code}|${view.film}|${view.org}|${view.noloc}|${zoneOn}`;
+  const abroadOn = view.layer === "produccion" && data.films.some(hasAbroad);
+  const camKey = `${view.place?.type}${view.place?.code}|${view.film}|${view.org}|${view.noloc}|${view.abroad}|${zoneOn}|${abroadOn}`;
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -917,8 +935,19 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
         const film = data.films.find((f) => f.slug === view.film);
         if (!film) return;
         const route = buildFilmRoute(film, geo.gaz);
+        const abroadToo = hasAbroad(film);
         if (!route.coords.length) {
-          map.fitBounds([[NOWHERE_BBOX[0], NOWHERE_BBOX[1]], [NOWHERE_BBOX[2], NOWHERE_BBOX[3]]], { padding: pad, maxZoom: 8, duration: 1000 });
+          const z = abroadToo ? ABROAD_BBOX : NOWHERE_BBOX;
+          map.fitBounds([[z[0], z[1]], [z[2], z[3]]], { padding: pad, maxZoom: 8, duration: 1000 });
+          return;
+        }
+        if (abroadToo) {
+          // lo rodado dentro y fuera de Guatemala se encuadra junto
+          const b = new (getMaplibre().LngLatBounds)();
+          route.coords.forEach((c) => b.extend(c));
+          b.extend([ABROAD_BBOX[0], ABROAD_BBOX[1]]);
+          b.extend([ABROAD_BBOX[2], ABROAD_BBOX[3]]);
+          map.fitBounds(b, { padding: pad, maxZoom: 9, duration: 1100 });
           return;
         }
         if (route.coords.length === 1) {
@@ -930,6 +959,8 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
         map.fitBounds(b, { padding: pad, maxZoom: 11, duration: 1100 });
       } else if (view.noloc) {
         map.fitBounds([[NOWHERE_BBOX[0], NOWHERE_BBOX[1]], [NOWHERE_BBOX[2], NOWHERE_BBOX[3]]], { padding: pad, maxZoom: 8, duration: 1000 });
+      } else if (view.abroad) {
+        map.fitBounds([[ABROAD_BBOX[0], ABROAD_BBOX[1]], [ABROAD_BBOX[2], ABROAD_BBOX[3]]], { padding: pad, maxZoom: 8, duration: 1000 });
       } else if (view.org) {
         const org = data.orgs.find((o) => o.slug === view.org);
         const p = org && locationPoint(org, geo.gaz);

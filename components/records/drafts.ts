@@ -1,3 +1,4 @@
+import { isAbroad } from "@/lib/completeness";
 import { contactFromFields, contactParts } from "@/lib/contact";
 import { orgCategories } from "@/lib/categories";
 import type { FilmFormat, FilmNature } from "@/lib/film-types";
@@ -12,6 +13,10 @@ export interface LocDraft {
   id?: string;
   muni_ine: number | null;
   depto_ine: number | null;
+  /** La locación es fuera de Guatemala: se piden país y ciudad o lugar en vez de departamento y municipio. */
+  abroad: boolean;
+  country: string;
+  city: string;
   site: string;
   lat: number | null;
   lng: number | null;
@@ -20,10 +25,10 @@ export interface LocDraft {
   jobs: string;
 }
 
-export const blankLoc = (): LocDraft => ({ muni_ine: null, depto_ine: null, site: "", lat: null, lng: null, days: "", local_spend: "", jobs: "" });
+export const blankLoc = (): LocDraft => ({ muni_ine: null, depto_ine: null, abroad: false, country: "", city: "", site: "", lat: null, lng: null, days: "", local_spend: "", jobs: "" });
 
 export const isBlankLoc = (l: LocDraft) =>
-  l.muni_ine == null && l.depto_ine == null && !l.site.trim() && l.lat == null && l.lng == null && !l.days.trim() && !l.local_spend.trim() && !l.jobs.trim();
+  l.muni_ine == null && l.depto_ine == null && !l.country.trim() && !l.city.trim() && !l.site.trim() && l.lat == null && l.lng == null && !l.days.trim() && !l.local_spend.trim() && !l.jobs.trim();
 
 const s = (v: number | null | undefined) => (v == null ? "" : String(v));
 /** "1,200.5" o "Q 1200" → número; vacío → null; basura → null. */
@@ -100,6 +105,9 @@ export function filmDraft(film?: Film): FilmDraft {
           id: l.id,
           muni_ine: l.muni_ine,
           depto_ine: l.depto_ine,
+          abroad: isAbroad(l),
+          country: l.country ?? "",
+          city: l.city ?? "",
           site: l.site ?? "",
           lat: l.lat,
           lng: l.lng,
@@ -148,6 +156,8 @@ export function filmPayload(d: FilmDraft) {
         id: l.id,
         muni_ine: l.muni_ine,
         depto_ine: l.depto_ine,
+        country: l.abroad ? l.country.trim() || null : null,
+        city: l.abroad ? l.city.trim() || null : null,
         site: l.site || null,
         lat: l.lat,
         lng: l.lng,

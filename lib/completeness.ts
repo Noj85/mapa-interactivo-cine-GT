@@ -10,6 +10,15 @@ export interface Completeness {
 export const hasAnchor = (l: Pick<FilmLocation, "depto_ine" | "muni_ine" | "lat" | "lng">) =>
   l.muni_ine != null || l.depto_ine != null || (l.lat != null && l.lng != null);
 
+/** Locación fuera de Guatemala: trae país y ese país no es Guatemala. */
+export const isAbroad = (l: { country?: string | null }) => {
+  const c = (l.country ?? "").trim().toLowerCase();
+  return c !== "" && c !== "guatemala";
+};
+
+/** La locación dice dónde se rodó: un lugar de Guatemala o un país de afuera. */
+export const hasPlace = (l: Pick<FilmLocation, "depto_ine" | "muni_ine" | "lat" | "lng"> & { country?: string | null }) => hasAnchor(l) || isAbroad(l);
+
 /**
  * Una producción se puede publicar con solo el título. Si todavía no tiene lugar de rodaje,
  * el mapa la muestra en el punto «Sin ubicación», fuera del territorio.
@@ -19,10 +28,7 @@ export function filmCompleteness(
   // Los festivales no cuentan en el porcentaje: una producción puede no haber ido a ninguno.
   f: Omit<Film, "completeness" | "missing_fields" | "status" | "id" | "slug" | "locations" | "festivals" | "companies" | "duration_min"> & {
     companies?: { name?: string | null }[];
-    locations: Pick<
-      FilmLocation,
-      "depto_ine" | "muni_ine" | "lat" | "lng" | "days" | "local_spend" | "jobs"
-    >[];
+    locations: (Pick<FilmLocation, "depto_ine" | "muni_ine" | "lat" | "lng" | "days" | "local_spend" | "jobs"> & { country?: string | null })[];
   },
 ): Completeness {
   const missing: string[] = [];
@@ -35,8 +41,8 @@ export function filmCompleteness(
   };
 
   check(!!f.title?.trim(), "Título", 2);
-  check(f.locations.length > 0 && f.locations.some(hasAnchor), "Locaciones", 3);
-  check(f.locations.length === 0 || f.locations.every((l) => l.muni_ine != null || (l.lat != null && l.lng != null)), "Municipio por confirmar", 2);
+  check(f.locations.length > 0 && f.locations.some(hasPlace), "Locaciones", 3);
+  check(f.locations.length === 0 || f.locations.every((l) => isAbroad(l) || l.muni_ine != null || (l.lat != null && l.lng != null)), "Municipio por confirmar", 2);
   check(f.year != null, "Año");
   check(!!f.format, "Formato");
   check(!!f.nature, "Naturaleza");

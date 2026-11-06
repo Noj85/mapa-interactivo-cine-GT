@@ -4,6 +4,7 @@ import { Layers, MapPinned, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { LocationPicker, type PickedPoint } from "@/components/admin/LocationPicker";
 import { PlaceSelect } from "./PlaceSelect";
+import { COUNTRIES } from "@/lib/countries";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
 import { blankLoc, isBlankLoc, type LocDraft } from "./drafts";
 
@@ -84,16 +85,54 @@ export function LocationsEditor({ locs, onChange }: { locs: LocDraft[]; onChange
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="label">Departamento y municipio</label>
-                <PlaceSelect idPrefix={`loc-${i}`} geo={geo} value={{ muni_ine: l.muni_ine, depto_ine: l.depto_ine }} onChange={(v) => setLoc(i, v)} />
+            <label className="mb-3 flex w-fit cursor-pointer items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={l.abroad}
+                onChange={(e) =>
+                  setLoc(
+                    i,
+                    e.target.checked
+                      ? { abroad: true, muni_ine: null, depto_ine: null, lat: null, lng: null }
+                      : { abroad: false, country: "", city: "" },
+                  )
+                }
+              />
+              Fuera de Guatemala
+            </label>
+            {l.abroad ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label" htmlFor={`loc-${i}-country`}>País</label>
+                  <input
+                    id={`loc-${i}-country`}
+                    className="field"
+                    list="loc-countries"
+                    maxLength={100}
+                    autoComplete="off"
+                    placeholder="Escribe o elige"
+                    value={l.country}
+                    onChange={(e) => setLoc(i, { country: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor={`loc-${i}-city`}>Ciudad o lugar (opcional)</label>
+                  <input id={`loc-${i}-city`} className="field" maxLength={150} placeholder="Ciudad de México, Oaxaca…" value={l.city} onChange={(e) => setLoc(i, { city: e.target.value })} />
+                </div>
               </div>
-              <div>
-                <label className="label">Dirección exacta (opcional)</label>
-                <input className="field" maxLength={200} placeholder="Calle, zona, finca, sitio de rodaje…" value={l.site} onChange={(e) => setLoc(i, { site: e.target.value })} />
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label">Departamento y municipio</label>
+                  <PlaceSelect idPrefix={`loc-${i}`} geo={geo} value={{ muni_ine: l.muni_ine, depto_ine: l.depto_ine }} onChange={(v) => setLoc(i, v)} />
+                </div>
+                <div>
+                  <label className="label">Dirección exacta (opcional)</label>
+                  <input className="field" maxLength={200} placeholder="Calle, zona, finca, sitio de rodaje…" value={l.site} onChange={(e) => setLoc(i, { site: e.target.value })} />
+                </div>
               </div>
-            </div>
+            )}
+            {!l.abroad && (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
               <button type="button" className="btn-outline !px-3 !py-1.5 text-xs" onClick={() => setPicker(i)}>
                 <MapPinned className="h-3.5 w-3.5" /> {l.lat != null ? "Mover punto en el mapa" : "Elegir punto en el mapa"}
@@ -105,6 +144,7 @@ export function LocationsEditor({ locs, onChange }: { locs: LocDraft[]; onChange
                 </>
               )}
             </div>
+            )}
             <div className="mt-3 grid grid-cols-3 gap-3">
               <div>
                 <label className="label">Días</label>
@@ -121,6 +161,11 @@ export function LocationsEditor({ locs, onChange }: { locs: LocDraft[]; onChange
             </div>
           </div>
         ))}
+        <datalist id="loc-countries">
+          {COUNTRIES.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
         {locs.length === 0 && (
           <div className="rounded-2xl border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
             Sin locaciones todavía. La producción se muestra en la zona «Sin ubicación» del mapa hasta que agregues dónde se rodó.

@@ -1,6 +1,7 @@
 import { orgCategories } from "@/lib/categories";
 import { companyNames } from "@/lib/companies";
 import { cleanGenres, FORMATS, formatLabel, legacyKind, NATURES, natureLabel, type FilmFormat, type FilmNature } from "@/lib/film-types";
+import { isAbroad } from "@/lib/completeness";
 import { CIRC_CATEGORIES, IND_CATEGORIES, INITIATIVE_TYPES, NATIONALITIES, type Film, type InitiativeType, type Nationality, type Org } from "@/lib/types";
 import { normalize } from "@/lib/utils";
 
@@ -251,7 +252,7 @@ export function filmMatches(f: Film, flt: FilmFilter): boolean {
     if (min != null && total < min) return false;
     if (max != null && total > max) return false;
   }
-  if (flt.soloCompletas && !(f.locations.length > 0 && f.locations.every((l) => l.muni_ine != null))) return false;
+  if (flt.soloCompletas && !(f.locations.length > 0 && f.locations.every((l) => isAbroad(l) || l.muni_ine != null))) return false;
   if (flt.q && !norm(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${companyNames(f.companies).join(" ")}`).includes(norm(flt.q))) return false;
   return true;
 }

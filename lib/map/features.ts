@@ -3,7 +3,7 @@ import type { Feature, FeatureCollection, GeometryCollection, LineString, Point,
 import type { Agg, Aggregates } from "@/lib/aggregate";
 import { buildStops, levelOf, metricValue } from "@/lib/aggregate";
 import { metricText } from "@/lib/format";
-import { hasAnchor } from "@/lib/completeness";
+import { hasPlace, isAbroad } from "@/lib/completeness";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import type { Dataset, Film, LayerId, MetricId } from "@/lib/types";
 
@@ -39,6 +39,7 @@ export function buildPins(data: Dataset, layer: LayerId, gaz: Gazetteer, depto?:
   if (layer === "produccion") {
     for (const f of data.films) {
       f.locations.forEach((l, i) => {
+        if (isAbroad(l)) return;
         if (depto != null && (l.depto_ine ?? gaz.muni(l.muni_ine)?.depto_ine) !== depto) return;
         const p = locationPoint(l, gaz);
         if (!p) return;
@@ -128,6 +129,8 @@ export function levels(map: Map<number, Agg>, metric: MetricId, all: number[]) {
 export function buildFilmRoute(film: Film, gaz: Gazetteer) {
   const pts: { lng: number; lat: number; n: number; site: string; approx: boolean }[] = [];
   film.locations.forEach((l, i) => {
+    // lo rodado fuera de Guatemala no está en el territorio: va en su propia zona
+    if (isAbroad(l)) return;
     const p = locationPoint(l, gaz);
     if (p) pts.push({ ...p, n: i + 1, site: l.site ?? gaz.muni(l.muni_ine)?.name ?? gaz.depto(l.depto_ine)?.name ?? "" });
   });
@@ -177,7 +180,7 @@ export function buildMask(pais: GeometryCollection): FeatureCollection<Polygon> 
   };
 }
 
-// ───────────────────────── producciones sin lugar de rodaje ─────────────────────────
+// ───────────────────────── producciones sin lugar de rodaje y rodadas fuera de Guatemala ─────────────────────────
 
 /**
  * Las producciones sin locación no se esconden: se agrupan en una zona marcada en el Pacífico,
@@ -185,34 +188,60 @@ export function buildMask(pais: GeometryCollection): FeatureCollection<Polygon> 
  */
 export const NOWHERE = { lng: -93.6, lat: 12.7, radius: 0.72 };
 
-export const isUnlocated = (f: Pick<Film, "locations">) => !f.locations.some(hasAnchor);
+/** Las producciones con locaciones en otro país tienen su propia zona, debajo de «Sin ubicación». */
+export const ABROAD = { lng: -93.6, lat: 10.75, radius: 0.72 };
+
+/** Sin ninguna locación que diga dónde se rodó (ni en Guatemala ni afuera). */
+export const isUnlocated = (f: Pick<Film, "locations">) => !f.locations.some(hasPlace);
 export const unlocatedFilms = <F extends Pick<Film, "locations">>(films: F[]) => films.filter(isUnlocated);
 
-/** [oeste, sur, este, norte] de la zona. */
-export const NOWHERE_BBOX: [number, number, number, number] = [
-  NOWHERE.lng - NOWHERE.radius / Math.cos((NOWHERE.lat * Math.PI) / 180),
-  NOWHERE.lat - NOWHERE.radius,
-  NOWHERE.lng + NOWHERE.radius / Math.cos((NOWHERE.lat * Math.PI) / 180),
-  NOWHERE.lat + NOWHERE.radius,
+/** Con al menos una locación fuera de Guatemala (puede tener otras dentro: aparece en ambos lados). */
+export const hasAbroad = (f: Pick<Film, "locations">) => f.locations.some(isAbroad);
+export const abroadFilms = <F extends Pick<Film, "locations">>(films: F[]) => films.filter(hasAbroad);
+
+type Zone = { lng: number; lat: number; radius: number };
+type Bbox = [number, number, number, number];
+
+const zoneBbox = (z: Zone): Bbox => [
+  z.lng - z.radius / Math.cos((z.lat * Math.PI) / 180),
+  z.lat - z.radius,
+  z.lng + z.radius / Math.cos((z.lat * Math.PI) / 180),
+  z.lat + z.radius,
 ];
 
-export function buildNowhere(count: number, selected: boolean): FeatureCollection<Polygon | Point> {
+/** [oeste, sur, este, norte] de cada zona. */
+export const NOWHERE_BBOX: Bbox = zoneBbox(NOWHERE);
+export const ABROAD_BBOX: Bbox = zoneBbox(ABROAD);
+
+/** El encuadre del país ampliado para incluir las zonas que existen. */
+export function withZones(base: Bbox, zones: { nowhere?: boolean; abroad?: boolean }): Bbox {
+  let b: Bbox = [...base];
+  for (const [on, z] of [[zones.nowhere, NOWHERE_BBOX], [zones.abroad, ABROAD_BBOX]] as const) {
+    if (on) b = [Math.min(b[0], z[0]), Math.min(b[1], z[1]), Math.max(b[2], z[2]), Math.max(b[3], z[3])];
+  }
+  return b;
+}
+
+function buildZone(z: Zone, id: "nowhere" | "abroad", title: string, count: number, selected: boolean): FeatureCollection<Polygon | Point> {
   if (count <= 0) return { type: "FeatureCollection", features: [] };
-  const k = Math.cos((NOWHERE.lat * Math.PI) / 180);
+  const k = Math.cos((z.lat * Math.PI) / 180);
   const ring: number[][] = [];
   for (let i = 0; i <= 64; i++) {
     const a = (i / 64) * Math.PI * 2;
-    ring.push([NOWHERE.lng + (Math.cos(a) * NOWHERE.radius) / k, NOWHERE.lat + Math.sin(a) * NOWHERE.radius]);
+    ring.push([z.lng + (Math.cos(a) * z.radius) / k, z.lat + Math.sin(a) * z.radius]);
   }
   return {
     type: "FeatureCollection",
     features: [
-      { type: "Feature", properties: { kind: "zone", sel: selected }, geometry: { type: "Polygon", coordinates: [ring] } },
+      { type: "Feature", properties: { kind: "zone", zone: id, sel: selected }, geometry: { type: "Polygon", coordinates: [ring] } },
       {
         type: "Feature",
-        properties: { kind: "label", count, text: count === 1 ? "1 producción" : `${count.toLocaleString("es-GT")} producciones` },
-        geometry: { type: "Point", coordinates: [NOWHERE.lng, NOWHERE.lat] },
+        properties: { kind: "label", zone: id, title, count, text: count === 1 ? "1 producción" : `${count.toLocaleString("es-GT")} producciones` },
+        geometry: { type: "Point", coordinates: [z.lng, z.lat] },
       },
     ],
   };
 }
+
+export const buildNowhere = (count: number, selected: boolean) => buildZone(NOWHERE, "nowhere", "Sin ubicación", count, selected);
+export const buildAbroad = (count: number, selected: boolean) => buildZone(ABROAD, "abroad", "Fuera de Guatemala", count, selected);

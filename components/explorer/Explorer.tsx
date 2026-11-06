@@ -2,15 +2,16 @@
 
 import { customGenres } from "@/lib/film-types";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
-import { filmFilterActive, filterFilms, orgFilterActive, orgMatches } from "@/lib/filters";
+import { EMPTY_FILM_FILTER, EMPTY_ORG_FILTER, filmFilterActive, filterFilms, orgFilterActive, orgMatches } from "@/lib/filters";
 import { AnimatePresence, motion } from "framer-motion";
 import { Download, HandHeart, Moon, Search, Sun } from "lucide-react";
 import { DepartmentFilter } from "./DepartmentFilter";
+import AbroadPanel from "./AbroadPanel";
 import UnlocatedPanel from "./UnlocatedPanel";
 import { AcademiaLogo, BrandMark, BrandName, ProcineLogo } from "@/components/site/Brand";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import MapCanvas, { type MapHandle, type ScaleInfo } from "@/components/map/MapCanvas";
+import MapCanvas, { type MapHandle } from "@/components/map/MapCanvas";
 import { aggregate } from "@/lib/aggregate";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
 import { useTheme } from "@/lib/use-theme";
@@ -20,7 +21,6 @@ import { Breadcrumbs } from "./Breadcrumbs";
 import FilmPanel from "./FilmPanel";
 import { FilterPanel } from "./FilterPanel";
 import { LayerSwitcher } from "./LayerSwitcher";
-import { Legend } from "./Legend";
 import { MapControls } from "./MapControls";
 import OrgPanel from "./OrgPanel";
 import OverviewPanel from "./OverviewPanel";
@@ -30,6 +30,12 @@ import type { PanelCtx } from "./parts";
 
 const PANEL_W = 400;
 
+/** La vista pública no tiene filtros: un enlace con filtros o con otra métrica se abre con el mapa completo. */
+function forMode(v: ViewState, canEdit: boolean): ViewState {
+  if (canEdit) return v;
+  return { ...v, metric: LAYER_METRICS[v.layer][0], filmFilter: EMPTY_FILM_FILTER, orgFilter: EMPTY_ORG_FILTER };
+}
+
 /**
  * `public`: lo que ve cualquier persona. `admin`: el mismo mapa dentro de /admin, con las herramientas del equipo.
  * El modo lo fija la página (nunca la sesión del navegador), para que «/» sea siempre la vista pública.
@@ -37,14 +43,13 @@ const PANEL_W = 400;
 export default function Explorer({ data, mode = "public" }: { data: Dataset; mode?: "public" | "admin" }) {
   const canEdit = mode === "admin";
   const [view, setView] = useState<ViewState>(() =>
-    typeof window === "undefined" ? DEFAULT_VIEW : parseView(window.location.search),
+    forMode(typeof window === "undefined" ? DEFAULT_VIEW : parseView(window.location.search), canEdit),
   );
   const [geo, setGeo] = useState<GeoBundle | null>(null);
   const [geoError, setGeoError] = useState(false);
   const [theme, toggleTheme] = useTheme();
   const [satellite, setSatellite] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [scale, setScale] = useState<ScaleInfo>({ scope: "depto", stops: [] });
   const [mapReady, setMapReady] = useState(false);
   const [sheetFull, setSheetFull] = useState(false);
   const dragY = useRef<number | null>(null);
@@ -70,33 +75,34 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
   }, []);
 
   useEffect(() => {
-    const onPop = () => setView(parseView(window.location.search));
+    const onPop = () => setView(forMode(parseView(window.location.search), canEdit));
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, []);
+  }, [canEdit]);
 
   const go = useMemo<PanelCtx["go"]>(
     () => ({
-      place: (p: Place | null) => commit({ ...view, place: p, film: null, org: null, noloc: false }),
-      film: (slug: string) => commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", film: slug, org: null, noloc: false }),
+      place: (p: Place | null) => commit({ ...view, place: p, film: null, org: null, noloc: false, abroad: false }),
+      film: (slug: string) => commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", film: slug, org: null, noloc: false, abroad: false }),
       org: (slug: string) => {
         const o = data.orgs.find((x) => x.slug === slug);
         const layer: LayerId = o?.layer ?? view.layer;
-        commit({ ...view, layer, metric: layer === view.layer ? view.metric : LAYER_METRICS[layer][0], org: slug, film: null, noloc: false });
+        commit({ ...view, layer, metric: layer === view.layer ? view.metric : LAYER_METRICS[layer][0], org: slug, film: null, noloc: false, abroad: false });
       },
       layer: (l: LayerId) =>
-        commit({ ...view, layer: l, metric: LAYER_METRICS[l][0], film: null, org: null, noloc: false }),
-      unlocated: () => commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", place: null, film: null, org: null, noloc: true }),
+        commit({ ...view, layer: l, metric: LAYER_METRICS[l][0], film: null, org: null, noloc: false, abroad: false }),
+      unlocated: () => commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", place: null, film: null, org: null, noloc: true, abroad: false }),
+      abroad: () => commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", place: null, film: null, org: null, noloc: false, abroad: true }),
       up: () => {
         if (view.film || view.org) return commit({ ...view, film: null, org: null });
-        if (view.noloc) return commit({ ...view, noloc: false });
+        if (view.noloc) return commit({ ...view, noloc: false, abroad: false });
         if (view.place?.type === "muni") {
           const e = geo?.gaz.muni(view.place.code);
           return commit({ ...view, place: e ? { type: "depto", code: e.depto_ine } : null });
         }
         commit({ ...view, place: null });
       },
-      clear: () => commit({ ...view, place: null, film: null, org: null, noloc: false }),
+      clear: () => commit({ ...view, place: null, film: null, org: null, noloc: false, abroad: false }),
     }),
     [view, commit, data.orgs, geo],
   );
@@ -110,7 +116,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       } else if (e.key === "/" && !searchOpen && !(e.target instanceof HTMLInputElement)) {
         e.preventDefault();
         setSearchOpen(true);
-      } else if (e.key === "Escape" && !searchOpen && (view.place || view.film || view.org || view.noloc)) {
+      } else if (e.key === "Escape" && !searchOpen && (view.place || view.film || view.org || view.noloc || view.abroad)) {
         go.up();
       }
     };
@@ -146,7 +152,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
   }, [data.orgs, view.layer]);
   const extraGenres = useMemo(() => customGenres(data.films), [data.films]);
   const aggs = useMemo(() => aggregate(shown, view.layer), [shown, view.layer]);
-  const hasSelection = !!(view.place || view.film || view.org || view.noloc);
+  const hasSelection = !!(view.place || view.film || view.org || view.noloc || view.abroad);
   const desktop = vw.w >= 900;
   const padding = desktop
     ? { top: 20, right: PANEL_W + 16, bottom: 20, left: 460 }
@@ -155,7 +161,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
   const ctx: PanelCtx | null = geo ? { data: shown, gaz: geo.gaz, aggs, view, go, canEdit } : null;
 
   // al elegir otra cosa, la hoja vuelve a su tamaño medio
-  const selectionKey = `${view.film ?? ""}|${view.org ?? ""}|${view.place?.type ?? ""}${view.place?.code ?? ""}|${view.noloc}`;
+  const selectionKey = `${view.film ?? ""}|${view.org ?? ""}|${view.place?.type ?? ""}${view.place?.code ?? ""}|${view.noloc}|${view.abroad}`;
   useEffect(() => setSheetFull(false), [selectionKey]);
 
   const liveText = view.film
@@ -164,11 +170,13 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       ? `Entidad: ${data.orgs.find((o) => o.slug === view.org)?.name ?? ""}`
       : view.noloc
         ? "Producciones sin ubicación"
+        : view.abroad
+          ? "Producciones rodadas fuera de Guatemala"
       : view.place
         ? `Territorio: ${(view.place.type === "depto" ? geo?.gaz.depto(view.place.code) : geo?.gaz.muni(view.place.code))?.name ?? ""}`
         : `Capa ${view.layer}`;
 
-  const panelKey = view.film ? `f-${view.film}` : view.org ? `o-${view.org}` : view.noloc ? "noloc" : view.place ? `p-${view.place.type}${view.place.code}` : `home-${view.layer}`;
+  const panelKey = view.film ? `f-${view.film}` : view.org ? `o-${view.org}` : view.noloc ? "noloc" : view.abroad ? "abroad" : view.place ? `p-${view.place.type}${view.place.code}` : `home-${view.layer}`;
 
   return (
     <main aria-label="Mapa del cine de Guatemala" className="relative h-full w-full overflow-hidden bg-bg">
@@ -188,7 +196,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
           onFilm={go.film}
           onOrg={go.org}
           onUnlocated={go.unlocated}
-          onScale={setScale}
+          onAbroad={go.abroad}
           onReady={() => setMapReady(true)}
         />
       )}
@@ -252,23 +260,25 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
         <div className="pointer-events-auto flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap">
           <LayerSwitcher layer={view.layer} onChange={go.layer} />
         </div>
-        <div className="pointer-events-none relative flex flex-wrap items-start gap-2">
-          {geo && <DepartmentFilter gaz={geo.gaz} place={view.place} onPlace={go.place} onClear={go.clear} />}
-          <FilterPanel
-            layer={view.layer}
-            metric={view.metric}
-            filmFilter={view.filmFilter}
-            orgFilter={view.orgFilter}
-            count={layerCount}
-            total={layerTotal}
-            extraCategories={extraCategories}
-            extraGenres={extraGenres}
-            onFilm={(filmFilter) => commit({ ...view, filmFilter, film: null, org: null, noloc: false })}
-            onOrg={(orgFilter) => commit({ ...view, orgFilter, film: null, org: null, noloc: false })}
-            onMetric={(metric) => commit({ ...view, metric })}
-            downloadHref={downloadHref(view)}
-          />
-        </div>
+        {canEdit && (
+          <div className="pointer-events-none relative flex flex-wrap items-start gap-2">
+            {geo && <DepartmentFilter gaz={geo.gaz} place={view.place} onPlace={go.place} onClear={go.clear} />}
+            <FilterPanel
+              layer={view.layer}
+              metric={view.metric}
+              filmFilter={view.filmFilter}
+              orgFilter={view.orgFilter}
+              count={layerCount}
+              total={layerTotal}
+              extraCategories={extraCategories}
+              extraGenres={extraGenres}
+              onFilm={(filmFilter) => commit({ ...view, filmFilter, film: null, org: null, noloc: false, abroad: false })}
+              onOrg={(orgFilter) => commit({ ...view, orgFilter, film: null, org: null, noloc: false, abroad: false })}
+              onMetric={(metric) => commit({ ...view, metric })}
+              downloadHref={downloadHref(view)}
+            />
+          </div>
+        )}
         {geo && (
           <div className="pointer-events-auto glass w-fit max-w-full rounded-xl border border-line px-3 py-1.5">
             <Breadcrumbs view={view} gaz={geo.gaz} data={data} onPlace={go.place} onClear={go.clear} />
@@ -285,16 +295,6 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
           bottom: desktop ? 28 : hasSelection ? Math.round(vw.h * (sheetFull ? 0.88 : 0.5)) + 28 : 76,
         }}
       >
-        <div className="pointer-events-auto empty:hidden">
-          <Legend
-            layer={view.layer}
-            metric={view.metric}
-            theme={theme}
-            scope={scale.scope}
-            stops={scale.stops}
-            dimmed={!!(view.film || view.org)}
-          />
-        </div>
         <div className="pointer-events-auto ml-auto">
           <MapControls
             onZoomIn={() => mapRef.current?.zoomIn()}
@@ -360,6 +360,8 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
                 <OrgPanel ctx={ctx} />
               ) : view.noloc ? (
                 <UnlocatedPanel ctx={ctx} />
+              ) : view.abroad ? (
+                <AbroadPanel ctx={ctx} />
               ) : view.place ? (
                 <TerritoryPanel ctx={ctx} />
               ) : desktop ? (

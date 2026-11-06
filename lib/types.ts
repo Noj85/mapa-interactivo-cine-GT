@@ -1,3 +1,4 @@
+import type { PublicStats } from "@/lib/site-settings";
 import type { FilmFormat, FilmNature } from "@/lib/film-types";
 export type LayerId = "produccion" | "circulacion" | "industria";
 
@@ -10,6 +11,10 @@ export interface FilmLocation {
   film_id: string;
   depto_ine: number | null;
   muni_ine: number | null;
+  /** País de la locación cuando es fuera de Guatemala (entonces no hay departamento ni municipio). */
+  country: string | null;
+  /** Ciudad o lugar de la locación fuera de Guatemala. */
+  city: string | null;
   /** Nombre del sitio ("Calle del Arco", "Volcán de Pacaya") */
   site: string | null;
   lat: number | null;
@@ -140,6 +145,8 @@ export interface Dataset {
   festivalOrgs: Record<string, string>;
   /** "supabase" | "local" */
   mode: "supabase" | "local";
+  /** Qué cifras muestra el mapa público (Ajustes → Cifras públicas). */
+  publicStats: PublicStats;
 }
 
 export interface GazetteerEntry {

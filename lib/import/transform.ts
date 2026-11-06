@@ -1,3 +1,4 @@
+import { detectCountry } from "@/lib/countries";
 import { formatContact, parseContact } from "@/lib/contact";
 import { cleanGenres } from "@/lib/film-types";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
@@ -60,7 +61,12 @@ export function collectPlaceTexts(file: ParsedFile, plan: ImportPlan): string[] 
     if (sp.entity === "ignore") continue;
     const sheet = file.sheets.find((s) => s.name === sp.sheet);
     if (!sheet) continue;
-    for (const row of sheet.rows) for (const q of placeQueries(row, sp)) set.add(q.query);
+    for (const row of sheet.rows)
+      for (const q of placeQueries(row, sp)) {
+        // «Oaxaca, México» ya se sabe que es fuera de Guatemala: no hay nada que buscar en el catálogo de municipios
+        if (sp.entity === "film" && /[,;|]/.test(q.query) && detectCountry(q.query)) continue;
+        set.add(q.query);
+      }
   }
   return [...set];
 }
@@ -80,6 +86,16 @@ function resolveLocation(
 ) {
   const loc: NonNullable<FilmInput["locations"]>[number] = { site: q?.site ?? null };
   let issue: Issue | null = null;
+  // «Oaxaca, México»: el lugar nombra otro país, así que es una locación fuera de Guatemala y no un lugar sin resolver
+  // (un texto de una sola palabra que el catálogo ya resolvió, como «El Salvador», se queda como lugar de Guatemala)
+  const resolved = q ? places[q.query] : undefined;
+  const abroad = q && plan.entity === "film" && !(resolved?.status === "ok" && !/[,;|]/.test(q.query)) ? detectCountry(q.query) : null;
+  if (abroad) {
+    loc.country = abroad.country;
+    loc.city = abroad.city || null;
+    loc.confidence = 0.9;
+    return { loc, issue };
+  }
   const lat = withCoords ? parseCoord(val(row, plan, "lat"), "lat") : null;
   const lng = withCoords ? parseCoord(val(row, plan, "lng"), "lng") : null;
   if (lat != null && lng != null) {

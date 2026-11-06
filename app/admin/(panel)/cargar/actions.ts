@@ -8,6 +8,7 @@ import { linkFestivals, syncOrgFestivalSafe } from "@/lib/festivals-server";
 import { applyFilmUpdate, applyOrgUpdate, summarizeApplied } from "@/lib/import/diff";
 import type { Candidate } from "@/lib/import/types";
 import { filmSchema, orgSchema } from "@/lib/schemas";
+import { isAbroad } from "@/lib/completeness";
 import type { FilmInput, OrgInput } from "@/lib/types";
 
 export async function createImportAction(filename: string, summary: Record<string, unknown>) {
@@ -119,7 +120,7 @@ export async function commitBatchAction(
 }
 
 const filmComplete = (f: FilmInput) =>
-  !!f.year && !!f.format && !!f.producer && !!f.nationality && f.locations.length > 0 && f.locations.every((l) => l.muni_ine != null);
+  !!f.year && !!f.format && !!f.producer && !!f.nationality && f.locations.length > 0 && f.locations.every((l) => isAbroad(l) || l.muni_ine != null);
 
 export interface DeferredQuestion {
   /** "film:<slug>" | "org:<slug>" */

@@ -1,5 +1,6 @@
 "use client";
 
+import { isAbroad } from "@/lib/completeness";
 import { EMPTY_FILM_FILTER, EMPTY_ORG_FILTER } from "@/lib/filters";
 import { AlertTriangle, ArrowRight, Copy, MapPin } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -96,14 +97,16 @@ export function StepReview({
     return out;
   }, [preview]);
   const activeLayer = layers.includes(layer) ? layer : (layers[0] ?? "produccion");
-  const view: ViewState = { layer: activeLayer, metric: activeLayer === "produccion" ? "films" : "orgs", place: null, film: null, org: null, filmFilter: EMPTY_FILM_FILTER, orgFilter: EMPTY_ORG_FILTER, noloc: false };
+  const view: ViewState = { layer: activeLayer, metric: activeLayer === "produccion" ? "films" : "orgs", place: null, film: null, org: null, filmFilter: EMPTY_FILM_FILTER, orgFilter: EMPTY_ORG_FILTER, noloc: false, abroad: false };
   const theme = typeof document !== "undefined" && document.documentElement.dataset.theme === "light" ? "light" : "dark";
 
   const placeLabel = (c: Candidate, idx: number) => {
     const loc = c.type === "film" ? c.film!.locations[idx] : { muni_ine: c.org!.muni_ine, depto_ine: c.org!.depto_ine };
     const muni = geo.gaz.muni(loc?.muni_ine);
     const depto = geo.gaz.depto(loc?.depto_ine);
-    return { muni, depto, ok: !!muni, text: c.placeTexts[idx] };
+    const fl = c.type === "film" ? c.film!.locations[idx] : undefined;
+    const abroad = fl && isAbroad(fl) ? [fl.city, fl.country].filter(Boolean).join(", ") : null;
+    return { muni, depto, abroad, ok: !!muni || !!abroad, text: c.placeTexts[idx] };
   };
 
   return (
@@ -215,7 +218,7 @@ export function StepReview({
                               )}
                             >
                               {p.ok ? <MapPin className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                              {p.muni ? `${p.muni.name}, ${p.muni.depto}` : p.depto ? `${p.depto.name} · municipio pendiente` : p.text ? `¿Dónde? “${p.text}”` : "Sin lugar"}
+                              {p.abroad ? `${p.abroad} · fuera de Guatemala` : p.muni ? `${p.muni.name}, ${p.muni.depto}` : p.depto ? `${p.depto.name} · municipio pendiente` : p.text ? `¿Dónde? “${p.text}”` : "Sin lugar"}
                             </button>
                           );
                         })}

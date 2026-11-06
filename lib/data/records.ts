@@ -1,4 +1,4 @@
-import { filmCompleteness, orgCompleteness } from "@/lib/completeness";
+import { filmCompleteness, isAbroad, orgCompleteness } from "@/lib/completeness";
 import { normalizeCategories } from "@/lib/categories";
 import { cleanGenres, cleanMinutes } from "@/lib/film-types";
 import { FESTIVAL_RESULTS, type Film, type FilmCompany, type FilmFestival, type FilmInput, type FilmLocation, type Org, type OrgInput } from "@/lib/types";
@@ -55,13 +55,18 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string; e
     .filter((c) => str(c.name))
     .map((c) => ({ name: str(c.name)!, country: str(c.country) }));
   const locations: FilmLocation[] = (input.locations ?? []).map((l, i) => {
-    const muni = num(l.muni_ine);
-    const depto = num(l.depto_ine) ?? (muni != null ? Math.floor(muni / 100) : null);
+    // fuera de Guatemala no hay departamento ni municipio; «Guatemala» como país es lo normal y no se guarda
+    const country = str(l.country);
+    const abroad = isAbroad({ country });
+    const muni = abroad ? null : num(l.muni_ine);
+    const depto = abroad ? null : num(l.depto_ine) ?? (muni != null ? Math.floor(muni / 100) : null);
     return {
       id: l.id ?? `${id}-loc-${i}`,
       film_id: id,
       depto_ine: depto,
       muni_ine: muni,
+      country: abroad ? country : null,
+      city: abroad ? str(l.city) : null,
       site: str(l.site),
       lat: num(l.lat),
       lng: num(l.lng),

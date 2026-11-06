@@ -51,6 +51,8 @@ export const locationSchema = z.object({
   id: z.string().optional(),
   depto_ine: optNum,
   muni_ine: optNum,
+  country: optStr,
+  city: optStr,
   site: optStr,
   lat: optNum,
   lng: optNum,
@@ -193,6 +195,8 @@ const pubImage = z
 const pubLocation = z.object({
   depto_ine: optNum,
   muni_ine: optNum,
+  country: pubStr(100),
+  city: pubStr(150),
   site: pubStr(200),
   lat: optNum,
   lng: optNum,

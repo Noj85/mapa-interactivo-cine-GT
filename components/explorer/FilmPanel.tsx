@@ -1,5 +1,6 @@
 "use client";
 
+import { isAbroad } from "@/lib/completeness";
 import { AlertCircle, Award, ExternalLink, MapPin, MessageSquarePlus, Pencil, Send } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -7,7 +8,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { durationLabel, filmTypeLabel } from "@/lib/film-types";
 import { FESTIVAL_RESULTS, NATIONALITIES } from "@/lib/types";
-import { fmtInt, fmtMoney } from "@/lib/utils";
+import { cn, fmtInt, fmtMoney } from "@/lib/utils";
 import { CompletenessBadge, CompletenessMeter } from "@/components/ui/Badges";
 import { PanelShell, type PanelCtx, SectionTitle, Stat } from "./parts";
 
@@ -31,6 +32,12 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
   const spend = film.locations.reduce((s, l) => s + (l.local_spend ?? 0), 0);
   const jobs = film.locations.reduce((s, l) => s + (l.jobs ?? 0), 0);
   const known = (k: "days" | "local_spend" | "jobs") => film.locations.some((l) => l[k] != null);
+  // solo las cifras que tienen dato: un «—» no le dice nada a quien mira el mapa
+  const figures = [
+    known("days") && { label: "Días", value: fmtInt(days) },
+    known("local_spend") && { label: "Inversión local", value: fmtMoney(spend) },
+    known("jobs") && { label: "Empleos", value: fmtInt(jobs) },
+  ].filter((x): x is { label: string; value: string } => !!x);
   const meta = [film.year, kind, durationLabel(film.duration_min), nat].filter(Boolean).join(" · ");
   // Lo más reciente primero; los premios antes que las selecciones dentro de un mismo año.
   const rank = (r: string) => FESTIVAL_RESULTS.findIndex((x) => x.id === r);
@@ -123,23 +130,29 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
         )}
       </dl>
 
-      <div className="mt-5 grid grid-cols-3 gap-2">
-        <Stat label="Días" value={known("days") ? fmtInt(days) : "—"} />
-        <Stat label="Inversión local" value={known("local_spend") ? fmtMoney(spend) : "—"} />
-        <Stat label="Empleos" value={known("jobs") ? fmtInt(jobs) : "—"} />
-      </div>
+      {figures.length > 0 && (
+        <div className={cn("mt-5 grid gap-2", figures.length === 1 ? "grid-cols-1" : figures.length === 2 ? "grid-cols-2" : "grid-cols-3")}>
+          {figures.map((f) => (
+            <Stat key={f.label} label={f.label} value={f.value} />
+          ))}
+        </div>
+      )}
 
       <SectionTitle aside={`${film.locations.length}`}>Locaciones</SectionTitle>
       <ol className="space-y-1.5">
         {film.locations.map((l, i) => {
           const muni = gaz.muni(l.muni_ine);
           const depto = gaz.depto(l.depto_ine ?? muni?.depto_ine);
+          const abroad = isAbroad(l);
+          const abroadWhere = [l.city, l.country].filter(Boolean).join(", ");
           return (
             <li key={l.id}>
               <button
                 className="flex w-full items-start gap-3 rounded-2xl border border-line/60 px-3 py-2.5 text-left transition hover:border-accent/60 hover:bg-surface-2/60"
                 onClick={() =>
-                  go.place(
+                  abroad
+                    ? go.abroad()
+                    : go.place(
                     l.muni_ine != null
                       ? { type: "muni", code: l.muni_ine }
                       : l.depto_ine != null
@@ -152,11 +165,11 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
                   {i + 1}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm text-ink">{l.site ?? muni?.name ?? depto?.name ?? "Lugar por confirmar"}</span>
+                  <span className="block text-sm text-ink">{abroad ? l.site ?? l.city ?? l.country : l.site ?? muni?.name ?? depto?.name ?? "Lugar por confirmar"}</span>
                   <span className="flex items-center gap-1 text-xs text-muted">
                     <MapPin className="h-3 w-3" />
-                    {[muni?.name, depto?.name].filter(Boolean).join(", ") || "Sin ubicación"}
-                    {!muni && depto && <span className="text-warn"> · municipio por confirmar</span>}
+                    {abroad ? abroadWhere : [muni?.name, depto?.name].filter(Boolean).join(", ") || "Sin ubicación"}
+                    {!abroad && !muni && depto && <span className="text-warn"> · municipio por confirmar</span>}
                   </span>
                   <span className="mt-1 block text-xs text-muted/90">
                     {[

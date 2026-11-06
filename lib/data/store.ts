@@ -117,6 +117,10 @@ export interface Store {
   /** Cuántas participaciones tiene cada festival del catálogo. */
   festivalUsage(ids: string[]): Promise<Record<string, number>>;
 
+  /** Ajustes del sitio (clave → valor JSON). Lectura pública; solo el equipo escribe. */
+  getSetting(key: string): Promise<unknown | null>;
+  saveSetting(key: string, value: unknown): Promise<void>;
+
   /** Solicitudes de información (enlace privado + contraseña). */
   createInfoRequest(input: NewInfoRequest): Promise<InfoRequest>;
   listInfoRequests(opts?: { kind?: SubmissionKind; target_id?: string }): Promise<InfoRequest[]>;
@@ -154,6 +158,7 @@ interface LocalDb {
   submissions: Submission[];
   festivals: Festival[];
   info_requests: LocalInfoRequest[];
+  settings: Record<string, unknown>;
 }
 
 const DB_PATH = path.join(process.cwd(), ".data", "db.json");
@@ -191,9 +196,10 @@ async function readDb(): Promise<LocalDb> {
       })),
       festivals: (j.festivals ?? []).map((f) => ({ ...f, org_id: f.org_id ?? null })),
       info_requests: j.info_requests ?? [],
+      settings: j.settings ?? {},
     };
   } catch {
-    return { films: [], orgs: [], imports: [], questions: [], submissions: [], festivals: [], info_requests: [] };
+    return { films: [], orgs: [], imports: [], questions: [], submissions: [], festivals: [], info_requests: [], settings: {} };
   }
 }
 
@@ -411,6 +417,14 @@ export class LocalStore implements Store {
     db.festivals = db.festivals.map((f) => (f.id === festivalId ? { ...f, org_id: orgId } : orgId && f.org_id === orgId ? { ...f, org_id: null } : f));
     await writeDb(db);
   }
+  async getSetting(key: string) {
+    return (await readDb()).settings[key] ?? null;
+  }
+  async saveSetting(key: string, value: unknown) {
+    const db = await readDb();
+    db.settings = { ...db.settings, [key]: value };
+    await writeDb(db);
+  }
   async festivalOrgMap() {
     const out: Record<string, string> = {};
     for (const f of (await readDb()).festivals) if (f.org_id) out[f.id] = f.org_id;
@@ -557,6 +571,8 @@ const rowToLocation = (r: any): FilmLocation => ({
   film_id: r.film_id,
   depto_ine: r.depto_ine,
   muni_ine: r.muni_ine,
+  country: r.country ?? null,
+  city: r.city ?? null,
   site: r.site,
   lat: r.lat,
   lng: r.lng,
@@ -738,6 +754,8 @@ export class SupabaseStore implements Store {
             position: i,
             depto_ine: l.depto_ine,
             muni_ine: l.muni_ine,
+            // las columnas de la migración 0014 solo se envían si hay datos: sin migrar, todo lo demás sigue funcionando
+            ...(l.country || l.city ? { country: l.country, city: l.city } : {}),
             site: l.site,
             lat: l.lat,
             lng: l.lng,
@@ -963,6 +981,13 @@ export class SupabaseStore implements Store {
   async linkFestivalOrg(festivalId: string, orgId: string | null) {
     if (orgId) must(await this.db.from("festivals").update({ org_id: null }).eq("org_id", orgId));
     must(await this.db.from("festivals").update({ org_id: orgId }).eq("id", festivalId));
+  }
+  async getSetting(key: string) {
+    const row = must(await this.db.from("site_settings").select("value").eq("key", key).maybeSingle()) as any;
+    return row?.value ?? null;
+  }
+  async saveSetting(key: string, value: unknown) {
+    must(await this.db.from("site_settings").upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" }));
   }
   async festivalOrgMap() {
     const out: Record<string, string> = {};

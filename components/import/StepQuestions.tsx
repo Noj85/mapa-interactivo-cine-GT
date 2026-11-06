@@ -12,6 +12,8 @@ import {
   type BatchResult,
   type DeferredQuestion,
 } from "@/app/admin/(panel)/cargar/actions";
+import { isAbroad } from "@/lib/completeness";
+import { COUNTRIES } from "@/lib/countries";
 import type { GeoBundle } from "@/lib/geo/load";
 import { planFilmUpdate, planOrgUpdate } from "@/lib/import/diff";
 import { applyAnswer, candidateStatus, type Question } from "@/lib/import/questions";
@@ -50,6 +52,9 @@ export function StepQuestions({
   const [phase, setPhase] = useState<Phase>(questions.some((q) => q.status === "open") ? "asking" : "summary");
   const [text, setText] = useState("");
   const [pickedPlace, setPickedPlace] = useState<PlaceValue>({ muni_ine: null, depto_ine: null });
+  const [abroadOpen, setAbroadOpen] = useState(false);
+  const [country, setCountry] = useState("");
+  const [city, setCity] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [publishIncomplete, setPublishIncomplete] = useState(true);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -67,13 +72,16 @@ export function StepQuestions({
     setErr(null);
     const r = applyAnswer(candidates, q, value, geo.gaz, places);
     if (r.candidates === candidates && r.places === places) {
-      setErr("No reconocimos ese lugar. Prueba con el nombre del municipio o del departamento.");
+      setErr(value.startsWith("abroad:") ? "Escribe el país donde se rodó." : "No reconocimos ese lugar. Prueba con el nombre del municipio o del departamento.");
       return;
     }
     onCandidates(r.candidates);
     onPlaces(r.places);
     setStatus(q.id, "answered", value);
     setText("");
+    setAbroadOpen(false);
+    setCountry("");
+    setCity("");
     if (open.length <= 1) setPhase("summary");
   };
 
@@ -98,7 +106,7 @@ export function StepQuestions({
       drafts: st.filter((s) => !s.publishable).length,
       // Producciones sin lugar de rodaje: se publican en la zona «Sin ubicación» del mapa.
       nowhere: live.filter(
-        (c) => c.type === "film" && !(c.film?.locations ?? []).some((l) => l.muni_ine || l.depto_ine || (l.lat != null && l.lng != null)),
+        (c) => c.type === "film" && !(c.film?.locations ?? []).some((l) => l.muni_ine || l.depto_ine || (l.lat != null && l.lng != null) || isAbroad(l)),
       ).length,
       // registros que ya existían y a los que el archivo sí les completa o agrega algo
       updates: live.filter((c) => {
@@ -216,6 +224,31 @@ export function StepQuestions({
                 >
                   Usar este lugar
                 </button>
+                {!current.id.startsWith("org-place:") && (
+                  <div className="mt-4 border-t border-line pt-4">
+                    {!abroadOpen ? (
+                      <button type="button" className="text-sm text-muted underline underline-offset-2 hover:text-ink" onClick={() => setAbroadOpen(true)}>
+                        Está fuera de Guatemala
+                      </button>
+                    ) : (
+                      <div>
+                        <p className="mb-2 text-xs text-muted">Se mostrará en la zona «Fuera de Guatemala» del mapa, no como «Sin ubicación».</p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <input className="field" list="q-countries" placeholder="País" aria-label="País" value={country} onChange={(e) => setCountry(e.target.value)} />
+                          <input className="field" placeholder="Ciudad o lugar (opcional)" aria-label="Ciudad o lugar" value={city} onChange={(e) => setCity(e.target.value)} />
+                        </div>
+                        <datalist id="q-countries">
+                          {COUNTRIES.map((n) => (
+                            <option key={n} value={n} />
+                          ))}
+                        </datalist>
+                        <button className="btn-primary mt-3" disabled={!country.trim()} onClick={() => answer(current, `abroad:${country.trim()}|${city.trim()}`)}>
+                          Usar este país
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               !current.options?.length && (

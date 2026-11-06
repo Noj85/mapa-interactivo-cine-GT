@@ -1,3 +1,4 @@
+import { ALL_STATS } from "@/lib/site-settings";
 import { buildFilm, buildOrg } from "@/lib/data/records";
 import type { Dataset } from "@/lib/types";
 import { slugify } from "@/lib/utils";
@@ -17,5 +18,5 @@ export function candidatesToDataset(candidates: Candidate[]): Dataset {
       orgs.push({ ...o, status: "published" });
     }
   }
-  return { films, orgs, festivalOrgs: {}, mode: "local" };
+  return { films, orgs, festivalOrgs: {}, mode: "local", publicStats: ALL_STATS };
 }

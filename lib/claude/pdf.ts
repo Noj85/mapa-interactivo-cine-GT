@@ -53,6 +53,8 @@ const TOOL = {
                   site: { type: "string", description: "Sitio o escenario específico, si se nombra." },
                   municipality: str,
                   department: str,
+                  country: { type: "string", description: "País, solo si el lugar de rodaje está fuera de Guatemala." },
+                  city: { type: "string", description: "Ciudad o lugar dentro de ese país, si se nombra." },
                 },
               },
             },
@@ -113,7 +115,7 @@ Reglas:
 - Un nombre de persona NO es una entidad, salvo que sea claramente un colectivo, productora o empresa.
 - Si el PDF es multicolumna, lee cada ficha completa antes de pasar a la siguiente.
 - En un documento de Word, las tablas llegan como filas de celdas separadas por « | » (la primera fila suele ser el encabezado) y los títulos como líneas que empiezan con «#». Una tabla de dos columnas «etiqueta | valor» suele ser la ficha de una sola producción o entidad; el título que la antecede suele ser el nombre.
-- "municipality" y "department" solo si el documento los indica o si "place" nombra un municipio o departamento de Guatemala sin ambigüedad. Si el lugar está fuera de Guatemala, déjalos vacíos y conserva el texto en "place".
+- "municipality" y "department" solo si el documento los indica o si "place" nombra un municipio o departamento de Guatemala sin ambigüedad. Si el lugar está fuera de Guatemala (por ejemplo «Oaxaca, México»), déjalos vacíos y llena "country" (el país) y "city" (la ciudad o lugar); no lo mapees a un municipio de Guatemala.
 - Para "category" elige la categoría permitida más cercana al tipo de entidad; si la entidad hace varias cosas (por ejemplo producción y postproducción), enumera todas las que apliquen separadas por «;», la principal primero. Si ninguna encaja, la más cercana igualmente.
 - Teléfonos y correos van en "contact" (solo números de teléfono y direcciones de correo), no en la descripción.
 - Producciones: "format" es el formato (largometraje, cortometraje, serie, video musical…), "nature" es ficción, documental o híbrido, y "genres" son los géneros. Son tres datos distintos: «cortometraje documental de terror» = formato Cortometraje, naturaleza Documental, género Terror. No inventes ninguno que el documento no diga.
@@ -136,7 +138,7 @@ interface RawFilm {
   budget?: string;
   currency?: string;
   synopsis?: string;
-  locations?: { place?: string; site?: string; municipality?: string; department?: string }[];
+  locations?: { place?: string; site?: string; municipality?: string; department?: string; country?: string; city?: string }[];
   festivals?: { festival?: string; year?: string; result?: string; section?: string; award?: string }[];
   /** Respuestas anteriores a las listas: un solo lugar. */
   place?: string;
@@ -326,7 +328,13 @@ function aggregate(results: ChunkResult[], refHeader: string | null, filename: s
         "Página del PDF": String(f.page),
       };
       const locs = (f.locations ?? [])
-        .map((l) => ({ place: v(l.place), site: v(l.site), municipality: v(l.municipality), department: v(l.department) }))
+        .map((l) => {
+          // un lugar fuera de Guatemala viaja como «Ciudad, País» en el texto del lugar: el resto del flujo lo reconoce
+          const country = v(l.country);
+          const abroad = country && country.toLowerCase() !== "guatemala";
+          const place = abroad ? [v(l.city) || v(l.place) || v(l.site), country].filter(Boolean).join(", ") : v(l.place);
+          return { place, site: abroad ? "" : v(l.site), municipality: abroad ? "" : v(l.municipality), department: abroad ? "" : v(l.department) };
+        })
         .filter((l) => l.place || l.site || l.municipality || l.department);
       if (!locs.length && (v(f.place) || v(f.municipality) || v(f.department)))
         locs.push({ place: v(f.place), site: "", municipality: v(f.municipality), department: v(f.department) });

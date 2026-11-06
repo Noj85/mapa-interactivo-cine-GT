@@ -33,6 +33,8 @@ export interface ViewState {
   orgFilter: OrgFilter;
   /** mostrando las producciones sin lugar de rodaje (el punto «Sin ubicación») */
   noloc: boolean;
+  /** mostrando las producciones rodadas fuera de Guatemala (la zona «Fuera de Guatemala») */
+  abroad: boolean;
 }
 
 export const DEFAULT_VIEW: ViewState = {
@@ -44,6 +46,7 @@ export const DEFAULT_VIEW: ViewState = {
   filmFilter: EMPTY_FILM_FILTER,
   orgFilter: EMPTY_ORG_FILTER,
   noloc: false,
+  abroad: false,
 };
 
 const LAYERS = ["produccion", "circulacion", "industria"];
@@ -70,7 +73,8 @@ export function parseView(search: string): ViewState {
     orgFilter = { ...parseOrgFilter(p), capa: null, depto: [] };
   }
   const noloc = layer === "produccion" && p.get("sinlugar") === "1" && !place && !p.get("pelicula") && !p.get("entidad");
-  return { layer, metric, place, film: p.get("pelicula"), org: p.get("entidad"), filmFilter, orgFilter, noloc };
+  const abroad = layer === "produccion" && p.get("fuera") === "1" && !place && !noloc && !p.get("pelicula") && !p.get("entidad");
+  return { layer, metric, place, film: p.get("pelicula"), org: p.get("entidad"), filmFilter, orgFilter, noloc, abroad };
 }
 
 export function serializeView(v: ViewState): string {
@@ -83,6 +87,7 @@ export function serializeView(v: ViewState): string {
   if (v.layer === "produccion") filmFilterToParams({ ...v.filmFilter, depto: [], muni: [] }, p);
   else orgFilterToParams({ ...v.orgFilter, capa: null, depto: [] }, p);
   if (v.noloc) p.set("sinlugar", "1");
+  if (v.abroad) p.set("fuera", "1");
   const s = p.toString();
   return s ? `?${s}` : "";
 }

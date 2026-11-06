@@ -12,6 +12,13 @@ export interface SettingsSection {
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
+    id: "cifras",
+    group: "Mapa público",
+    title: "Cifras públicas",
+    description: "Elegir qué cifras muestra el mapa público: producciones con locación, días de rodaje, inversión local y empleos.",
+    enabled: true,
+  },
+  {
     id: "festivales",
     group: "Catálogos",
     title: "Festivales",
