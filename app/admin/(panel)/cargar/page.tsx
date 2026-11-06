@@ -10,7 +10,7 @@ export default function CargarPage() {
       <Link href="/admin/agregar" className="text-sm text-muted hover:text-ink">← Agregar datos</Link>
       <h1 className="font-display text-4xl tracking-tight">Cargar archivo</h1>
       <p className="mb-8 mt-1 text-sm text-muted">
-        Sube un Excel, CSV o PDF con producciones, locaciones o entidades. {claudeEnabled() ? "Claude analiza el archivo y organiza la información." : "Sin clave de Claude configurada: usamos reconocimiento básico de columnas y de PDF con tablas o fichas."}
+        Sube un Excel, CSV, Word o PDF con producciones, locaciones o entidades. {claudeEnabled() ? "Claude analiza el archivo y organiza la información." : "Sin clave de Claude configurada: usamos reconocimiento básico de columnas y de PDF o Word con tablas o fichas."}
       </p>
       <ImportWizard />
     </div>

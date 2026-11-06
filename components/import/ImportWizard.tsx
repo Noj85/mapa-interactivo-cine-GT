@@ -11,6 +11,7 @@ import { parseFile } from "@/lib/import/parse";
 import { buildQuestions, type Question } from "@/lib/import/questions";
 import { buildCandidates, collectPlaceTexts } from "@/lib/import/transform";
 import type { Candidate, ImportPlan, ParsedFile, PlaceResolution, ResolveResponse } from "@/lib/import/types";
+import type { DocxResponse } from "@/app/api/import/docx/route";
 import type { PdfResponse } from "@/app/api/import/pdf/route";
 import type { Film, Org } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -95,8 +96,13 @@ export function ImportWizard() {
   const onFile = useCallback(async (f: File) => {
     setError(null);
     const isPdf = /\.pdf$/i.test(f.name) || f.type === "application/pdf";
-    if (!isPdf && !/\.(csv|tsv|txt|xlsx|xls|xlsm|ods)$/i.test(f.name)) {
-      setError("Aceptamos PDF, CSV o Excel (.xlsx, .xls).");
+    const isDocx = /\.docx$/i.test(f.name) || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    if (/\.doc$/i.test(f.name)) {
+      setError("Ese es un Word antiguo (.doc). Ábrelo en Word y guárdalo como .docx.");
+      return;
+    }
+    if (!isPdf && !isDocx && !/\.(csv|tsv|txt|xlsx|xls|xlsm|ods)$/i.test(f.name)) {
+      setError("Aceptamos PDF, Word (.docx), CSV o Excel (.xlsx, .xls).");
       return;
     }
     try {
@@ -108,7 +114,15 @@ export function ImportWizard() {
         const r = await fetch("/api/import/pdf", { method: "POST", body: form });
         const j = (await r.json().catch(() => ({}))) as Partial<PdfResponse> & { error?: string };
         if (!r.ok || !j.file) throw new Error(j.error ?? (r.status === 401 ? "Tu sesión expiró. Vuelve a entrar." : "No pudimos leer el PDF."));
-        parsed = { ...j.file, pdf: { pages: j.pages ?? 0, engine: j.engine ?? "heuristic", notes: j.notes ?? [] } };
+        parsed = { ...j.file, doc: { kind: "pdf", pages: j.pages ?? 0, engine: j.engine ?? "heuristic", notes: j.notes ?? [] } };
+      } else if (isDocx) {
+        setBusy("Leyendo el documento de Word…");
+        const form = new FormData();
+        form.append("file", f);
+        const r = await fetch("/api/import/docx", { method: "POST", body: form });
+        const j = (await r.json().catch(() => ({}))) as Partial<DocxResponse> & { error?: string };
+        if (!r.ok || !j.file) throw new Error(j.error ?? (r.status === 401 ? "Tu sesión expiró. Vuelve a entrar." : "No pudimos leer el documento."));
+        parsed = { ...j.file, doc: { kind: "docx", pages: 0, engine: j.engine ?? "heuristic", notes: j.notes ?? [] } };
       } else {
         setBusy("Leyendo el archivo…");
         parsed = await parseFile(f);
@@ -241,7 +255,7 @@ export function ImportWizard() {
                   <>
                     <Loader2 className="h-8 w-8 animate-spin text-accent" />
                     <p className="mt-4 font-display text-xl">{busy}</p>
-                    <p className="mt-1 text-sm text-muted">{busy.includes("PDF") ? "Un PDF largo puede tardar un par de minutos." : "Esto toma unos segundos."}</p>
+                    <p className="mt-1 text-sm text-muted">{busy.includes("PDF") || busy.includes("Word") ? "Un documento largo puede tardar un par de minutos." : "Esto toma unos segundos."}</p>
                   </>
                 ) : (
                   <>
@@ -250,8 +264,8 @@ export function ImportWizard() {
                     </div>
                     <p className="mt-5 font-display text-2xl tracking-tight">Suelta aquí tu archivo</p>
                     <p className="mt-2 max-w-md text-sm leading-relaxed text-muted">
-                      PDF, CSV o Excel. No hace falta seguir un formato: nosotros entendemos qué trae
-                      cada columna o ficha y te preguntamos lo que falte. Los PDF pueden ser catálogos, directorios o listados.
+                      PDF, Word, CSV o Excel. No hace falta seguir un formato: nosotros entendemos qué trae
+                      cada columna o ficha y te preguntamos lo que falte. Los PDF y Word pueden ser catálogos, directorios, listados o fichas.
                     </p>
                     <span className="btn-outline mt-6">
                       <FileSpreadsheet className="h-4 w-4" /> Elegir archivo
@@ -262,7 +276,7 @@ export function ImportWizard() {
                   ref={input}
                   type="file"
                   className="hidden"
-                  accept=".pdf,.csv,.tsv,.txt,.xlsx,.xls,.xlsm,.ods,application/pdf,text/csv"
+                  accept=".pdf,.docx,.csv,.tsv,.txt,.xlsx,.xls,.xlsm,.ods,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (f) onFile(f);

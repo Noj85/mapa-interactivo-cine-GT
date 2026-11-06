@@ -167,7 +167,7 @@ function planSheet(sheet: ParsedSheet, fromPdf = false): SheetPlan {
     const col = film.columns.title;
     const titles = sheet.rows.map((r) => normalize(r[col] ?? "")).filter(Boolean);
     const seen = new Set(titles);
-    // en un PDF leído por Claude, un lugar o un festival de más es otra fila con el mismo título: basta con que alguno se repita
+    // en un PDF o Word leído por Claude, un lugar o un festival de más es otra fila con el mismo título: basta con que alguno se repita
     const grain = seen.size < sheet.rows.length * 0.75 || (fromPdf && seen.size < titles.length) ? "row_per_location" : "row_per_film";
     return {
       sheet: sheet.name,
@@ -195,7 +195,7 @@ function planSheet(sheet: ParsedSheet, fromPdf = false): SheetPlan {
 
 /** Análisis sin conexión: reconoce encabezados comunes en español e inglés. */
 export function heuristicPlan(file: ParsedFile): ImportPlan {
-  const sheets = file.sheets.map((s) => planSheet(s, file.pdf?.engine === "claude"));
+  const sheets = file.sheets.map((s) => planSheet(s, file.doc?.engine === "claude"));
   const films = sheets.filter((s) => s.entity === "film").length;
   const orgs = sheets.filter((s) => s.entity === "org").length;
   return {

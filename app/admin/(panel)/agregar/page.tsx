@@ -7,7 +7,7 @@ const options = [
     href: "/admin/cargar",
     icon: FileUp,
     title: "Cargar archivo",
-    text: "Sube un Excel, CSV o PDF con muchas producciones o entidades. Revisas lo que entendimos antes de publicar.",
+    text: "Sube un Excel, CSV, Word o PDF con muchas producciones o entidades. Revisas lo que entendimos antes de publicar.",
     primary: true,
   },
   {

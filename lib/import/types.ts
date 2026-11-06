@@ -14,8 +14,8 @@ export interface ParsedSheet {
 export interface ParsedFile {
   filename: string;
   sheets: ParsedSheet[];
-  /** Solo si el archivo era un PDF: cómo se leyó. */
-  pdf?: { pages: number; engine: "claude" | "heuristic"; notes: string[] };
+  /** Solo si el archivo era un PDF o un Word: cómo se leyó (`pages` es 0 en un Word). */
+  doc?: { kind: "pdf" | "docx"; pages: number; engine: "claude" | "heuristic"; notes: string[] };
 }
 
 // ───────────────────────── campos destino ─────────────────────────

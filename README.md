@@ -53,11 +53,19 @@ La lectura pública solo ve registros con `status = 'published'`. Escribir exige
 
 ### PDF
 
-Además de CSV y Excel, el asistente acepta **PDF** (catálogos, directorios, listados, hasta 25 MB). El PDF se convierte en filas (nombre, categoría, lugar, contacto, página del PDF…) y sigue el mismo camino de revisión.
+Además de CSV, Excel y Word, el asistente acepta **PDF** (catálogos, directorios, listados, hasta 25 MB). El PDF se convierte en filas (nombre, categoría, lugar, contacto, página del PDF…) y sigue el mismo camino de revisión.
 
 - **Con `ANTHROPIC_API_KEY`**: Claude lee el PDF por partes de 6 páginas (texto, tablas y maquetación en columnas) y entrega producciones y entidades. Solo transcribe lo que el documento dice; lo que no aparece queda vacío. Un PDF largo puede tardar un par de minutos (la ruta permite hasta 300 s; en Vercel eso requiere un plan que lo soporte, y las peticiones están limitadas a ~4.5 MB).
 - **Sin clave**: lectura básica de dos maquetaciones: *fichas* (un nombre en letra grande y datos con etiquetas que se repiten, como un directorio de servicios) y *tablas* con fila de encabezados. Si no reconoce ninguna, lo dice y sugiere Excel o activar Claude.
 - Los PDF escaneados (solo imagen) no tienen texto: la lectura básica no los entiende.
+
+### Word (.docx)
+
+También se aceptan documentos de **Word** (`.docx`, hasta 15 MB; `/api/import/docx`). El `.docx` se abre en el servidor (`lib/import/docx.ts`, con `fflate`) y se leen sus párrafos, títulos, viñetas y tablas (celdas combinadas resueltas; una tabla de una celda combinada hacia abajo repite su valor en cada fila). Los `.doc` antiguos se rechazan con la instrucción de guardarlos como `.docx`.
+
+- **Tablas**: las que repiten el mismo encabezado (porque el documento las partió) se juntan en una hoja; varias tablas de dos columnas «etiqueta | valor» con etiquetas parecidas son **fichas** y cada una se vuelve una fila. Si las fichas no traen el nombre como etiqueta, se usa el título que las antecede. Esto funciona sin clave.
+- **Con `ANTHROPIC_API_KEY`**: si el documento es sobre todo texto corrido o fichas sueltas (o tiene pocas filas en tablas), Claude lee el contenido completo (títulos, viñetas y tablas como filas con «|») por fragmentos de ~30 000 caracteres y entrega producciones y entidades, con los lugares de rodaje y festivales como listas. Si el documento es sobre todo una tabla grande (20 filas o más), se lee la tabla directo, que es más exacta. Si Claude falla, se cae a las tablas.
+- Sin clave y sin tablas legibles, lo dice y sugiere Excel o activar Claude. Texto dentro de imágenes, encabezados, pies de página y notas al pie no se leen.
 
 
 ### Formato, naturaleza y géneros al importar
@@ -76,7 +84,7 @@ Cada elemento tiene su casilla. Una celda vacía nunca borra nada, y el título 
 
 ### Primera carga
 
-El mapa arranca vacío y se llena desde cero: entra a `/admin/agregar` y sube un archivo (CSV, Excel o PDF) o registra una producción o entidad a mano. El proyecto no trae datos de producciones ni entidades; solo trae el catálogo base de festivales (ver «Festivales y premios»). Las producciones sin lugar de rodaje salen en la zona **«Sin ubicación»** del mapa (ver abajo) hasta que les agregues sus locaciones desde `/admin/peliculas`; el botón «Publicar todas» de esa pantalla publica de una vez los borradores que ya tienen título.
+El mapa arranca vacío y se llena desde cero: entra a `/admin/agregar` y sube un archivo (CSV, Excel, Word o PDF) o registra una producción o entidad a mano. El proyecto no trae datos de producciones ni entidades; solo trae el catálogo base de festivales (ver «Festivales y premios»). Las producciones sin lugar de rodaje salen en la zona **«Sin ubicación»** del mapa (ver abajo) hasta que les agregues sus locaciones desde `/admin/peliculas`; el botón «Publicar todas» de esa pantalla publica de una vez los borradores que ya tienen título.
 
 ## Dos partes: mapa público y equipo
 
@@ -85,7 +93,7 @@ La app es una sola, con dos áreas separadas. **`/` siempre es el mapa público*
 | | Mapa público (`/`, `/descargas`, `/aportar`) | Equipo (`/admin/*`) |
 |---|---|---|
 | Quién | Cualquier persona, sin cuenta | Solo el equipo (login) |
-| Qué hace | Explorar el mapa, descargar datos filtrados, **aportar** | Revisar aportes, cargar archivos (CSV/Excel/PDF), editar producciones y entidades, preguntas pendientes, pósters, exportar para informes |
+| Qué hace | Explorar el mapa, descargar datos filtrados, **aportar** | Revisar aportes, cargar archivos (CSV/Excel/Word/PDF), editar producciones y entidades, preguntas pendientes, pósters, exportar para informes |
 
 **Aportes del público.** En `/aportar` cualquiera puede sugerir una producción o entidad nueva (con varias locaciones), y desde la ficha de cada registro, «Sugerir corrección» abre el mismo formulario con los datos actuales. Nada se publica de inmediato: el aporte queda **pendiente** en `/admin/aportes`, donde el equipo ve los datos propuestos (en una corrección, lo que cambia frente al registro actual) y puede **aprobar y publicar**, **aprobar como borrador y editar**, **aplicar la corrección** o **rechazar** con una nota. El número de pendientes aparece en el menú y en el resumen.
 

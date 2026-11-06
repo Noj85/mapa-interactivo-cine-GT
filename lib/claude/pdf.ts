@@ -1,4 +1,5 @@
 import "server-only";
+import type Anthropic from "@anthropic-ai/sdk";
 import { PDFDocument } from "pdf-lib";
 import { FORMATS, GENRES, NATURES } from "@/lib/film-types";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
@@ -12,7 +13,7 @@ const CONCURRENCY = 3;
 const str = { type: "string" as const };
 const TOOL = {
   name: "submit_records",
-  description: "Entrega los registros que aparecen en estas páginas del PDF.",
+  description: "Entrega los registros que aparecen en este fragmento del documento.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -102,7 +103,7 @@ const TOOL = {
 };
 
 const SYSTEM = `Eres el asistente de carga del "Mapa del Cine de Guatemala", de la Academia de Cine de Guatemala.
-Recibes páginas de un PDF (catálogo, directorio, informe, listado) y extraes SOLO los registros que aparecen: producciones (películas, cortometrajes, series) y entidades del ecosistema audiovisual.
+Recibes páginas de un PDF o el contenido de un documento de Word (catálogo, directorio, informe, listado, fichas) y extraes SOLO los registros que aparecen: producciones (películas, cortometrajes, series) y entidades del ecosistema audiovisual.
 
 Reglas:
 - Transcribe lo que dice el documento. No inventes, no completes de memoria ni deduzcas datos que no estén.
@@ -111,6 +112,7 @@ Reglas:
 - Ignora portadas, índices, créditos, encabezados, pies de página y texto institucional que no describa un registro.
 - Un nombre de persona NO es una entidad, salvo que sea claramente un colectivo, productora o empresa.
 - Si el PDF es multicolumna, lee cada ficha completa antes de pasar a la siguiente.
+- En un documento de Word, las tablas llegan como filas de celdas separadas por « | » (la primera fila suele ser el encabezado) y los títulos como líneas que empiezan con «#». Una tabla de dos columnas «etiqueta | valor» suele ser la ficha de una sola producción o entidad; el título que la antecede suele ser el nombre.
 - "municipality" y "department" solo si el documento los indica o si "place" nombra un municipio o departamento de Guatemala sin ambigüedad. Si el lugar está fuera de Guatemala, déjalos vacíos y conserva el texto en "place".
 - Para "category" elige la categoría permitida más cercana al tipo de entidad; si la entidad hace varias cosas (por ejemplo producción y postproducción), enumera todas las que apliquen separadas por «;», la principal primero. Si ninguna encaja, la más cercana igualmente.
 - Teléfonos y correos van en "contact" (solo números de teléfono y direcciones de correo), no en la descripción.
@@ -181,38 +183,39 @@ async function splitPdf(data: Uint8Array): Promise<{ chunks: { bytes: Uint8Array
   return { chunks, pages };
 }
 
-async function readChunk(bytes: Uint8Array, from: number, to: number, total: number): Promise<ChunkResult> {
+const ALLOWED = () =>
+  `Categorías permitidas para entidades de Circulación: ${CIRC_CATEGORIES.join(", ")}.\n` +
+  `Categorías permitidas para entidades de Industria: ${IND_CATEGORIES.join(", ")}.`;
+
+/** Una consulta a Claude. `pages` (solo PDF) convierte la página relativa que devuelve el modelo en página del documento. */
+async function ask(content: Anthropic.Messages.ContentBlockParam[], pages?: { from: number; to: number }): Promise<ChunkResult> {
   const res = await claude().messages.create({
     model: CLAUDE_MODEL,
     max_tokens: 16000,
     system: SYSTEM,
     tools: [TOOL],
     tool_choice: { type: "tool", name: TOOL.name },
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "document", source: { type: "base64", media_type: "application/pdf", data: Buffer.from(bytes).toString("base64") } },
-          {
-            type: "text",
-            text:
-              `Estas son las páginas ${from} a ${to} de un PDF de ${total} páginas. Extrae todos los registros.\n` +
-              `Categorías permitidas para entidades de Circulación: ${CIRC_CATEGORIES.join(", ")}.\n` +
-              `Categorías permitidas para entidades de Industria: ${IND_CATEGORIES.join(", ")}.`,
-          },
-        ],
-      },
-    ],
+    messages: [{ role: "user", content }],
   });
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") return { films: [], orgs: [], notes: [] };
   const input = block.input as { films?: RawFilm[]; orgs?: RawOrg[]; notes?: string };
-  const abs = (p?: number) => from - 1 + Math.max(1, Math.min(to - from + 1, Math.round(p ?? 1)));
+  const abs = (p?: number) => (pages ? pages.from - 1 + Math.max(1, Math.min(pages.to - pages.from + 1, Math.round(p ?? 1))) : 1);
   return {
     films: (input.films ?? []).map((f) => ({ ...f, page: abs(f.page) })),
     orgs: (input.orgs ?? []).map((o) => ({ ...o, page: abs(o.page) })),
     notes: input.notes ? [input.notes] : [],
   };
+}
+
+function readChunk(bytes: Uint8Array, from: number, to: number, total: number): Promise<ChunkResult> {
+  return ask(
+    [
+      { type: "document", source: { type: "base64", media_type: "application/pdf", data: Buffer.from(bytes).toString("base64") } },
+      { type: "text", text: `Estas son las páginas ${from} a ${to} de un PDF de ${total} páginas. Extrae todos los registros.\n${ALLOWED()}` },
+    ],
+    { from, to },
+  );
 }
 
 const key = (s?: string) =>
@@ -270,7 +273,32 @@ export async function claudePdf(data: Uint8Array, filename: string): Promise<Cla
     }
   };
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, chunks.length) }, worker));
+  return aggregate(results, "Página del PDF", filename, pages);
+}
 
+/** Lee el texto de un documento de Word (ya convertido a texto por fragmentos) con Claude. Lanza si falla. */
+export async function claudeText(parts: string[], filename: string): Promise<ClaudePdfResult> {
+  const results: ChunkResult[] = new Array(parts.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < parts.length) {
+      const i = next++;
+      results[i] = await ask([
+        {
+          type: "text",
+          text:
+            `Este es el contenido del documento de Word «${filename}»` +
+            (parts.length > 1 ? ` (parte ${i + 1} de ${parts.length}; una ficha puede quedar partida entre partes: entrega lo que veas)` : "") +
+            `. Extrae todos los registros.\n${ALLOWED()}\n\n--- INICIO ---\n${parts[i]}\n--- FIN ---`,
+        },
+      ]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, parts.length) }, worker));
+  return aggregate(results, null, filename, 0);
+}
+
+function aggregate(results: ChunkResult[], refHeader: string | null, filename: string, pages: number): ClaudePdfResult {
   // Una producción puede salir en varias páginas: los datos se completan y sus lugares y festivales se suman.
   const films = new Map<string, FilmAgg>();
   const orgRows = new Map<string, Record<string, string>>();
@@ -360,7 +388,11 @@ export async function claudePdf(data: Uint8Array, filename: string): Promise<Cla
       });
     }
   }
-  if (filmRows.length) sheets.push({ name: "Producciones", headers: FILM_HEADERS, rows: filmRows, totalRows: filmRows.length });
-  if (orgRows.size) sheets.push({ name: "Entidades", headers: ORG_HEADERS, rows: [...orgRows.values()], totalRows: orgRows.size });
+  // Un Word no tiene páginas: sin la columna de referencia.
+  const heads = (h: string[]) => (refHeader ? h : h.filter((x) => x !== "Página del PDF"));
+  const orgList = [...orgRows.values()];
+  if (!refHeader) for (const r of [...filmRows, ...orgList]) delete r["Página del PDF"];
+  if (filmRows.length) sheets.push({ name: "Producciones", headers: heads(FILM_HEADERS), rows: filmRows, totalRows: filmRows.length });
+  if (orgList.length) sheets.push({ name: "Entidades", headers: heads(ORG_HEADERS), rows: orgList, totalRows: orgList.length });
   return { file: { filename, sheets }, pages, notes: [...new Set(notes)] };
 }

@@ -79,10 +79,18 @@ export function buildRequestMessage(i: RequestMessageInput): { subject: string; 
     subject = `Información de ${label(i.title, i.year)} · PROCINE`;
   }
 
+  // La prioridad de esta fase de investigación aplica solo a producciones (las entidades no tienen locaciones ni empleos).
+  const priority = isFilm
+    ? films
+      ? "Puedes completar todo lo que quieras; lo más importante en esta fase de investigación son los lugares donde se rodaron y, si puedes, los empleos que generaron."
+      : "Puedes completar todo lo que quieras; lo más importante en esta fase de investigación son los lugares donde se rodó y, si puedes, los empleos que generó."
+    : null;
+
   const body = [
     greeting,
     "",
     `Desde PROCINE, proyecto que ejecuta la Academia de Cine de Guatemala, estamos documentando el cine nacional. ${ask}`,
+    ...(priority ? ["", priority] : []),
     "",
     i.link,
     "",

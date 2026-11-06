@@ -118,19 +118,22 @@ export function StepUnderstand({
         </div>
       )}
 
-      {file.pdf && (
+      {file.doc && (
         <div className="rounded-2xl border border-warn/30 bg-warn/5 px-4 py-3 text-sm">
           <p className="font-medium">
-            Esto salió de un PDF de {file.pdf.pages} {file.pdf.pages === 1 ? "página" : "páginas"}
-            {file.pdf.engine === "claude" ? ", leído con Claude." : ", con lectura básica."}
+            {file.doc.kind === "pdf"
+              ? `Esto salió de un PDF de ${file.doc.pages} ${file.doc.pages === 1 ? "página" : "páginas"}`
+              : "Esto salió de un documento de Word"}
+            {file.doc.engine === "claude" ? ", leído con Claude." : file.doc.kind === "pdf" ? ", con lectura básica." : ", a partir de sus tablas."}
           </p>
           <p className="mt-0.5 text-xs leading-relaxed text-muted">
-            Un PDF no es una base de datos: confirma las columnas aquí y revisa cada registro en el siguiente paso, sobre todo nombres, lugares y
-            contactos. La columna «Página del PDF» te dice dónde buscar cada registro en el documento original.
+            {file.doc.kind === "pdf" ? "Un PDF" : "Un documento de Word"} no es una base de datos: confirma las columnas aquí y revisa cada registro en el siguiente paso, sobre todo
+            nombres, lugares y contactos.
+            {file.doc.kind === "pdf" ? " La columna «Página del PDF» te dice dónde buscar cada registro en el documento original." : ""}
           </p>
-          {file.pdf.notes.length > 0 && (
+          {file.doc.notes.length > 0 && (
             <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs text-muted">
-              {file.pdf.notes.map((n) => (
+              {file.doc.notes.map((n) => (
                 <li key={n}>{n}</li>
               ))}
             </ul>
