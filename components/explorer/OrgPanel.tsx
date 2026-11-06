@@ -2,17 +2,24 @@
 
 import { categoriesText } from "@/lib/categories";
 import { contactParts } from "@/lib/contact";
-import { AlertCircle, AtSign, ExternalLink, Mail, MapPin, MessageSquarePlus, Pencil, Phone } from "lucide-react";
+import { AlertCircle, AtSign, ExternalLink, Mail, MapPin, MessageSquarePlus, Pencil, Phone, Send } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useState } from "react";
+import { createPortal } from "react-dom";
 import { INITIATIVE_TYPES, LAYERS } from "@/lib/types";
 import { CompletenessBadge, CompletenessMeter } from "@/components/ui/Badges";
 import { OrgLogo, PanelShell, SectionTitle, type PanelCtx } from "./parts";
 import { FESTIVAL_RESULTS } from "@/lib/types";
 
+// solo se carga cuando alguien del equipo lo abre
+const RequestInfoDialog = dynamic(() => import("@/components/admin/RequestInfoDialog").then((m) => m.RequestInfoDialog), { ssr: false });
+
 const href = (w: string) => (/^https?:\/\//.test(w) ? w : `https://${w}`);
 
 export default function OrgPanel({ ctx }: { ctx: PanelCtx }) {
   const { data, gaz, view, go, canEdit } = ctx;
+  const [asking, setAsking] = useState(false);
   const org = data.orgs.find((o) => o.slug === view.org);
   if (!org)
     return (
@@ -45,6 +52,11 @@ export default function OrgPanel({ ctx }: { ctx: PanelCtx }) {
           <Link href={`/admin/entidades/${org.id}`} className="chip transition hover:border-accent hover:text-ink">
             <Pencil className="h-3 w-3" /> Editar
           </Link>
+        )}
+        {canEdit && (
+          <button type="button" onClick={() => setAsking(true)} className="chip transition hover:border-accent hover:text-ink">
+            <Send className="h-3 w-3" /> Solicitar información
+          </button>
         )}
         {!canEdit && (
           <Link href={`/aportar?entidad=${org.slug}`} className="chip transition hover:border-accent hover:text-ink">
@@ -140,6 +152,8 @@ export default function OrgPanel({ ctx }: { ctx: PanelCtx }) {
         </>
       )}
       {org.source && <p className="mt-6 text-xs text-muted/70">Fuente: {org.source}</p>}
+      {asking &&
+        createPortal(<RequestInfoDialog kind="org" targets={[{ id: org.id, title: org.name }]} onClose={() => setAsking(false)} />, document.body)}
     </PanelShell>
   );
 }

@@ -1,15 +1,22 @@
 "use client";
 
-import { AlertCircle, Award, ExternalLink, MapPin, MessageSquarePlus, Pencil } from "lucide-react";
+import { AlertCircle, Award, ExternalLink, MapPin, MessageSquarePlus, Pencil, Send } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useState } from "react";
+import { createPortal } from "react-dom";
 import { durationLabel, filmTypeLabel } from "@/lib/film-types";
 import { FESTIVAL_RESULTS, NATIONALITIES } from "@/lib/types";
 import { fmtInt, fmtMoney } from "@/lib/utils";
 import { CompletenessBadge, CompletenessMeter } from "@/components/ui/Badges";
 import { PanelShell, type PanelCtx, SectionTitle, Stat } from "./parts";
 
+// solo se carga cuando alguien del equipo lo abre
+const RequestInfoDialog = dynamic(() => import("@/components/admin/RequestInfoDialog").then((m) => m.RequestInfoDialog), { ssr: false });
+
 export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
   const { data, gaz, view, go, canEdit } = ctx;
+  const [asking, setAsking] = useState(false);
   const film = data.films.find((f) => f.slug === view.film);
   if (!film)
     return (
@@ -53,6 +60,11 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
           <Link href={`/admin/peliculas/${film.id}`} className="chip transition hover:border-accent hover:text-ink">
             <Pencil className="h-3 w-3" /> Editar
           </Link>
+        )}
+        {canEdit && (
+          <button type="button" onClick={() => setAsking(true)} className="chip transition hover:border-accent hover:text-ink">
+            <Send className="h-3 w-3" /> Solicitar información
+          </button>
         )}
         {!canEdit && (
           <Link href={`/aportar?pelicula=${film.slug}`} className="chip transition hover:border-accent hover:text-ink">
@@ -211,6 +223,8 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
           </ul>
         </>
       )}
+      {asking &&
+        createPortal(<RequestInfoDialog kind="film" targets={[{ id: film.id, title: film.title }]} onClose={() => setAsking(false)} />, document.body)}
     </PanelShell>
   );
 }
