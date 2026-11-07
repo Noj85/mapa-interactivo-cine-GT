@@ -2,7 +2,7 @@
 
 import { customGenres } from "@/lib/film-types";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
-import { EMPTY_FILM_FILTER, EMPTY_ORG_FILTER, filmFilterActive, filterFilms, orgFilterActive, orgMatches } from "@/lib/filters";
+import { EMPTY_FILM_FILTER, EMPTY_ORG_FILTER, filmFilterActive, filterFilms, orgFilterActive, orgMatches, type FilmFilter } from "@/lib/filters";
 import { AnimatePresence, motion } from "framer-motion";
 import { Download, HandHeart, Moon, Search, Sun } from "lucide-react";
 import { DepartmentFilter } from "./DepartmentFilter";
@@ -22,6 +22,8 @@ import FilmPanel from "./FilmPanel";
 import { FilterPanel } from "./FilterPanel";
 import { LayerSwitcher } from "./LayerSwitcher";
 import { MapControls } from "./MapControls";
+import { MobilePeek } from "./MobilePeek";
+import { MobileTopBar } from "./MobileTopBar";
 import OrgPanel from "./OrgPanel";
 import OverviewPanel from "./OverviewPanel";
 import { SearchPalette } from "./SearchPalette";
@@ -51,7 +53,8 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
   const [satellite, setSatellite] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [mapReady, setMapReady] = useState(false);
-  const [sheetFull, setSheetFull] = useState(false);
+  // altura de la hoja inferior del teléfono: mínima (solo resumen), media o completa
+  const [sheetRaw, setSheet] = useState<"peek" | "half" | "full">("peek");
   const dragY = useRef<number | null>(null);
   const [vw, setVw] = useState({ w: 1280, h: 800 });
   const mapRef = useRef<MapHandle>(null);
@@ -80,9 +83,11 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
     return () => window.removeEventListener("popstate", onPop);
   }, [canEdit]);
 
-  const go = useMemo<PanelCtx["go"]>(
-    () => ({
-      place: (p: Place | null) => commit({ ...view, place: p, film: null, org: null, noloc: false, abroad: false }),
+  const go = useMemo<PanelCtx["go"]>(() => {
+    // «Sin locación» solo se ve como lista aparte: al salir de ahí, o al elegir un lugar, se vuelve a lo normal («con locación»)
+    const backToCon = (f: FilmFilter): FilmFilter => (f.locacion === "sin" ? { ...f, locacion: "con" } : f);
+    return {
+      place: (p: Place | null) => commit({ ...view, place: p, film: null, org: null, noloc: false, abroad: false, filmFilter: backToCon(view.filmFilter) }),
       film: (slug: string) => commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", film: slug, org: null, noloc: false, abroad: false }),
       org: (slug: string) => {
         const o = data.orgs.find((x) => x.slug === slug);
@@ -91,24 +96,25 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       },
       layer: (l: LayerId) =>
         commit({ ...view, layer: l, metric: LAYER_METRICS[l][0], film: null, org: null, noloc: false, abroad: false }),
-      unlocated: () => commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", place: null, film: null, org: null, noloc: true, abroad: false }),
-      abroad: () => commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", place: null, film: null, org: null, noloc: false, abroad: true }),
+      unlocated: () =>
+        commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", place: null, film: null, org: null, noloc: true, abroad: false, filmFilter: { ...view.filmFilter, locacion: "sin" } }),
+      abroad: () =>
+        commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", place: null, film: null, org: null, noloc: false, abroad: true, filmFilter: backToCon(view.filmFilter) }),
       up: () => {
         if (view.film || view.org) return commit({ ...view, film: null, org: null });
-        if (view.noloc) return commit({ ...view, noloc: false, abroad: false });
+        if (view.noloc || view.abroad) return commit({ ...view, noloc: false, abroad: false, filmFilter: view.noloc ? backToCon(view.filmFilter) : view.filmFilter });
         if (view.place?.type === "muni") {
           const e = geo?.gaz.muni(view.place.code);
           return commit({ ...view, place: e ? { type: "depto", code: e.depto_ine } : null });
         }
         commit({ ...view, place: null });
       },
-      clear: () => commit({ ...view, place: null, film: null, org: null, noloc: false, abroad: false }),
+      clear: () => commit({ ...view, place: null, film: null, org: null, noloc: false, abroad: false, filmFilter: view.noloc ? backToCon(view.filmFilter) : view.filmFilter }),
       locacion: (locacion: "con" | "sin" | null) =>
         // en «Sin locación» no hay territorio que ver: se sale del lugar o de la producción abiertos
         commit({ ...view, filmFilter: { ...view.filmFilter, locacion }, film: null, ...(locacion === "sin" ? { place: null } : {}), noloc: false, abroad: false }),
-    }),
-    [view, commit, data.orgs, geo],
-  );
+    };
+  }, [view, commit, data.orgs, geo]);
 
   // atajos de teclado
   useEffect(() => {
@@ -157,15 +163,22 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
   const aggs = useMemo(() => aggregate(shown, view.layer), [shown, view.layer]);
   const hasSelection = !!(view.place || view.film || view.org || view.noloc || view.abroad);
   const desktop = vw.w >= 900;
+  // teléfono del público: barra superior compacta; el equipo conserva la distribución de siempre
+  const compactTop = !desktop && !canEdit;
+  // con algo elegido, la hoja nunca queda en su altura mínima
+  const sheet = hasSelection && sheetRaw === "peek" ? "half" : sheetRaw;
+  const PEEK_H = 112;
   const padding = desktop
     ? { top: 20, right: PANEL_W + 16, bottom: 20, left: 460 }
-    : { top: 190, right: 0, bottom: hasSelection ? Math.round(vw.h * 0.5) : 0, left: 0 };
+    : { top: compactTop ? 168 : 190, right: 0, bottom: sheet === "peek" ? PEEK_H : Math.round(vw.h * 0.5), left: 0 };
 
-  const ctx: PanelCtx | null = geo ? { data: shown, gaz: geo.gaz, aggs, view, go, canEdit } : null;
+  const ctx: PanelCtx | null = geo ? { data: shown, allFilms: data.films, gaz: geo.gaz, aggs, view, go, canEdit, mobile: !desktop, sheet } : null;
 
-  // al elegir otra cosa, la hoja vuelve a su tamaño medio
+  // al elegir otra cosa, la hoja vuelve a su tamaño medio (o a la mínima si no hay nada elegido)
   const selectionKey = `${view.film ?? ""}|${view.org ?? ""}|${view.place?.type ?? ""}${view.place?.code ?? ""}|${view.noloc}|${view.abroad}`;
-  useEffect(() => setSheetFull(false), [selectionKey]);
+  useEffect(() => setSheet(hasSelection ? "half" : "peek"), [selectionKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const levels: ("peek" | "half" | "full")[] = hasSelection ? ["half", "full"] : ["peek", "half", "full"];
+  const stepSheet = (dir: 1 | -1) => setSheet(levels[Math.max(0, Math.min(levels.length - 1, levels.indexOf(sheet) + dir))]);
 
   const liveText = view.film
     ? `Producción: ${data.films.find((f) => f.slug === view.film)?.title ?? ""}`
@@ -231,61 +244,74 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
 
       {/* columna superior izquierda */}
       <div className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex flex-col gap-2.5 sm:left-4 sm:right-auto sm:top-4 sm:w-[440px]">
-        <div className="pointer-events-auto glass flex items-center gap-2 rounded-2xl border border-line p-2 shadow-soft">
-          <h1 className="m-0 flex min-w-0 flex-1 items-center pl-1.5">
-            <MapLogo className="h-10 max-w-full object-contain object-left sm:h-12" />
-          </h1>
-          <button className="btn-ghost h-9 w-9 !p-0" onClick={() => setSearchOpen(true)} aria-label="Buscar (⌘K)" title="Buscar (⌘K)">
-            <Search className="h-4 w-4" />
-          </button>
-          <Link href="/descargas" className="btn-ghost h-9 w-9 !p-0" aria-label="Descargas de datos" title="Descargas de datos">
-            <Download className="h-4 w-4" />
-          </Link>
-          <button
-            className="btn-ghost h-9 w-9 !p-0"
-            onClick={toggleTheme}
-            aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-            title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-
-        </div>
-        {!canEdit && (
-          <Link
-            href={`/aportar?capa=${view.layer}`}
-            className="btn-primary pointer-events-auto h-11 w-full justify-center gap-2 rounded-2xl text-[15px] shadow-soft"
-            title="Aporta una producción o entidad que falta en el mapa"
-          >
-            <HandHeart className="h-5 w-5" aria-hidden />
-            Aportar al mapa
-          </Link>
-        )}
-        <div className="pointer-events-auto flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap">
-          <LayerSwitcher layer={view.layer} onChange={go.layer} />
-        </div>
-        {(canEdit || geo) && (
-          <div className="pointer-events-none relative flex flex-wrap items-start gap-2">
-            {geo && <DepartmentFilter gaz={geo.gaz} place={view.place} onPlace={go.place} onClear={go.clear} />}
-            {canEdit && (
-              <FilterPanel
-                layer={view.layer}
-                metric={view.metric}
-                filmFilter={view.filmFilter}
-                orgFilter={view.orgFilter}
-                count={layerCount}
-                total={layerTotal}
-                extraCategories={extraCategories}
-                extraGenres={extraGenres}
-                onFilm={(filmFilter) => commit({ ...view, filmFilter, film: null, org: null, noloc: false, abroad: false })}
-                onOrg={(orgFilter) => commit({ ...view, orgFilter, film: null, org: null, noloc: false, abroad: false })}
-                onMetric={(metric) => commit({ ...view, metric })}
-                downloadHref={downloadHref(view)}
-              />
+        {compactTop ? (
+          <>
+            <MobileTopBar aportarHref={`/aportar?capa=${view.layer}`} onSearch={() => setSearchOpen(true)} theme={theme} onTheme={toggleTheme} />
+            <div className="pointer-events-none flex items-center gap-2">
+              <div className="pointer-events-auto min-w-0 flex-1">
+                <LayerSwitcher layer={view.layer} onChange={go.layer} />
+              </div>
+              {geo && <DepartmentFilter compact gaz={geo.gaz} place={view.place} onPlace={go.place} onClear={go.clear} />}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="pointer-events-auto glass flex items-center gap-2 rounded-2xl border border-line p-2 shadow-soft">
+              <h1 className="m-0 flex min-w-0 flex-1 items-center pl-1.5">
+                <MapLogo className="h-10 max-w-full object-contain object-left sm:h-12" />
+              </h1>
+              <button className="btn-ghost h-9 w-9 !p-0" onClick={() => setSearchOpen(true)} aria-label="Buscar (⌘K)" title="Buscar (⌘K)">
+                <Search className="h-4 w-4" />
+              </button>
+              <Link href="/descargas" className="btn-ghost h-9 w-9 !p-0" aria-label="Descargas de datos" title="Descargas de datos">
+                <Download className="h-4 w-4" />
+              </Link>
+              <button
+                className="btn-ghost h-9 w-9 !p-0"
+                onClick={toggleTheme}
+                aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+                title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+              >
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+            </div>
+            {!canEdit && (
+              <Link
+                href={`/aportar?capa=${view.layer}`}
+                className="btn-primary pointer-events-auto h-11 w-full justify-center gap-2 rounded-2xl text-[15px] shadow-soft"
+                title="Aporta una producción o entidad que falta en el mapa"
+              >
+                <HandHeart className="h-5 w-5" aria-hidden />
+                Aportar al mapa
+              </Link>
             )}
-          </div>
+            <div className="pointer-events-auto flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap">
+              <LayerSwitcher layer={view.layer} onChange={go.layer} />
+            </div>
+            {(canEdit || geo) && (
+              <div className="pointer-events-none relative flex flex-wrap items-start gap-2">
+                {geo && <DepartmentFilter gaz={geo.gaz} place={view.place} onPlace={go.place} onClear={go.clear} />}
+                {canEdit && (
+                  <FilterPanel
+                    layer={view.layer}
+                    metric={view.metric}
+                    filmFilter={view.filmFilter}
+                    orgFilter={view.orgFilter}
+                    count={layerCount}
+                    total={layerTotal}
+                    extraCategories={extraCategories}
+                    extraGenres={extraGenres}
+                    onFilm={(filmFilter) => commit({ ...view, filmFilter, film: null, org: null, noloc: false, abroad: false })}
+                    onOrg={(orgFilter) => commit({ ...view, orgFilter, film: null, org: null, noloc: false, abroad: false })}
+                    onMetric={(metric) => commit({ ...view, metric })}
+                    downloadHref={downloadHref(view)}
+                  />
+                )}
+              </div>
+            )}
+          </>
         )}
-        {geo && (
+        {geo && (!compactTop || hasSelection) && (
           <div className="pointer-events-auto glass w-fit max-w-full rounded-xl border border-line px-3 py-1.5">
             <Breadcrumbs view={view} gaz={geo.gaz} data={data} onPlace={go.place} onClear={go.clear} />
           </div>
@@ -298,7 +324,9 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
         style={{
           left: desktop ? 16 : 12,
           right: desktop ? PANEL_W + 32 : 12,
-          bottom: desktop ? 28 : hasSelection ? Math.round(vw.h * (sheetFull ? 0.88 : 0.5)) + 28 : 76,
+          bottom: desktop ? 28 : sheet === "peek" ? PEEK_H + 14 : Math.round(vw.h * 0.5) + 14,
+          // con la hoja completa los controles quedarían debajo de ella
+          visibility: !desktop && sheet === "full" ? "hidden" : undefined,
         }}
       >
         <div className="pointer-events-auto ml-auto">
@@ -311,6 +339,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
             }}
             satellite={satellite}
             onSatellite={() => setSatellite((s) => !s)}
+            hideZoom={!desktop}
           />
         </div>
       </div>
@@ -327,15 +356,18 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
           style={
             desktop
               ? { width: PANEL_W }
-              : { height: hasSelection ? (sheetFull ? "88dvh" : "50dvh") : 64, transition: "height .3s ease" }
+              : {
+                  height: sheet === "full" ? "88dvh" : sheet === "half" ? "50dvh" : `calc(${PEEK_H}px + env(safe-area-inset-bottom))`,
+                  transition: "height .3s ease",
+                }
           }
         >
-          {!desktop && hasSelection && (
+          {!desktop && (
             <button
-              aria-label={sheetFull ? "Reducir panel" : "Ampliar panel"}
-              aria-expanded={sheetFull}
-              className="flex h-6 w-full shrink-0 touch-none items-center justify-center"
-              onClick={() => setSheetFull((f) => !f)}
+              aria-label={sheet === "full" ? "Reducir panel" : "Ampliar panel"}
+              aria-expanded={sheet !== "peek"}
+              className="flex h-7 w-full shrink-0 touch-none items-center justify-center"
+              onClick={() => (sheet === "full" ? stepSheet(-1) : stepSheet(1))}
               onPointerDown={(e) => {
                 dragY.current = e.clientY;
               }}
@@ -344,8 +376,8 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
                 dragY.current = null;
                 if (start == null) return;
                 const dy = e.clientY - start;
-                if (dy < -30) setSheetFull(true);
-                else if (dy > 30) setSheetFull(false);
+                if (dy < -30) stepSheet(1);
+                else if (dy > 30) stepSheet(-1);
               }}
             >
               <span className="h-1 w-10 rounded-full bg-line" />
@@ -370,12 +402,10 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
                 <AbroadPanel ctx={ctx} />
               ) : view.place ? (
                 <TerritoryPanel ctx={ctx} />
-              ) : desktop ? (
+              ) : desktop || sheet !== "peek" ? (
                 <OverviewPanel ctx={ctx} />
               ) : (
-                <button className="flex h-16 w-full items-center justify-center gap-2 text-sm text-muted" onClick={() => setSearchOpen(true)}>
-                  <Search className="h-4 w-4" /> Toca el mapa o busca un lugar
-                </button>
+                <MobilePeek ctx={ctx} onOpen={() => setSheet("half")} />
               )}
             </motion.div>
           </AnimatePresence>

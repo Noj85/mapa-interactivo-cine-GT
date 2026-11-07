@@ -2,10 +2,11 @@
 
 import { categoriesText } from "@/lib/categories";
 import { posterThumb } from "@/lib/poster-url";
-import { ArrowLeft, Clapperboard, Download, Landmark, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Clapperboard, Download, Landmark, X } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { isAbroad } from "@/lib/completeness";
+import { createPortal } from "react-dom";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { isAbroad, isUnlocated } from "@/lib/completeness";
 import type { Aggregates } from "@/lib/aggregate";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { durationLabel, filmTypeLabel } from "@/lib/film-types";
@@ -22,6 +23,12 @@ export interface PanelCtx {
   view: ViewState;
   /** El usuario tiene sesión de equipo: muestra acciones de edición. */
   canEdit?: boolean;
+  /** Todas las producciones publicadas, sin filtrar (para los conteos y el aviso de las que no se muestran). */
+  allFilms: Film[];
+  /** Teléfono: hoja inferior con la lista compacta. */
+  mobile?: boolean;
+  /** Altura de la hoja inferior en el teléfono. */
+  sheet?: "peek" | "half" | "full";
   go: {
     place(p: Place | null): void;
     film(slug: string): void;
@@ -36,30 +43,122 @@ export interface PanelCtx {
   };
 }
 
-const LOCACION_OPTIONS: { id: "con" | "sin" | null; label: string }[] = [
-  { id: null, label: "Todas" },
-  { id: "con", label: "Con locación" },
-  { id: "sin", label: "Sin locación" },
-];
+type Locacion = "con" | "sin" | null;
 
-/** Selector de tres estados para ver solo las producciones con o sin locación registrada (afecta la lista y el mapa). */
-export function LocacionFilter({ value, onChange }: { value: "con" | "sin" | null; onChange(v: "con" | "sin" | null): void }) {
+const LOCACION_LABEL: Record<"con" | "sin" | "todas", string> = { con: "Con locación", sin: "Sin locación", todas: "Todas" };
+
+/**
+ * Chip compacto con menú para elegir qué producciones se ven: con locación (lo normal), sin locación o todas.
+ * Cada opción trae su conteo. Afecta a la lista y al mapa.
+ */
+export function LocacionChip({
+  value,
+  counts,
+  onChange,
+  options = ["con", "sin", "todas"],
+  className,
+}: {
+  value: Locacion;
+  counts: { con: number; sin: number; todas: number };
+  onChange(v: Locacion): void;
+  options?: ("con" | "sin" | "todas")[];
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const key = value ?? "todas";
+  const MENU_W = 232;
+
+  const toggle = () => {
+    if (open) return setOpen(false);
+    const r = btn.current?.getBoundingClientRect();
+    if (r) {
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - MENU_W - 8));
+      // el menú sale por fuera de la hoja (portal), hacia abajo o hacia arriba según haya espacio
+      setPos(r.bottom + options.length * 44 + 24 > window.innerHeight ? { left, bottom: window.innerHeight - r.top + 6 } : { left, top: r.bottom + 6 });
+    }
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!btn.current?.contains(t) && !menu.current?.contains(t)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setOpen(false);
+    };
+    const close = () => setOpen(false);
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", esc, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
+
   return (
-    <div role="radiogroup" aria-label="Filtrar producciones por locación" className="mb-2 grid grid-cols-3 gap-1 rounded-lg border border-line bg-surface-2 p-0.5 text-xs">
-      {LOCACION_OPTIONS.map((o) => (
-        <button
-          key={String(o.id)}
-          type="button"
-          role="radio"
-          aria-checked={value === o.id}
-          onClick={() => onChange(o.id)}
-          className={cn("rounded px-2 py-1.5 transition-colors", value === o.id ? "bg-surface font-medium text-ink shadow-sm" : "text-muted hover:text-ink")}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div className={cn("relative", className)}>
+      <button
+        ref={btn}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={toggle}
+        className={cn(
+          "flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors",
+          key === "con" ? "border-line bg-surface-2/60 text-ink hover:border-muted/60" : "border-accent/60 bg-accent/10 text-accent",
+        )}
+      >
+        {LOCACION_LABEL[key]}
+        <span className="tabular-nums text-muted">{counts[key]}</span>
+        <ChevronDown className={cn("h-3.5 w-3.5 text-muted transition-transform", open && "rotate-180")} aria-hidden />
+      </button>
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={menu}
+            role="menu"
+            aria-label="Qué producciones ver"
+            className="glass fixed z-[60] overflow-hidden rounded-xl border border-line p-1 shadow-float"
+            style={{ width: MENU_W, left: pos.left, top: pos.top, bottom: pos.bottom }}
+          >
+            {options.map((o) => (
+              <button
+                key={o}
+                type="button"
+                role="menuitemradio"
+                aria-checked={key === o}
+                onClick={() => {
+                  setOpen(false);
+                  onChange(o === "todas" ? null : o);
+                }}
+                className={cn("flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm transition-colors hover:bg-surface-2", key === o ? "text-ink" : "text-muted")}
+              >
+                <Check className={cn("h-4 w-4 shrink-0 text-accent", key === o ? "opacity-100" : "opacity-0")} aria-hidden />
+                <span className="flex-1">{LOCACION_LABEL[o]}</span>
+                <span className="text-xs tabular-nums text-muted">{counts[o]}</span>
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
+}
+
+/** Conteos para el chip de locación, sobre todas las producciones publicadas (sin filtrar). */
+export function locacionCounts(films: Pick<Film, "locations">[]) {
+  const sin = films.filter(isUnlocated).length;
+  return { con: films.length - sin, sin, todas: films.length };
 }
 
 export function PanelShell({
@@ -188,12 +287,15 @@ export function FilmCard({
   hereMuni,
   hereDepto,
   onClick,
+  hideBadge,
 }: {
   film: Film;
   gaz: Gazetteer;
   hereMuni?: number;
   hereDepto?: number;
   onClick: () => void;
+  /** Teléfono: sin la insignia de completitud, para no recargar la lista. */
+  hideBadge?: boolean;
 }) {
   const kind = filmTypeLabel(film);
   const here = film.locations.filter((l) =>
@@ -207,7 +309,7 @@ export function FilmCard({
   return (
     <button
       onClick={onClick}
-      className="group flex w-full items-start gap-3 rounded-2xl border border-transparent px-3 py-2.5 text-left transition hover:border-line hover:bg-surface-2/70"
+      className="group flex min-h-[48px] w-full items-start gap-3 rounded-2xl border border-transparent px-3 py-2.5 text-left transition hover:border-line hover:bg-surface-2/70"
     >
       {film.poster_url ? (
         <span className="mt-0.5 block h-14 w-10 shrink-0 overflow-hidden rounded-md bg-surface-2 ring-1 ring-line">
@@ -233,7 +335,7 @@ export function FilmCard({
             <span key={g} className="chip !py-0 text-[11px]">{g}</span>
           ))}
           {film.genres.length > 2 && <span className="text-[11px] text-muted">+{film.genres.length - 2}</span>}
-          <CompletenessBadge pct={film.completeness} missing={film.missing_fields} compact />
+          {!hideBadge && <CompletenessBadge pct={film.completeness} missing={film.missing_fields} compact />}
         </span>
       </span>
     </button>
@@ -268,12 +370,12 @@ export function OrgLogo({ org, className, full }: { org: Pick<Org, "name" | "log
   );
 }
 
-export function OrgCard({ org, gaz, onClick }: { org: Org; gaz: Gazetteer; onClick: () => void }) {
+export function OrgCard({ org, gaz, onClick, hideBadge }: { org: Org; gaz: Gazetteer; onClick: () => void; hideBadge?: boolean }) {
   const place = gaz.muni(org.muni_ine)?.name ?? gaz.depto(org.depto_ine)?.name ?? org.city;
   return (
     <button
       onClick={onClick}
-      className="group flex w-full items-start gap-3 rounded-2xl border border-transparent px-3 py-2.5 text-left transition hover:border-line hover:bg-surface-2/70"
+      className="group flex min-h-[48px] w-full items-start gap-3 rounded-2xl border border-transparent px-3 py-2.5 text-left transition hover:border-line hover:bg-surface-2/70"
     >
       <OrgLogo org={org} className="mt-0.5 h-9 w-9 rounded-xl" />
       <span className="min-w-0 flex-1">
@@ -283,7 +385,7 @@ export function OrgCard({ org, gaz, onClick }: { org: Org; gaz: Gazetteer; onCli
           {place ? ` — ${place}` : ""}
         </span>
         <span className="mt-1 flex flex-wrap items-center gap-1.5">
-          <CompletenessBadge pct={org.completeness} missing={org.missing_fields} compact />
+          {!hideBadge && <CompletenessBadge pct={org.completeness} missing={org.missing_fields} compact />}
         </span>
       </span>
     </button>

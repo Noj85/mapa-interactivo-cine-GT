@@ -6,7 +6,7 @@ import { metricText } from "@/lib/format";
 import { LAYERS, type LayerId } from "@/lib/types";
 import { fmtInt, fmtMoney } from "@/lib/utils";
 import { downloadHref } from "@/lib/view";
-import { BarRow, DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid, LocacionFilter } from "./parts";
+import { BarRow, DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid } from "./parts";
 
 const ZERO: Agg = { films: 0, days: 0, spend: 0, jobs: 0, orgs: 0 };
 
@@ -53,7 +53,7 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
 
   return (
     <PanelShell eyebrow={eyebrow} onBack={go.up} onClose={go.clear}>
-      <h2 className="font-display text-[34px] leading-[1.05] tracking-tight text-ink">{entry?.name}</h2>
+      <h2 className={ctx.mobile ? "font-display text-[26px] leading-tight tracking-tight text-ink" : "font-display text-[34px] leading-[1.05] tracking-tight text-ink"}>{entry?.name}</h2>
 
       {view.layer === "produccion" ? (
         <StatsGrid
@@ -104,7 +104,6 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
       <SectionTitle aside={view.layer === "produccion" ? films.length : orgs.length}>
         {view.layer === "produccion" ? "Producciones rodadas aquí" : "Registros aquí"}
       </SectionTitle>
-      {view.layer === "produccion" && <LocacionFilter value={view.filmFilter.locacion} onChange={go.locacion} />}
       <div className="-mx-2 space-y-0.5">
         {view.layer === "produccion" ? (
           films.length ? (
@@ -115,6 +114,7 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
                 gaz={gaz}
                 hereMuni={place.type === "muni" ? place.code : undefined}
                 hereDepto={place.type === "depto" ? place.code : undefined}
+                hideBadge={!!ctx.mobile && !ctx.canEdit}
                 onClick={() => go.film(f.slug)}
               />
             ))
@@ -122,7 +122,7 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
             <Empty>Todavía no hay producciones registradas en {entry?.name}.</Empty>
           )
         ) : orgs.length ? (
-          orgs.map((o) => <OrgCard key={o.id} org={o} gaz={gaz} onClick={() => go.org(o.slug)} />)
+          orgs.map((o) => <OrgCard key={o.id} org={o} gaz={gaz} hideBadge={!!ctx.mobile && !ctx.canEdit} onClick={() => go.org(o.slug)} />)
         ) : (
           <Empty>Sin registros en esta capa para {entry?.name}.</Empty>
         )}

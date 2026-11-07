@@ -183,13 +183,17 @@ export function buildMask(pais: GeometryCollection): FeatureCollection<Polygon> 
 // ───────────────────────── producciones sin lugar de rodaje y rodadas fuera de Guatemala ─────────────────────────
 
 /**
- * Las producciones sin locación no se esconden: se agrupan en una zona marcada en el Pacífico,
+ * Las producciones sin locación no se esconden: se agrupan en un marcador en el Pacífico, frente a la costa,
  * fuera del territorio, para que se vea que existen pero que todavía no tienen lugar.
+ * `radius` es el área que se puede tocar; el marcador es un ícono (ver `zone-icons.ts`).
  */
-export const NOWHERE = { lng: -93.6, lat: 12.7, radius: 0.72 };
+export const NOWHERE = { lng: -92.05, lat: 13.98, radius: 0.18 };
 
-/** Las producciones con locaciones en otro país tienen su propia zona, debajo de «Sin locación». */
-export const ABROAD = { lng: -93.6, lat: 10.75, radius: 0.72 };
+/** Las producciones con locaciones en otro país tienen su propio marcador, más al este sobre la misma costa. */
+export const ABROAD = { lng: -90.95, lat: 13.55, radius: 0.18 };
+
+/** Espacio bajo el marcador para su nombre y su conteo (grados). */
+const ZONE_LABEL_ROOM = 0.42;
 
 /** Sin ninguna locación que diga dónde se rodó (ni en Guatemala ni afuera). */
 export { isUnlocated };
@@ -204,7 +208,7 @@ type Bbox = [number, number, number, number];
 
 const zoneBbox = (z: Zone): Bbox => [
   z.lng - z.radius / Math.cos((z.lat * Math.PI) / 180),
-  z.lat - z.radius,
+  z.lat - z.radius - ZONE_LABEL_ROOM,
   z.lng + z.radius / Math.cos((z.lat * Math.PI) / 180),
   z.lat + z.radius,
 ];

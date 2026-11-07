@@ -37,13 +37,16 @@ export interface ViewState {
   abroad: boolean;
 }
 
+/** El mapa muestra por defecto solo las producciones con locación; «sin» y «todas» se piden con un chip. */
+export const DEFAULT_FILM_FILTER: FilmFilter = { ...EMPTY_FILM_FILTER, locacion: "con" };
+
 export const DEFAULT_VIEW: ViewState = {
   layer: "produccion",
   metric: "films",
   place: null,
   film: null,
   org: null,
-  filmFilter: EMPTY_FILM_FILTER,
+  filmFilter: DEFAULT_FILM_FILTER,
   orgFilter: EMPTY_ORG_FILTER,
   noloc: false,
   abroad: false,
@@ -62,10 +65,13 @@ export function parseView(search: string): ViewState {
     place = { type: lugar[0] === "d" ? "depto" : "muni", code: Number(lugar.slice(1)) };
   }
   // Los filtros usan los mismos parámetros que /descargas; el lugar y la capa los fijan `lugar` y `capa`.
-  let filmFilter = EMPTY_FILM_FILTER;
+  // locación: sin parámetro es «con» (lo que sale por defecto); `sin` y `todas` se piden; ?sinlugar=1 (enlaces anteriores) abre «sin»
+  const locParam = p.get("locacion");
+  const locacion: FilmFilter["locacion"] = locParam === "sin" ? "sin" : locParam === "todas" ? null : locParam === "con" ? "con" : p.get("sinlugar") === "1" ? "sin" : "con";
+  let filmFilter: FilmFilter = { ...EMPTY_FILM_FILTER, locacion };
   let orgFilter = EMPTY_ORG_FILTER;
   if (layer === "produccion") {
-    filmFilter = { ...parseFilmFilter(p), depto: [], muni: [] };
+    filmFilter = { ...parseFilmFilter(p), depto: [], muni: [], locacion };
     // enlaces anteriores: ?categoria=ficcion era el tipo de obra
     const old = legacyClase([p.get("categoria") ?? ""]);
     if (!filmFilter.formato.length && !filmFilter.naturaleza.length) filmFilter = { ...filmFilter, formato: old.formato, naturaleza: old.naturaleza };
@@ -86,6 +92,10 @@ export function serializeView(v: ViewState): string {
   if (v.metric !== LAYER_METRICS[v.layer][0]) p.set("metrica", v.metric);
   if (v.layer === "produccion") filmFilterToParams({ ...v.filmFilter, depto: [], muni: [] }, p);
   else orgFilterToParams({ ...v.orgFilter, capa: null, depto: [] }, p);
+  // «con» es lo normal y no se escribe; así el enlace de la capa de entidades también recuerda la elección
+  p.delete("locacion");
+  if (v.filmFilter.locacion === "sin") p.set("locacion", "sin");
+  else if (v.filmFilter.locacion === null) p.set("locacion", "todas");
   if (v.noloc) p.set("sinlugar", "1");
   if (v.abroad) p.set("fuera", "1");
   const s = p.toString();
@@ -115,8 +125,9 @@ export function deptoOf(place: Place | null | undefined): number | null {
 /** Cuántos filtros de la capa activa están en uso (para el botón «Filtros»). */
 export function activeFilterCount(v: Pick<ViewState, "layer" | "filmFilter" | "orgFilter">): number {
   const params = v.layer === "produccion" ? filmFilterToParams({ ...v.filmFilter, depto: [], muni: [] }) : orgFilterToParams({ ...v.orgFilter, capa: null, depto: [] });
-  // moneda es un ajuste del presupuesto, no un filtro aparte
+  // moneda es un ajuste del presupuesto, no un filtro aparte; la locación tiene su propio chip en el panel
   params.delete("moneda");
+  params.delete("locacion");
   // presupuesto, año y demás rangos cuentan como un solo filtro cada uno
   const groups = new Set<string>();
   for (const k of params.keys()) groups.add(k.replace(/_(min|max)$/, "").replace(/^(desde|hasta)$/, "anio"));

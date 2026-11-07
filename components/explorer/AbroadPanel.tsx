@@ -45,8 +45,8 @@ export default function AbroadPanel({ ctx }: { ctx: PanelCtx }) {
         <h2 className="font-display text-[30px] leading-[1.05] tracking-tight text-ink">Rodadas fuera de Guatemala</h2>
       </div>
       <p className="mt-3 text-sm leading-relaxed text-muted">
-        {films.length === 1 ? "Esta producción guatemalteca se rodó" : `Estas ${films.length.toLocaleString("es-GT")} producciones guatemaltecas se rodaron`} total o parcialmente en otros países. Se muestran en la zona
-        punteada del Pacífico porque no tienen un lugar dentro del territorio.
+        {films.length === 1 ? "Esta producción guatemalteca se rodó" : `Estas ${films.length.toLocaleString("es-GT")} producciones guatemaltecas se rodaron`} total o parcialmente en otros países. Se muestran en el marcador
+        «Fuera de Guatemala», en el Pacífico frente a la costa.
       </p>
 
       {films.length > 8 && (

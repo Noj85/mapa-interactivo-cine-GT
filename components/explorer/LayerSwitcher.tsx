@@ -25,7 +25,7 @@ export function LayerSwitcher({ layer, onChange }: { layer: LayerId; onChange(l:
             onClick={() => onChange(l.id)}
             title={l.blurb}
             className={cn(
-              "relative flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2 py-2 text-xs font-medium transition-colors sm:flex-none sm:gap-2 sm:px-4 sm:text-sm",
+              "relative flex min-h-[36px] flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2 py-2 text-xs font-medium transition-colors sm:flex-none sm:gap-2 sm:px-4 sm:text-sm",
               active ? "text-accent-ink" : "text-muted hover:text-ink",
             )}
           >

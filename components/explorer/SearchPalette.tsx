@@ -12,6 +12,8 @@ import type { Dataset } from "@/lib/types";
 import type { Place } from "@/lib/view";
 import { cn, normalize } from "@/lib/utils";
 
+const SUGGESTIONS = ["Panajachel", "Antigua Guatemala", "Tikal", "Quetzaltenango"];
+
 type Result =
   | { kind: "place"; id: string; label: string; sub: string; place: Place }
   | { kind: "film"; id: string; label: string; sub: string; slug: string; poster: string | null }
@@ -119,7 +121,7 @@ export function SearchPalette({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-[14vh] backdrop-blur-[2px]"
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-[2px] sm:px-4 sm:pt-[14vh]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -128,14 +130,14 @@ export function SearchPalette({
           <motion.div
             role="dialog"
             aria-label="Buscar"
-            className="w-full max-w-xl overflow-hidden rounded-xl border border-line bg-surface shadow-float"
+            className="flex h-[100dvh] w-full flex-col overflow-hidden bg-surface shadow-float sm:h-auto sm:max-w-xl sm:rounded-xl sm:border sm:border-line"
             initial={{ y: -12, scale: 0.98, opacity: 0 }}
             animate={{ y: 0, scale: 1, opacity: 1 }}
             exit={{ y: -8, opacity: 0 }}
             transition={{ duration: 0.18 }}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-3 border-b border-line px-5">
+            <div className="flex items-center gap-3 border-b border-line px-4 pt-[env(safe-area-inset-top)] sm:px-5 sm:pt-0">
               <Search className="h-4 w-4 text-muted" />
               <input
                 ref={input}
@@ -145,16 +147,29 @@ export function SearchPalette({
                   setIdx(0);
                 }}
                 onKeyDown={onKey}
-                placeholder="Busca un municipio, producción o entidad…"
+                placeholder="Busca un lugar, producción o entidad…"
+                enterKeyHint="search"
+                autoComplete="off"
+                autoCorrect="off"
                 className="h-14 w-full bg-transparent text-base text-ink placeholder:text-muted/70 focus:outline-none"
               />
-              <span className="kbd">esc</span>
+              <span className="kbd hidden sm:inline">esc</span>
+              <button type="button" className="shrink-0 py-3 text-sm font-medium text-accent sm:hidden" onClick={onClose}>
+                Cancelar
+              </button>
             </div>
-            <div className="max-h-[50vh] overflow-y-auto p-2">
+            <div className="min-h-0 flex-1 overflow-y-auto p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:max-h-[50vh] sm:flex-none">
               {!q && (
-                <p className="px-3 py-6 text-center text-sm text-muted">
-                  Prueba con “Panajachel”, “Xela”, “Tikal” o el título de una producción.
-                </p>
+                <div className="px-3 py-5 text-center">
+                  <p className="text-sm text-muted">Busca un lugar, el título de una producción o una entidad.</p>
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
+                    {SUGGESTIONS.map((x) => (
+                      <button key={x} type="button" className="chip min-h-[36px] px-3 text-sm transition hover:border-accent hover:text-ink" onClick={() => setQ(x)}>
+                        {x}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
               {q && results.length === 0 && (
                 <p className="px-3 py-6 text-center text-sm text-muted">Sin resultados para “{q}”.</p>
@@ -166,7 +181,7 @@ export function SearchPalette({
                     onMouseEnter={() => setIdx(i)}
                     onClick={() => pick(r)}
                     className={cn(
-                      "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors",
+                      "flex min-h-[52px] w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors",
                       i === idx ? "bg-surface-2" : "",
                     )}
                   >

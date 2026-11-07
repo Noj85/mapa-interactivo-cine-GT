@@ -9,18 +9,21 @@ export function MapControls({
   onReset,
   satellite,
   onSatellite,
+  hideZoom,
 }: {
   onZoomIn(): void;
   onZoomOut(): void;
   onReset(): void;
   satellite: boolean;
   onSatellite(): void;
+  /** Teléfono: se acerca y aleja con los dedos, así que sobran los botones +/−. */
+  hideZoom?: boolean;
 }) {
   const btn =
     "flex h-10 w-10 items-center justify-center text-ink/80 transition-colors hover:bg-surface-2 hover:text-ink";
   return (
     <div className="flex flex-col gap-2">
-      <div className="glass flex flex-col divide-y divide-line overflow-hidden rounded-2xl border border-line shadow-soft">
+      <div className={cn("glass flex-col divide-y divide-line overflow-hidden rounded-2xl border border-line shadow-soft", hideZoom ? "hidden" : "flex")}>
         <button className={btn} onClick={onZoomIn} aria-label="Acercar">
           <Plus className="h-4 w-4" />
         </button>

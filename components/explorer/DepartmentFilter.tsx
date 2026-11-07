@@ -12,11 +12,14 @@ export function DepartmentFilter({
   place,
   onPlace,
   onClear,
+  compact,
 }: {
   gaz: Gazetteer;
   place: Place | null;
   onPlace(p: Place): void;
   onClear(): void;
+  /** Teléfono: solo el ícono del lugar (el nombre aparece en la ruta de arriba del panel); el selector nativo queda encima. */
+  compact?: boolean;
 }) {
   const deptos = useMemo(
     () =>
@@ -28,6 +31,33 @@ export function DepartmentFilter({
   );
   const current = deptoOf(place);
   const active = current != null;
+
+  if (compact)
+    return (
+      <label
+        className={cn(
+          "pointer-events-auto glass relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-soft transition-colors",
+          active ? "border-accent/60 text-accent" : "border-line text-muted",
+        )}
+      >
+        <span className="sr-only">Filtrar el mapa por departamento</span>
+        <MapPin className="h-5 w-5" aria-hidden />
+        {active && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent" aria-hidden />}
+        <select
+          value={current ?? ""}
+          onChange={(e) => (e.target.value === "" ? onClear() : onPlace({ type: "depto", code: Number(e.target.value) }))}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          aria-label="Filtrar el mapa por departamento"
+        >
+          <option value="">Todo el país</option>
+          {deptos.map((d) => (
+            <option key={d.code} value={d.code}>
+              {d.name}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
 
   return (
     <div

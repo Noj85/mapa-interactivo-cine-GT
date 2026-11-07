@@ -9,7 +9,8 @@ import { deletePublicImages } from "@/lib/posters";
 import { filmSchema, orgSchema } from "@/lib/schemas";
 import { isAbroad } from "@/lib/completeness";
 import { applyFilmFields, applyOrgFields, createFilmFromImport, createOrgFromImport, planFilmUpdate, planOrgUpdate } from "@/lib/import/apply-server";
-import type { FilmInput, OrgInput, QuestionStatus, RecordStatus } from "@/lib/types";
+import { applyCorrection, planCorrection } from "@/lib/submissions-plan";
+import type { Film, FilmInput, Org, OrgInput, QuestionStatus, RecordStatus } from "@/lib/types";
 
 type Result = { ok: true; id: string } | { ok: false; error: string };
 
@@ -193,7 +194,7 @@ const SOURCE_PUBLIC = "Aporte del público";
  */
 export async function approveSubmissionAction(
   id: string,
-  opts: { publish: boolean; note?: string | null },
+  opts: { publish: boolean; note?: string | null; accepted?: string[] },
 ): Promise<{ ok: true; kind: "film" | "org"; recordId: string } | { ok: false; error: string }> {
   await requireSession();
   try {
@@ -204,6 +205,58 @@ export async function approveSubmissionAction(
     if (sub.origin === "carga") return { ok: false, error: "Este aporte viene de una carga de archivo: se revisa campo por campo." };
     const newStatus: RecordStatus = opts.publish ? "published" : "draft";
     let recordId: string;
+    let reviewNote = opts.note ?? null;
+
+    // Aceptación parcial (solo correcciones): se aplica lo marcado sobre el registro de hoy. Sin `accepted`, se aprueba todo como siempre.
+    if (opts.accepted) {
+      if (!sub.target_id) return { ok: false, error: "Solo las correcciones a un registro existente se pueden aceptar en parte." };
+      const gaz = await serverGazetteer();
+      const current = sub.kind === "film" ? await store.getFilm(sub.target_id) : await store.getOrg(sub.target_id);
+      if (!current) return { ok: false, error: "El registro a corregir ya no existe" };
+      const res = applyCorrection(sub, current, gaz, opts.accepted);
+      if (!res) return { ok: false, error: "Los datos del aporte no son válidos" };
+      if (!res.applied.length) return { ok: false, error: "No marcaste nada para aplicar. Si no hay nada que aceptar, rechaza el aporte." };
+      const status = opts.publish ? "published" : current.status;
+      const payload = sub.payload as { poster_url?: string | null; logo_url?: string | null };
+      const proposedImage = (sub.kind === "film" ? payload.poster_url : payload.logo_url) || null;
+      const currentImage = (sub.kind === "film" ? (current as Film).poster_url : (current as Org).logo_url) ?? null;
+      const dropped: (string | null)[] = [];
+      if (sub.kind === "film") {
+        const input = res.input as FilmInput;
+        input.festivals = await linkFestivals(store, input.festivals);
+        const film = await store.saveFilm({ ...input, id: current.id, status, source: undefined });
+        recordId = film.id;
+        if (currentImage && film.poster_url !== currentImage) dropped.push(currentImage);
+      } else {
+        const input = res.input as OrgInput;
+        const org = await store.saveOrg({ ...input, id: current.id, status, source: (current as Org).source });
+        await syncOrgFestivalSafe(store, org);
+        recordId = org.id;
+        if (currentImage && org.logo_url !== currentImage) dropped.push(currentImage);
+      }
+      // la imagen que se propuso y no se aceptó ya no sirve
+      const usedImage = res.applied.some((i) => i.id === "field:poster" || i.id === "field:logo");
+      if (proposedImage && proposedImage !== currentImage && !usedImage) dropped.push(proposedImage);
+      const dropFiles = dropped.filter((u): u is string => !!u);
+      if (dropFiles.length) await deletePublicImages(dropFiles);
+
+      // la nota deja constancia de qué se aplicó y qué no
+      const names = (items: { label: string }[]) => {
+        const n = new Map<string, number>();
+        for (const i of items) n.set(i.label, (n.get(i.label) ?? 0) + 1);
+        return [...n].map(([k, c]) => (c > 1 ? `${k} (${c})` : k)).join(", ");
+      };
+      const plan = planCorrection(sub, current, gaz).items;
+      const appliedIds = new Set(res.applied.map((i) => i.id));
+      const left = plan.filter((i) => !appliedIds.has(i.id));
+      const summary = `Aceptado en parte. Aplicado: ${names(res.applied)}.${left.length ? ` No aplicado: ${names(left)}.` : ""}`;
+      reviewNote = [reviewNote, summary].filter(Boolean).join("\n");
+
+      await store.reviewSubmission(id, { status: "approved", reviewer_note: reviewNote, result_id: recordId });
+      refresh();
+      revalidatePath("/admin/aportes");
+      return { ok: true, kind: sub.kind, recordId };
+    }
 
     if (sub.kind === "film") {
       const parsed = filmSchema.safeParse(sub.payload);
@@ -239,7 +292,7 @@ export async function approveSubmissionAction(
       recordId = org.id;
     }
 
-    await store.reviewSubmission(id, { status: "approved", reviewer_note: opts.note ?? null, result_id: recordId });
+    await store.reviewSubmission(id, { status: "approved", reviewer_note: reviewNote, result_id: recordId });
     refresh();
     revalidatePath("/admin/aportes");
     return { ok: true, kind: sub.kind, recordId };

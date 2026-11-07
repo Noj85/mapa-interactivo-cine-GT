@@ -9,8 +9,8 @@ import { aggregate, type Stop } from "@/lib/aggregate";
 import { metricText } from "@/lib/format";
 import type { GeoBundle } from "@/lib/geo/load";
 import { INCOMPLETE_COLOR, LAYER_COLORS, MAP_BG, ramp, readableOn, type Theme } from "@/lib/map/colors";
-import { abroadFilms, ABROAD, ABROAD_BBOX, buildAbroad, buildFilmRoute, buildLabels, buildMask, buildNowhere, buildPins, hasAbroad, levels, locationPoint, NOWHERE, NOWHERE_BBOX, isUnlocated, unlocatedFilms, withZones } from "@/lib/map/features";
-import { isAbroad } from "@/lib/completeness";
+import { abroadFilms, ABROAD_BBOX, buildAbroad, buildFilmRoute, buildLabels, buildMask, buildNowhere, buildPins, hasAbroad, levels, locationPoint, NOWHERE_BBOX, isUnlocated, unlocatedFilms, withZones } from "@/lib/map/features";
+import { loadZoneIcons } from "@/lib/map/zone-icons";
 import { buildStyle, firstSymbolId } from "@/lib/map/style";
 import type { Dataset } from "@/lib/types";
 import { deptoOf, type Place, type ViewState } from "@/lib/view";
@@ -228,21 +228,16 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       paint: { "fill-color": bg, "fill-opacity": dark ? 0.78 : 0.7 },
     });
 
-    // producciones sin lugar de rodaje: zona punteada fuera del territorio
+    // producciones sin lugar de rodaje y rodadas fuera: marcadores en el mar; el círculo es solo el área táctil (y un halo al elegirlo)
     const neutral = dark ? "#9aa7bd" : "#5b6b85";
+    const prodAccent = LAYER_COLORS.produccion[theme];
+    loadZoneIcons(map, { fg: neutral, sel: prodAccent, bg });
     add({
       id: "nowhere-fill",
       type: "fill",
       source: "nowhere",
       filter: ["==", ["get", "kind"], "zone"],
-      paint: { "fill-color": neutral, "fill-opacity": ["case", ["==", ["get", "sel"], true], 0.26, 0.12] },
-    });
-    add({
-      id: "nowhere-line",
-      type: "line",
-      source: "nowhere",
-      filter: ["==", ["get", "kind"], "zone"],
-      paint: { "line-color": neutral, "line-width": ["case", ["==", ["get", "sel"], true], 2.4, 1.6], "line-dasharray": [2, 2.2] },
+      paint: { "fill-color": prodAccent, "fill-opacity": ["case", ["==", ["get", "sel"], true], 0.16, 0] },
     });
 
     // líneas
@@ -420,9 +415,15 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       source: "nowhere",
       filter: ["==", ["get", "kind"], "label"],
       layout: {
-        "text-field": ["format", ["get", "title"], { "font-scale": 1 }, "\n", {}, ["get", "text"], { "font-scale": 0.8, "text-font": ["literal", fonts.reg] }],
+        "icon-image": ["concat", "zone-", ["get", "zone"], ["case", ["==", ["get", "sel"], true], "-sel", ""]],
+        "icon-size": ["interpolate", ["linear"], ["zoom"], 5, 0.7, 8, 1],
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true,
+        "text-field": ["format", ["get", "title"], { "font-scale": 1 }, "\n", {}, ["get", "text"], { "font-scale": 0.82, "text-font": ["literal", fonts.reg] }],
         "text-font": fonts.bold,
-        "text-size": ["interpolate", ["linear"], ["zoom"], 5, 11, 8, 15],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 5, 10, 8, 13],
+        "text-anchor": "top",
+        "text-offset": [0, 1.9],
         "text-max-width": 9,
         "text-allow-overlap": true,
         "text-ignore-placement": true,
@@ -595,26 +596,9 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       const film = data.films.find((f) => f.slug === view.film);
       if (film) {
         const route = buildFilmRoute(film, geo.gaz);
-        // las locaciones de otro país son un punto dentro de la zona «Fuera de Guatemala»
-        const abroadPts = film.locations
-          .filter(isAbroad)
-          .map((l) => ({
-            type: "Feature",
-            properties: { n: "", site: [l.city, l.country].filter(Boolean).join(", "), approx: true },
-            geometry: { type: "Point", coordinates: [ABROAD.lng, ABROAD.lat - 0.46] },
-          }))
-          .slice(0, 1);
-        if (!route.coords.length && !abroadPts.length) {
-          // sin lugar de rodaje: la producción queda dentro de la zona «Sin locación»
-          filmSrc.setData({
-            type: "FeatureCollection",
-            features: [{ type: "Feature", properties: { n: "", site: "Sin locación", approx: true }, geometry: { type: "Point", coordinates: [NOWHERE.lng, NOWHERE.lat - 0.46] } }],
-          } as any);
-          lineSrc.setData(empty);
-        } else {
-          filmSrc.setData({ type: "FeatureCollection", features: [...route.points.features, ...abroadPts] } as any);
-          lineSrc.setData(route.lines as any);
-        }
+        // sin lugar de rodaje o rodada fuera: lo marca el ícono de su zona, que se resalta al elegirla
+        filmSrc.setData({ type: "FeatureCollection", features: route.points.features } as any);
+        lineSrc.setData(route.coords.length ? (route.lines as any) : empty);
         for (const l of film.locations) {
           if (l.muni_ine != null) prevHot.current.push({ source: "muni", id: l.muni_ine });
           else if (l.depto_ine != null) prevHot.current.push({ source: "depto", id: l.depto_ine });
@@ -778,7 +762,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
           layers: live(["pin-point", "pin-cluster", "film-dot"]),
         })[0];
         if (pinHit) return { kind: "pin" as const, f: pinHit };
-        const zoneHit = map!.queryRenderedFeatures(point, { layers: live(["nowhere-fill"]) })[0];
+        const zoneHit = map!.queryRenderedFeatures(point, { layers: live(["nowhere-label", "nowhere-fill"]) })[0];
         if (zoneHit) return { kind: "nowhere" as const, f: zoneHit };
         const muniZoom = map!.getZoom() >= Z_MUNI;
         const t = map!.queryRenderedFeatures(point, { layers: live([muniZoom ? "muni-fill" : "depto-fill"]) })[0];
@@ -940,7 +924,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
         const abroadToo = hasAbroad(film);
         if (!route.coords.length) {
           const z = abroadToo ? ABROAD_BBOX : NOWHERE_BBOX;
-          map.fitBounds([[z[0], z[1]], [z[2], z[3]]], { padding: pad, maxZoom: 8, duration: 1000 });
+          map.fitBounds([[z[0], z[1]], [z[2], z[3]]], { padding: pad, maxZoom: 7, duration: 1000 });
           return;
         }
         if (abroadToo) {
@@ -960,9 +944,9 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
         route.coords.forEach((c) => b.extend(c));
         map.fitBounds(b, { padding: pad, maxZoom: 11, duration: 1100 });
       } else if (view.noloc) {
-        map.fitBounds([[NOWHERE_BBOX[0], NOWHERE_BBOX[1]], [NOWHERE_BBOX[2], NOWHERE_BBOX[3]]], { padding: pad, maxZoom: 8, duration: 1000 });
+        map.fitBounds([[NOWHERE_BBOX[0], NOWHERE_BBOX[1]], [NOWHERE_BBOX[2], NOWHERE_BBOX[3]]], { padding: pad, maxZoom: 7, duration: 1000 });
       } else if (view.abroad) {
-        map.fitBounds([[ABROAD_BBOX[0], ABROAD_BBOX[1]], [ABROAD_BBOX[2], ABROAD_BBOX[3]]], { padding: pad, maxZoom: 8, duration: 1000 });
+        map.fitBounds([[ABROAD_BBOX[0], ABROAD_BBOX[1]], [ABROAD_BBOX[2], ABROAD_BBOX[3]]], { padding: pad, maxZoom: 7, duration: 1000 });
       } else if (view.org) {
         const org = data.orgs.find((o) => o.slug === view.org);
         const p = org && locationPoint(org, geo.gaz);

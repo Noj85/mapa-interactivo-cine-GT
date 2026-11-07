@@ -19,7 +19,7 @@ const dash = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null)
 
 type Loc = Partial<{ muni_ine: number | null; depto_ine: number | null; country: string | null; city: string | null; site: string | null; days: number | null; local_spend: number | null; jobs: number | null }>;
 
-function locText(l: Loc, gaz: Gazetteer) {
+export function locText(l: Loc, gaz: Gazetteer) {
   const muni = gaz.muni(l.muni_ine ?? null);
   const depto = gaz.depto(l.depto_ine ?? muni?.depto_ine ?? null);
   const abroad = isAbroad(l);

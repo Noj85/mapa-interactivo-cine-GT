@@ -4,16 +4,16 @@ import { useMemo, useState } from "react";
 import { metricText, metricValueText } from "@/lib/format";
 import { metricValue } from "@/lib/aggregate";
 import { LAYERS, METRICS } from "@/lib/types";
-import { fmtInt, fmtMoney } from "@/lib/utils";
+import { cn, fmtInt, fmtMoney } from "@/lib/utils";
 import Link from "next/link";
 import { downloadHref } from "@/lib/view";
 import { BrandFooter } from "@/components/site/Brand";
 import { hasAnchor, isAbroad } from "@/lib/completeness";
 import type { StatKey } from "@/lib/site-settings";
 import type { Film } from "@/lib/types";
-import { Globe2, MapPinOff } from "lucide-react";
+import { ChevronDown, Globe2, MapPinOff } from "lucide-react";
 import { abroadFilms, unlocatedFilms } from "@/lib/map/features";
-import { BarRow, DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid, LocacionFilter } from "./parts";
+import { BarRow, DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid, LocacionChip, locacionCounts } from "./parts";
 
 export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
   const { data, gaz, aggs, view, go } = ctx;
@@ -43,7 +43,8 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
       : orgs.filter((o) => o.completeness < 100).length;
   const totalRecords = view.layer === "produccion" ? films.length : orgs.length;
 
-  const unlocated = useMemo(() => unlocatedFilms(data.films).length, [data.films]);
+  // sobre todas: con «Con locación» las que no tienen lugar no están en `data`, pero el aviso dice cuántas faltan
+  const unlocated = useMemo(() => unlocatedFilms(ctx.allFilms).length, [ctx.allFilms]);
   const abroad = useMemo(() => abroadFilms(data.films).length, [data.films]);
   const t = aggs.total;
   // solo para el equipo: en cuántas producciones hay dato de cada cifra
@@ -52,19 +53,28 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
     return `dato en ${data.films.filter(has).length} de ${data.films.length}`;
   };
   const list = view.layer === "produccion" ? films : orgs;
-  const shown = showAll ? list : list.slice(0, 6);
+  const mobile = !!ctx.mobile;
+  const full = ctx.sheet === "full";
+  const previewN = mobile ? 8 : 6;
+  const shown = showAll ? list : list.slice(0, previewN);
+  const [showDeptos, setShowDeptos] = useState(false);
 
-  return (
-    <PanelShell eyebrow={layer.blurb}>
-      <h2 className="font-display text-[30px] leading-[1.05] tracking-tight text-ink">
+  const counts = useMemo(() => locacionCounts(ctx.allFilms), [ctx.allFilms]);
+  const loc = view.filmFilter.locacion;
+
+  const heading = (
+    <>
+      <h2 className={cn("font-display tracking-tight text-ink", mobile ? "text-[22px] leading-tight" : "text-[30px] leading-[1.05]")}>
         {view.layer === "produccion" && "Dónde se ha filmado en Guatemala"}
         {view.layer === "circulacion" && "Dónde se ve cine en Guatemala"}
         {view.layer === "industria" && "Quién hace cine en Guatemala"}
       </h2>
-      <p className="mt-2 text-sm leading-relaxed text-muted">
-        Toca un departamento o municipio, o busca con <span className="kbd">⌘ K</span>. Acércate al mapa para ver cada
-        locación.
-      </p>
+      {!mobile && (
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          Toca un departamento o municipio, o busca con <span className="kbd">⌘ K</span>. Acércate al mapa para ver cada
+          locación.
+        </p>
+      )}
       {data.films.length + data.orgs.length === 0 && (
         <div className="mt-4 rounded-xl border border-dashed border-line px-3.5 py-3 text-sm text-muted">
           <p className="font-medium text-ink">Todavía no hay información publicada.</p>
@@ -77,57 +87,67 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
           )}
         </div>
       )}
+    </>
+  );
 
-      {view.layer === "produccion" ? (
-        <StatsGrid
-          className="mt-5"
-          stats={data.publicStats}
-          canEdit={ctx.canEdit}
-          items={[
-            { key: "films", label: "Producciones con locación", value: fmtInt(t.films), coverage: cover("films") },
-            { key: "days", label: "Días de rodaje", value: fmtInt(t.days), coverage: cover("days") },
-            { key: "spend", label: "Inversión local", value: fmtMoney(t.spend), coverage: cover("spend") },
-            { key: "jobs", label: "Empleos generados", value: fmtInt(t.jobs), coverage: cover("jobs") },
-          ]}
-        />
-      ) : (
-        <div className="mt-5 grid grid-cols-2 gap-2.5">
-          <Stat label={view.layer === "circulacion" ? "Espacios de circulación" : "Empresas e instituciones"} value={fmtInt(t.orgs)} />
-          <Stat label="Departamentos presentes" value={fmtInt(aggs.depto.size)} sub="de 22" />
-        </div>
-      )}
+  const stats =
+    view.layer === "produccion" ? (
+      <StatsGrid
+        className={mobile ? "mt-4" : "mt-5"}
+        stats={data.publicStats}
+        canEdit={ctx.canEdit}
+        items={[
+          { key: "films", label: "Producciones con locación", value: fmtInt(t.films), coverage: cover("films") },
+          { key: "days", label: "Días de rodaje", value: fmtInt(t.days), coverage: cover("days") },
+          { key: "spend", label: "Inversión local", value: fmtMoney(t.spend), coverage: cover("spend") },
+          { key: "jobs", label: "Empleos generados", value: fmtInt(t.jobs), coverage: cover("jobs") },
+        ]}
+      />
+    ) : (
+      <div className={cn("grid grid-cols-2 gap-2.5", mobile ? "mt-4" : "mt-5")}>
+        <Stat label={view.layer === "circulacion" ? "Espacios de circulación" : "Empresas e instituciones"} value={fmtInt(t.orgs)} />
+        <Stat label="Departamentos presentes" value={fmtInt(aggs.depto.size)} sub="de 22" />
+      </div>
+    );
 
-      {view.layer === "produccion" && unlocated > 0 && (
+  // avisos de las producciones que el filtro deja fuera
+  const notices = (
+    <>
+      {view.layer === "produccion" && loc !== "sin" && unlocated > 0 && (
         <button
           onClick={go.unlocated}
-          className="mt-3 flex w-full items-center gap-2 rounded-xl border border-dashed border-line px-3 py-2 text-left text-xs text-muted transition hover:border-accent hover:text-ink"
+          className="mt-3 flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-dashed border-line px-3 py-2 text-left text-xs text-muted transition hover:border-accent hover:text-ink"
         >
           <MapPinOff className="h-4 w-4 shrink-0" />
-          <span>
-            <b className="font-medium text-ink">{fmtInt(unlocated)}</b> {unlocated === 1 ? "producción no tiene" : "producciones no tienen"} lugar de rodaje. Están en la zona «Sin locación».
+          <span className="flex-1">
+            <b className="font-medium text-ink">{fmtInt(unlocated)}</b> {unlocated === 1 ? "producción no tiene" : "producciones no tienen"} lugar de rodaje
+            {loc === "con" ? " y no se muestran." : ". Están en el marcador «Sin locación»."}
           </span>
+          <span className="shrink-0 font-medium text-accent">Ver</span>
         </button>
       )}
-
-      {view.layer === "produccion" && abroad > 0 && (
+      {view.layer === "produccion" && abroad > 0 && loc !== "sin" && (
         <button
           onClick={go.abroad}
-          className="mt-3 flex w-full items-center gap-2 rounded-xl border border-dashed border-line px-3 py-2 text-left text-xs text-muted transition hover:border-accent hover:text-ink"
+          className="mt-3 flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-dashed border-line px-3 py-2 text-left text-xs text-muted transition hover:border-accent hover:text-ink"
         >
           <Globe2 className="h-4 w-4 shrink-0" />
-          <span>
-            <b className="font-medium text-ink">{fmtInt(abroad)}</b> {abroad === 1 ? "producción se rodó" : "producciones se rodaron"} fuera de Guatemala. Están en la zona «Fuera de Guatemala».
+          <span className="flex-1">
+            <b className="font-medium text-ink">{fmtInt(abroad)}</b> {abroad === 1 ? "producción se rodó" : "producciones se rodaron"} fuera de Guatemala.
           </span>
+          <span className="shrink-0 font-medium text-accent">Ver</span>
         </button>
       )}
-
-      {incomplete > 0 && (
+      {!mobile && incomplete > 0 && (
         <p className="mt-3 text-xs text-muted">
           <span className="text-warn">{incomplete}</span> de {totalRecords} registros tienen información pendiente.
         </p>
       )}
+    </>
+  );
 
-      <SectionTitle aside={METRICS[view.metric].label}>Más actividad por departamento</SectionTitle>
+  const deptos = (
+    <>
       {top.length === 0 ? (
         <Empty>Aún no hay registros con locación en esta capa.</Empty>
       ) : (
@@ -144,20 +164,76 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
           ))}
         </div>
       )}
+    </>
+  );
 
-      <SectionTitle aside={`${list.length}`}>{view.layer === "produccion" ? "Producciones" : "Registros"}</SectionTitle>
-      {view.layer === "produccion" && (films.length > 0 || view.filmFilter.locacion) && <LocacionFilter value={view.filmFilter.locacion} onChange={go.locacion} />}
+  const listTitle = view.layer === "produccion" ? "Producciones" : "Registros";
+  const listBlock = (
+    <>
+      {view.layer === "produccion" && ctx.allFilms.length > 0 ? (
+        <div className={cn("mb-2 flex items-center justify-between gap-2", mobile ? "mt-1" : "mt-7")}>
+          <h3 className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
+            {listTitle} <span className="tabular-nums">{list.length}</span>
+          </h3>
+          <LocacionChip value={loc} counts={counts} onChange={go.locacion} />
+        </div>
+      ) : (
+        <SectionTitle aside={`${list.length}`}>{listTitle}</SectionTitle>
+      )}
       <div className="-mx-2 space-y-0.5">
         {view.layer === "produccion"
-          ? (shown as typeof films).map((f) => <FilmCard key={f.id} film={f} gaz={gaz} onClick={() => go.film(f.slug)} />)
-          : (shown as typeof orgs).map((o) => <OrgCard key={o.id} org={o} gaz={gaz} onClick={() => go.org(o.slug)} />)}
-        {list.length === 0 && <Empty>{view.layer === "produccion" && view.filmFilter.locacion ? "Ninguna producción coincide con este filtro." : "Sin registros todavía."}</Empty>}
+          ? (shown as typeof films).map((f) => <FilmCard key={f.id} film={f} gaz={gaz} hideBadge={mobile && !ctx.canEdit} onClick={() => go.film(f.slug)} />)
+          : (shown as typeof orgs).map((o) => <OrgCard key={o.id} org={o} gaz={gaz} hideBadge={mobile && !ctx.canEdit} onClick={() => go.org(o.slug)} />)}
+        {list.length === 0 && (
+          <Empty>
+            {view.layer !== "produccion"
+              ? "Sin registros todavía."
+              : loc === "con" && counts.sin > 0
+                ? "Ninguna producción tiene locación todavía."
+                : loc
+                  ? "Ninguna producción coincide con este filtro."
+                  : "Sin registros todavía."}
+          </Empty>
+        )}
       </div>
-      {list.length > 6 && (
-        <button className="btn-ghost mt-2 w-full text-xs" onClick={() => setShowAll((s) => !s)}>
+      {list.length > previewN && (
+        <button className="btn-ghost mt-2 min-h-[44px] w-full text-xs" onClick={() => setShowAll((s) => !s)}>
           {showAll ? "Ver menos" : `Ver las ${list.length}`}
         </button>
       )}
+    </>
+  );
+
+  if (mobile) {
+    return (
+      <PanelShell eyebrow={layer.blurb}>
+        {heading}
+        {listBlock}
+        {notices}
+        {stats}
+        {top.length > 0 && (
+          <div className="mt-4">
+            <button className="btn-ghost min-h-[44px] w-full justify-between text-xs" aria-expanded={showDeptos} onClick={() => setShowDeptos((o) => !o)}>
+              <span>Más actividad por departamento</span>
+              <ChevronDown className={cn("h-4 w-4 transition-transform", showDeptos && "rotate-180")} />
+            </button>
+            {showDeptos && <div className="mt-1">{deptos}</div>}
+          </div>
+        )}
+        {list.length > 0 && <DownloadLink href={downloadHref(view)} label="Descargar estos datos" />}
+        {full && <BrandFooter bare className="mt-6 border-t border-line pt-5 [&_img]:max-h-8" />}
+      </PanelShell>
+    );
+  }
+
+  return (
+    <PanelShell eyebrow={layer.blurb}>
+      {heading}
+      {stats}
+      {notices}
+      <SectionTitle aside={METRICS[view.metric].label}>Más actividad por departamento</SectionTitle>
+      {deptos}
+      {listBlock}
       {list.length > 0 && <DownloadLink href={downloadHref(view)} label="Descargar estos datos" />}
       <BrandFooter bare className="mt-8 border-t border-line pt-5 [&_img]:max-h-8" />
     </PanelShell>

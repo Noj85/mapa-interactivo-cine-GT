@@ -8,6 +8,7 @@ import { posterThumb } from "@/lib/poster-url";
 import { planFilmUpdate, planOrgUpdate } from "@/lib/import/diff";
 import { filmSchema, orgSchema } from "@/lib/schemas";
 import { diffSubmission } from "@/lib/submissions";
+import { planCorrection } from "@/lib/submissions-plan";
 import type { Film, FilmInput, Org, OrgInput, SubmissionKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,9 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
     }
   }
   const isCorrection = !!sub.target_id;
+  // corrección pendiente a un registro que existe: sus cambios se pueden marcar uno por uno
+  const correctionItems = sub.status === "pending" && !isCarga && isCorrection && current ? planCorrection(sub, current, gaz).items : [];
+  const splitReview = correctionItems.length > 0;
   const visible = isCorrection ? rows : rows.filter((r) => r.after);
   const changes = rows.filter((r) => r.changed).length;
   const payload = sub.payload as { poster_url?: string | null; logo_url?: string | null };
@@ -129,7 +133,10 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
       <h2 className="mb-2 mt-8 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
         {isCorrection ? `Datos propuestos · ${changes} ${changes === 1 ? "cambio" : "cambios"}` : "Datos propuestos"}
       </h2>
-      <dl className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+      {splitReview && (
+        <p className="mb-2 text-xs text-muted">Abajo eliges qué cambios aplicar. Aquí están todos los datos del aporte, por si quieres compararlos.</p>
+      )}
+      <dl className={cn("divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface", splitReview && "opacity-90")}>
         {visible.map((r) => (
           <div key={r.label} className={cn("grid gap-1 px-4 py-3 sm:grid-cols-[150px_1fr]", r.changed && "bg-accent/5")}>
             <dt className="text-xs text-muted">{r.label}</dt>
@@ -154,7 +161,7 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
       )}
       {sub.status === "pending" && !isCarga && (
         <div className="mt-6">
-          <SubmissionReview id={sub.id} isCorrection={isCorrection && !!current} hidden={!!current && current.status === "draft"} />
+          <SubmissionReview id={sub.id} isCorrection={isCorrection && !!current} hidden={!!current && current.status === "draft"} items={correctionItems} />
         </div>
       )}
     </div>

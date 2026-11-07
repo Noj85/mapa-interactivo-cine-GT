@@ -205,23 +205,6 @@ export function FilterPanel(p: Props) {
           node: <Range label="Empleos" min={ff.empleosMin} max={ff.empleosMax} hints={["Mínimo", "Máximo"]} onChange={(empleosMin, empleosMax) => pf({ empleosMin, empleosMax })} />,
         },
         {
-          id: "locacion",
-          label: "Locación registrada",
-          ownLabel: true,
-          active: ff.locacion != null,
-          clear: () => pf({ locacion: null }),
-          node: (
-            <div>
-              <div className="label pr-8">Locación registrada</div>
-              <select aria-label="Locación registrada" className="field" value={ff.locacion ?? ""} onChange={(e) => pf({ locacion: e.target.value === "con" || e.target.value === "sin" ? e.target.value : null })}>
-                <option value="">Todas</option>
-                <option value="con">Con locación</option>
-                <option value="sin">Sin locación</option>
-              </select>
-            </div>
-          ),
-        },
-        {
           id: "completas",
           label: "Locaciones con municipio",
           active: ff.soloCompletas,
@@ -278,7 +261,7 @@ export function FilterPanel(p: Props) {
   const customMetric = metricOptions.length > 1 && p.metric !== metricOptions[0];
 
   const clearAll = () => {
-    if (isFilm) p.onFilm({ ...EMPTY_FILM_FILTER });
+    if (isFilm) p.onFilm({ ...EMPTY_FILM_FILTER, locacion: ff.locacion });
     else p.onOrg({ ...EMPTY_ORG_FILTER });
     setAdded([]);
   };
