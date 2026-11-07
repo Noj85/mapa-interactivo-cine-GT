@@ -1,42 +1,11 @@
 import "server-only";
-import { z } from "zod";
 import type { DistinctMap } from "@/lib/import/distinct";
 import { heuristicPlan } from "@/lib/import/heuristic";
 import { FILM_FIELDS, ORG_FIELDS, type ImportPlan, type ParsedFile, type SheetPlan } from "@/lib/import/types";
 import { FORMATS, GENRES, NATURES } from "@/lib/film-types";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
 import { CLAUDE_MODEL, claude, claudeEnabled } from "./client";
-
-const planSchema = z.object({
-  summary: z.string().default(""),
-  instructions_applied: z.array(z.string()).default([]),
-  sheets: z.array(
-    z.object({
-      sheet: z.string(),
-      entity: z.enum(["film", "org", "ignore"]),
-      layer: z.enum(["circulacion", "industria"]).nullish(),
-      layer_by_row: z.boolean().nullish(),
-      grain: z.enum(["row_per_film", "row_per_location"]).default("row_per_film"),
-      columns: z.record(z.string(), z.string()).default({}),
-      confidence: z.record(z.string(), z.number()).default({}),
-      multi_place: z.boolean().nullish(),
-      value_maps: z.record(z.string(), z.record(z.string(), z.string())).nullish(),
-      note: z.string().nullish(),
-    }),
-  ),
-  questions: z
-    .array(
-      z.object({
-        id: z.string(),
-        question: z.string(),
-        options: z.array(z.string()).nullish(),
-        sheet: z.string().nullish(),
-        field: z.string().nullish(),
-        value: z.string().nullish(),
-      }),
-    )
-    .default([]),
-});
+import { claudeFailReason, parseClaudePlan, type ClaudePlan } from "./plan-input";
 
 const TOOL = {
   name: "submit_plan",
@@ -105,7 +74,19 @@ const LOCATION_FIELDS = ["place", "muni", "depto", "site", "lat", "lng", "days",
 
 const cut = (s: string, n = 140) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
-function sample(file: ParsedFile, distinct?: DistinctMap) {
+function compactDistinct(distinct: DistinctMap | undefined, max: number): DistinctMap | undefined {
+  if (!distinct) return distinct;
+  return Object.fromEntries(
+    Object.entries(distinct).map(([sheet, cols]) => [
+      sheet,
+      Object.fromEntries(Object.entries(cols).map(([h, list]) => [h, list.slice(0, max)])),
+    ]),
+  );
+}
+
+function sample(file: ParsedFile, distinct?: DistinctMap, compact = false) {
+  const rows = compact ? 20 : 60;
+  const maxValues = compact ? 12 : 24;
   return file.sheets.map((s) => {
     const d = distinct?.[s.name] ?? {};
     return {
@@ -116,9 +97,9 @@ function sample(file: ParsedFile, distinct?: DistinctMap) {
       ...(s.layout === "ficha" ? { formato_de_la_hoja: "ficha: una columna de etiquetas y otra de valores; cada fila de aquí es una ficha ya pivotada" } : {}),
       ...(s.layout === "dos filas" ? { formato_de_la_hoja: "encabezados en dos filas; el encabezado completo une el grupo y la columna («Locación Días»)" } : {}),
       // el navegador manda filas del inicio, del medio y del final del archivo
-      sampleRows: s.rows.slice(0, 60).map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, cut(v, 110)]))),
+      sampleRows: s.rows.slice(0, rows).map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, cut(v, 110)]))),
       // valores distintos de las columnas tipo lista, contados sobre TODAS las filas (la muestra no los trae todos)
-      valores_distintos: Object.fromEntries(Object.entries(d).map(([h, list]) => [h, list.map((x) => `${cut(x.v, 80)} (${x.n})`)])),
+      valores_distintos: Object.fromEntries(Object.entries(d).map(([h, list]) => [h, list.slice(0, maxValues).map((x) => `${cut(x.v, 80)} (${x.n})`)])),
     };
   });
 }
@@ -141,7 +122,7 @@ Reglas:
 - Entidades: "logo" es un enlace (URL) a la imagen del logo, solo si hay una columna así.
 - La muestra de filas trae filas del inicio, del medio y del final del archivo: úsala para distinguir lo que cambia a lo largo de él.
 - "confidence" es honesta: baja (<0.6) si dudas.
-- En "value_maps" normaliza los valores de columnas de lista (tipo de producción, nacionalidad, naturaleza de la iniciativa, categoría) hacia los valores canónicos. Cubre TODOS los valores que aparezcan en "valores_distintos" de esa columna (la muestra de filas es parcial), con el texto exacto del archivo como llave.
+- En "value_maps" normaliza los valores de columnas de lista (tipo de producción, nacionalidad, naturaleza de la iniciativa, categoría) hacia los valores canónicos, con el texto exacto del archivo como llave. Cubre los de "valores_distintos"; si hay más de 20, solo los más frecuentes. Prioriza "columns" y "grain" sobre un value_map exhaustivo.
 - Los valores canónicos de formato, naturaleza, nacionalidad y naturaleza de la iniciativa son cerrados: usa solo los del catálogo (por ejemplo la etiqueta "Cortometraje"). Nunca inventes un valor que no esté en el catálogo. Si un valor de formato no encaja en ninguno, no lo mapees a "Otro": déjalo fuera de value_maps y, si es relevante, hazlo una pregunta (con "value" y field "format").
 - Una producción se describe con tres cosas distintas: "format" (largometraje, cortometraje, serie, video musical…; uno), "nature" (ficción, documental o híbrido; uno, aplica a cualquier formato) y "genres" (varios; drama, comedia, terror…). Una misma columna puede alimentar más de un campo: una columna "Tipo" con «Largometraje documental» sirve para "format" y para "nature" a la vez (asigna el mismo encabezado a los dos campos). Una columna llamada "Género" suele traer géneros, pero a veces trae «Documental» o «Ficción»: eso es naturaleza, no género; el código lo separa, tú solo asigna "genres".
 - "genres" es multivalor: una celda puede traer varios géneros separados por ; , / o |. Traduce al catálogo "generos_estandar" los que correspondan (por ejemplo "sci-fi" -> "Ciencia ficción", "horror" -> "Terror", "thriller" -> "Suspenso / thriller") y conserva tal cual los que no estén: se aceptan géneros propios (máximo 8 por producción).
@@ -165,111 +146,139 @@ function offline(file: ParsedFile, instructions: string): ImportPlan {
   return plan;
 }
 
+const catalog = {
+  campos_pelicula: FILM_FIELDS.map((f) => ({ id: f.id, nombre: f.label, pista: f.hint })),
+  campos_entidad: ORG_FIELDS.map((f) => ({ id: f.id, nombre: f.label, pista: f.hint })),
+  categorias_circulacion: CIRC_CATEGORIES,
+  categorias_industria: IND_CATEGORIES,
+  valores_formato: FORMATS.map((k) => k.label),
+  valores_naturaleza: NATURES.map((k) => k.label),
+  generos_estandar: GENRES,
+  valores_nationality: ["guatemalteca", "coproduccion", "extranjera"],
+  valores_initiative_type: ["publica", "privada", "comunitaria", "transnacional"],
+};
+
+async function askPlan(file: ParsedFile, instructions: string, distinct: DistinctMap | undefined, compact: boolean) {
+  const extra = compact
+    ? "\n\nSé breve: prioriza columns y grain. En value_maps cubre como máximo 12 valores por columna (los más frecuentes)."
+    : "";
+  const res = await claude().messages.create({
+    model: CLAUDE_MODEL,
+    max_tokens: 16000,
+    system: SYSTEM,
+    tools: [TOOL],
+    tool_choice: { type: "tool", name: TOOL.name },
+    messages: [
+      {
+        role: "user",
+        content:
+          `Catálogo de campos destino:\n${JSON.stringify(catalog)}\n\nArchivo "${file.filename}":\n${JSON.stringify(sample(file, distinct, compact))}` +
+          (instructions
+            ? `\n\nInstrucciones del equipo para este archivo (texto libre):\n<instrucciones>\n${instructions.replace(/<\/?instrucciones>/gi, "")}\n</instrucciones>`
+            : "") +
+          extra,
+      },
+    ],
+  });
+  const block = res.content.find((b) => b.type === "tool_use");
+  if (!block || block.type !== "tool_use") throw new Error("Sin plan en la respuesta");
+  return { input: block.input, stopReason: res.stop_reason };
+}
+
+function toImportPlan(parsed: ClaudePlan, file: ParsedFile, instructions: string): ImportPlan {
+  const sheets: SheetPlan[] = parsed.sheets
+    .filter((sp) => file.sheets.some((s) => s.name === sp.sheet))
+    .map((sp) => {
+      const headers = new Set(file.sheets.find((s) => s.name === sp.sheet)!.headers);
+      const columns: Record<string, string> = {};
+      const confidence: Record<string, number> = {};
+      for (const [field, header] of Object.entries(sp.columns)) {
+        if (!headers.has(header)) continue;
+        // sufijos de grupo de locación: solo para los campos de lugar y en grupos del 2 al 9
+        const suffix = field.match(/^(.+)__(\d)$/);
+        if (suffix && (!LOCATION_FIELDS.includes(suffix[1]) || Number(suffix[2]) < 2)) continue;
+        columns[field] = header;
+        confidence[field] = Math.max(0, Math.min(1, sp.confidence[field] ?? 0.6));
+      }
+      return {
+        sheet: sp.sheet,
+        entity: sp.entity,
+        layer: sp.entity === "org" ? (sp.layer ?? "circulacion") : undefined,
+        layer_by_row: sp.entity === "org" && sp.layer_by_row ? true : undefined,
+        grain: sp.grain,
+        columns,
+        confidence,
+        multi_place: sp.multi_place ?? false,
+        value_maps: sp.value_maps ?? undefined,
+        note: sp.note ?? undefined,
+      };
+    });
+  // Lo que el reconocimiento de encabezados detectó con certeza y el modelo pudo pasar por alto.
+  const base = heuristicPlan(file);
+  for (const sp of sheets) {
+    const h = base.sheets.find((x) => x.sheet === sp.sheet);
+    if (!h) continue;
+    if (sp.entity === "film" && h.entity === "film") {
+      const used = new Set(Object.values(sp.columns));
+      for (const [k, header] of Object.entries(h.columns)) {
+        if (k.includes("__") && !sp.columns[k] && !used.has(header)) {
+          sp.columns[k] = header;
+          sp.confidence[k] = h.confidence[k] ?? 0.7;
+        }
+      }
+    }
+    if (sp.entity === "org" && h.entity === "org" && h.layer_by_row) sp.layer_by_row = true;
+  }
+  // Hojas que el modelo omitió: ignorar explícitamente.
+  for (const s of file.sheets) {
+    if (!sheets.some((x) => x.sheet === s.name))
+      sheets.push({ sheet: s.name, entity: "ignore", grain: "row_per_film", columns: {}, confidence: {} });
+  }
+  return {
+    sheets,
+    engine: "claude",
+    summary: parsed.summary,
+    instructions_applied: instructions ? parsed.instructions_applied.map((x) => x.trim()).filter(Boolean).slice(0, 12) : undefined,
+    questions: parsed.questions.map((q) => ({
+      id: q.id,
+      question: q.question,
+      options: q.options ?? undefined,
+      sheet: q.sheet ?? undefined,
+      field: q.field ?? undefined,
+      value: q.value ?? undefined,
+    })),
+  };
+}
+
 export async function analyzeFile(file: ParsedFile, opts: AnalyzeOptions = {}): Promise<ImportPlan> {
   const instructions = (opts.instructions ?? "").trim().slice(0, 2000);
   if (!claudeEnabled()) return offline(file, instructions);
 
-  const catalog = {
-    campos_pelicula: FILM_FIELDS.map((f) => ({ id: f.id, nombre: f.label, pista: f.hint })),
-    campos_entidad: ORG_FIELDS.map((f) => ({ id: f.id, nombre: f.label, pista: f.hint })),
-    categorias_circulacion: CIRC_CATEGORIES,
-    categorias_industria: IND_CATEGORIES,
-    valores_formato: FORMATS.map((k) => k.label),
-    valores_naturaleza: NATURES.map((k) => k.label),
-    generos_estandar: GENRES,
-    valores_nationality: ["guatemalteca", "coproduccion", "extranjera"],
-    valores_initiative_type: ["publica", "privada", "comunitaria", "transnacional"],
-  };
+  let lastError: unknown;
+  let lastStop: string | null | undefined;
+  let backup: ClaudePlan | null = null;
 
-  try {
-    const res = await claude().messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 6000,
-      system: SYSTEM,
-      tools: [TOOL],
-      tool_choice: { type: "tool", name: TOOL.name },
-      messages: [
-        {
-          role: "user",
-          content:
-            `Catálogo de campos destino:\n${JSON.stringify(catalog)}\n\nArchivo "${file.filename}":\n${JSON.stringify(sample(file, opts.distinct))}` +
-            (instructions
-              ? `\n\nInstrucciones del equipo para este archivo (texto libre):\n<instrucciones>\n${instructions.replace(/<\/?instrucciones>/gi, "")}\n</instrucciones>`
-              : ""),
-        },
-      ],
-    });
-    const block = res.content.find((b) => b.type === "tool_use");
-    if (!block || block.type !== "tool_use") throw new Error("Sin plan en la respuesta");
-    const parsed = planSchema.parse(block.input);
-
-    // Limpieza: solo columnas que existen de verdad en cada hoja.
-    const sheets: SheetPlan[] = parsed.sheets
-      .filter((sp) => file.sheets.some((s) => s.name === sp.sheet))
-      .map((sp) => {
-        const headers = new Set(file.sheets.find((s) => s.name === sp.sheet)!.headers);
-        const columns: Record<string, string> = {};
-        const confidence: Record<string, number> = {};
-        for (const [field, header] of Object.entries(sp.columns)) {
-          if (!headers.has(header)) continue;
-          // sufijos de grupo de locación: solo para los campos de lugar y en grupos del 2 al 9
-          const suffix = field.match(/^(.+)__(\d)$/);
-          if (suffix && (!LOCATION_FIELDS.includes(suffix[1]) || Number(suffix[2]) < 2)) continue;
-          columns[field] = header;
-          confidence[field] = Math.max(0, Math.min(1, sp.confidence[field] ?? 0.6));
-        }
-        return {
-          sheet: sp.sheet,
-          entity: sp.entity,
-          layer: sp.entity === "org" ? (sp.layer ?? "circulacion") : undefined,
-          layer_by_row: sp.entity === "org" && sp.layer_by_row ? true : undefined,
-          grain: sp.grain,
-          columns,
-          confidence,
-          multi_place: sp.multi_place ?? false,
-          value_maps: sp.value_maps ?? undefined,
-          note: sp.note ?? undefined,
-        };
-      });
-    // Lo que el reconocimiento de encabezados detectó con certeza y el modelo pudo pasar por alto.
-    const base = heuristicPlan(file);
-    for (const sp of sheets) {
-      const h = base.sheets.find((x) => x.sheet === sp.sheet);
-      if (!h) continue;
-      if (sp.entity === "film" && h.entity === "film") {
-        const used = new Set(Object.values(sp.columns));
-        for (const [k, header] of Object.entries(h.columns)) {
-          if (k.includes("__") && !sp.columns[k] && !used.has(header)) {
-            sp.columns[k] = header;
-            sp.confidence[k] = h.confidence[k] ?? 0.7;
-          }
-        }
+  for (const compact of [false, true] as const) {
+    try {
+      const distinct = compact ? compactDistinct(opts.distinct, 12) : opts.distinct;
+      const res = await askPlan(file, instructions, distinct, compact);
+      lastStop = res.stopReason;
+      const parsed = parseClaudePlan(res.input);
+      if (res.stopReason === "max_tokens" && !compact) {
+        backup = parsed;
+        lastError = new Error("incompleta");
+        continue;
       }
-      if (sp.entity === "org" && h.entity === "org" && h.layer_by_row) sp.layer_by_row = true;
+      return toImportPlan(parsed, file, instructions);
+    } catch (e) {
+      lastError = e;
+      console.error("[import/analyze] Claude falló" + (compact ? " (reintento breve)" : "") + ":", e instanceof Error ? e.message : e);
     }
-    // Hojas que el modelo omitió: ignorar explícitamente.
-    for (const s of file.sheets) {
-      if (!sheets.some((x) => x.sheet === s.name))
-        sheets.push({ sheet: s.name, entity: "ignore", grain: "row_per_film", columns: {}, confidence: {} });
-    }
-    return {
-      sheets,
-      engine: "claude",
-      summary: parsed.summary,
-      instructions_applied: instructions ? parsed.instructions_applied.map((x) => x.trim()).filter(Boolean).slice(0, 12) : undefined,
-      questions: parsed.questions.map((q) => ({
-        id: q.id,
-        question: q.question,
-        options: q.options ?? undefined,
-        sheet: q.sheet ?? undefined,
-        field: q.field ?? undefined,
-        value: q.value ?? undefined,
-      })),
-    };
-  } catch (e) {
-    console.error("[import/analyze] Claude falló, uso el modo sin conexión:", (e as Error).message);
-    const plan = offline(file, instructions);
-    plan.summary = `No pudimos consultar a Claude (${(e as Error).message.slice(0, 80)}). ` + plan.summary;
-    return plan;
   }
+
+  if (backup) return toImportPlan(backup, file, instructions);
+
+  const plan = offline(file, instructions);
+  plan.summary = `No pudimos consultar a Claude (${claudeFailReason(lastError, lastStop)}). ` + plan.summary;
+  return plan;
 }

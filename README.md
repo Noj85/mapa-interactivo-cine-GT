@@ -85,7 +85,7 @@ Además de tablas simples, la lectura entiende (`lib/import/parse.ts`, `lib/impo
 - **Entidades de Circulación e Industria en la misma hoja**: la capa se decide por la categoría de cada fila.
 - **Logo (enlace)** de las entidades y **enlace del festival o premio** (también en PDF/Word con Claude).
 
-A Claude se le manda una muestra de ~60 filas del inicio, el medio y el final del archivo (no solo las primeras), con el catálogo de campos, categorías y formatos y avisos de si la hoja venía en dos filas o como ficha.
+A Claude se le manda una muestra de ~60 filas del inicio, el medio y el final del archivo (no solo las primeras), con el catálogo de campos, categorías y formatos y avisos de si la hoja venía en dos filas o como ficha. Si la respuesta se corta (archivos con muchas columnas de lista), se reintenta una vez con una muestra más corta; si aun así no hay plan, se cae al reconocimiento básico de columnas y el aviso dice «la respuesta de Claude llegó incompleta», no el error técnico.
 
 ### Coincidencias, colisiones y «nunca pisar»
 

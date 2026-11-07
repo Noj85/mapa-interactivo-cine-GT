@@ -3,7 +3,7 @@ import { z } from "zod";
 import { analyzeFile } from "@/lib/claude/analyze";
 import { getSession } from "@/lib/auth";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
 const body = z.object({
