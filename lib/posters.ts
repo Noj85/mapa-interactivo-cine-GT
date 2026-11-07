@@ -15,12 +15,14 @@ export const UPLOAD_DIR = path.join(process.cwd(), ".data", "uploads");
 
 export class PosterError extends Error {}
 
-export type ImageKind = "poster" | "logo";
+/** `still`: miniatura de un video (16:9). */
+export type ImageKind = "poster" | "logo" | "still";
 
 /**
  * Valida que sea una imagen real y la deja en dos tamaños WebP.
  * Póster: 900 px y miniatura de 400 px sobre fondo blanco.
  * Logo: cabe en 512 px (miniatura 128 px) y conserva la transparencia.
+ * Miniatura de video: 1280 px de ancho y miniatura de 480 px.
  * Al re-codificar con sharp se descartan metadatos y cualquier contenido oculto en el archivo.
  */
 export async function processImage(input: Buffer, kind: ImageKind = "poster", maxBytes = POSTER_MAX_BYTES): Promise<{ full: Buffer; thumb: Buffer }> {
@@ -43,6 +45,14 @@ export async function processImage(input: Buffer, kind: ImageKind = "poster", ma
     const [full, thumb] = await Promise.all([
       base().resize(fit(512)).webp({ quality: 88 }).toBuffer(),
       base().resize(fit(128)).webp({ quality: 85 }).toBuffer(),
+    ]);
+    return { full, thumb };
+  }
+  if (kind === "still") {
+    const base = () => sharp(input).rotate().flatten({ background: "#000000" });
+    const [full, thumb] = await Promise.all([
+      base().resize({ width: 1280, withoutEnlargement: true }).webp({ quality: 80 }).toBuffer(),
+      base().resize({ width: 480, withoutEnlargement: true }).webp({ quality: 76 }).toBuffer(),
     ]);
     return { full, thumb };
   }
@@ -137,32 +147,62 @@ async function assertPublicHost(u: URL) {
 export const posterFromUrl = (raw: string) => imageFromUrl(raw, "poster");
 
 /**
- * Descarga una imagen por URL y la guarda (póster o logo).
- * Devuelve null si la descarga falla; nunca interrumpe una carga.
+ * Pide una dirección pública siguiendo hasta 4 redirecciones a mano (cada salto se valida contra direcciones privadas).
+ * Devuelve la respuesta y la dirección final; null si falla o no responde bien.
  */
-export async function imageFromUrl(raw: string, kind: ImageKind): Promise<string | null> {
-  const url = raw.trim();
-  if (!url) return null;
+export async function fetchPublic(raw: string, opts: { accept?: string; timeoutMs?: number } = {}): Promise<{ res: Response; url: URL } | null> {
   try {
-    let current = new URL(url);
+    let current = new URL(raw.trim());
     for (let hop = 0; hop < 4; hop++) {
       await assertPublicHost(current);
       const res = await fetch(current, {
         redirect: "manual",
-        signal: AbortSignal.timeout(12_000),
-        headers: { "User-Agent": "MapaCineGT/1.0 (importador de pósters)", Accept: "image/*" },
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 12_000),
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; MapaCineGT/1.0; +https://mapa-interactivo-cine-gt.vercel.app)", Accept: opts.accept ?? "*/*", "Accept-Language": "es,en;q=0.8" },
       });
       if (res.status >= 300 && res.status < 400 && res.headers.get("location")) {
         current = new URL(res.headers.get("location")!, current);
         continue;
       }
-      if (!res.ok) return null;
-      const len = Number(res.headers.get("content-length") ?? 0);
-      if (len > POSTER_MAX_BYTES) return null;
-      const buf = Buffer.from(await res.arrayBuffer());
-      return await storeImage(buf, kind);
+      return res.ok ? { res, url: current } : null;
     }
     return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Lee el cuerpo de una respuesta hasta un máximo de bytes (el resto se descarta). */
+export async function readLimited(res: Response, maxBytes: number): Promise<Buffer> {
+  if (!res.body) return Buffer.alloc(0);
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (total < maxBytes) {
+    const { done, value } = await reader.read();
+    if (done || !value) break;
+    chunks.push(value);
+    total += value.length;
+  }
+  await reader.cancel().catch(() => {});
+  return Buffer.concat(chunks).subarray(0, maxBytes);
+}
+
+/**
+ * Descarga una imagen por URL y la guarda (póster, logo o miniatura de video).
+ * Devuelve null si la descarga falla; nunca interrumpe una carga.
+ */
+export async function imageFromUrl(raw: string, kind: ImageKind, opts: { origin?: "team" | "public" } = {}): Promise<string | null> {
+  const url = raw.trim();
+  if (!url) return null;
+  try {
+    const got = await fetchPublic(url, { accept: "image/*" });
+    if (!got) return null;
+    const len = Number(got.res.headers.get("content-length") ?? 0);
+    if (len > POSTER_MAX_BYTES) return null;
+    const buf = await readLimited(got.res, POSTER_MAX_BYTES + 1);
+    if (buf.length > POSTER_MAX_BYTES) return null;
+    return await storeImage(buf, kind, { origin: opts.origin ?? "team", maxBytes: POSTER_MAX_BYTES });
   } catch {
     return null;
   }

@@ -35,7 +35,7 @@ const PANEL_W = 400;
 /** La vista pública solo filtra por locación: un enlace con otros filtros o con otra métrica los ignora. */
 function forMode(v: ViewState, canEdit: boolean): ViewState {
   if (canEdit) return v;
-  return { ...v, metric: LAYER_METRICS[v.layer][0], filmFilter: { ...EMPTY_FILM_FILTER, locacion: v.filmFilter.locacion }, orgFilter: EMPTY_ORG_FILTER };
+  return { ...v, metric: LAYER_METRICS[v.layer][0], filmFilter: { ...EMPTY_FILM_FILTER, locacion: v.filmFilter.locacion, origen: v.filmFilter.origen }, orgFilter: EMPTY_ORG_FILTER };
 }
 
 /**
@@ -113,6 +113,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       locacion: (locacion: "con" | "sin" | null) =>
         // en «Sin locación» no hay territorio que ver: se sale del lugar o de la producción abiertos
         commit({ ...view, filmFilter: { ...view.filmFilter, locacion }, film: null, ...(locacion === "sin" ? { place: null } : {}), noloc: false, abroad: false }),
+      origen: (origen: "nacional" | "extranjera" | null) => commit({ ...view, filmFilter: { ...view.filmFilter, origen }, film: null, noloc: false, abroad: false }),
     };
   }, [view, commit, data.orgs, geo]);
 

@@ -29,6 +29,8 @@ export const MERGE_FIELDS = [
   { key: "screenwriter", label: "Guionista" },
   { key: "budget", label: "Presupuesto" },
   { key: "synopsis", label: "Sinopsis" },
+  { key: "trailer_url", label: "Tráiler" },
+  { key: "film_url", label: "Película completa" },
 ] as const;
 
 export type MergeFieldKey = (typeof MERGE_FIELDS)[number]["key"];
@@ -228,6 +230,11 @@ export function applyMerge(a: Film, b: Film, gaz: Gazetteer, choice: MergeChoice
     budget: budgetFrom.budget,
     currency: budgetFrom.currency,
     synopsis: pick("synopsis").synopsis,
+    // el enlace va con su miniatura, de la misma versión
+    trailer_url: pick("trailer_url").trailer_url ?? null,
+    trailer_thumb: pick("trailer_url").trailer_thumb ?? null,
+    film_url: pick("film_url").film_url ?? null,
+    film_thumb: pick("film_url").film_thumb ?? null,
     poster_url: plan.poster ? films[choice.poster ?? plan.poster.def].poster_url ?? null : keep.poster_url ?? null,
     // si cualquiera de las dos estaba en el mapa, la fusionada también
     status: a.status === "published" || b.status === "published" ? "published" : "draft",

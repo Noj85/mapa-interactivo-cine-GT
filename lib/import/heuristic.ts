@@ -21,6 +21,8 @@ const FILM_SYN: Syn[] = [
   ["genres", [/^(genero|generos|genre|genres|subgenero|subgeneros|genero(s)? (cinematografico|principal|de la (obra|pelicula)))$/]],
   ["director", [/^(direccion|director|directora|director a|dirigida por|directed by|realizacion|realizador|realizadora)$/]],
   ["poster", [/^(poster|poster url|poster enlace|afiche|afiche url|cartel|portada|miniatura|thumbnail)$/]],
+  ["trailer", [/^(trailer|trailer url|trailer enlace|enlace del trailer|url del trailer|link del trailer|enlace trailer|teaser)$/]],
+  ["film_link", [/^(pelicula completa|pelicula completa enlace|enlace de la pelicula|enlace pelicula|url de la pelicula|url pelicula|link de la pelicula|ver pelicula|donde ver|donde verla|streaming|plataforma)$/]],
   ["company", [/^(casas? productoras?|productoras?|empresas? productoras?|empresas?|production compan(y|ies)|produccion por)$/]],
   ["company_country", [/^pais(es)? (de )?(la |las )?(casas? )?(productoras?|empresas?)$/, /^(casas? )?productoras? pais(es)?$/]],
   ["producer", [/^(productor|productor a|productor es|productores|producer|producers)$/]],
@@ -61,6 +63,8 @@ const ORG_SYN: Syn[] = [
 /** Segunda pasada, más tolerante: encabezados largos como "Nombre del proyecto" o "Dónde se filmó". */
 const FILM_LOOSE: Syn[] = [
   ["festival", [/\bfestival/, /\bselecciones?\b/]],
+  ["trailer", [/\btrailer\b/, /\bteaser\b/]],
+  ["film_link", [/pelicula completa/, /\bver (la )?pelicula\b/, /\bdonde (ver|verla)\b/, /\bstreaming\b/]],
   ["title", [/\b(titulo|pelicula|proyecto|obra|nombre)\b/]],
   ["year", [/\b(ano|anio|year|estreno)\b/]],
   ["duration_min", [/\b(duracion|duration|runtime|minutaje)\b(?!.*(rodaje|filmacion|shooting))/, /\bminutos\b/]],

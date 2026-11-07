@@ -26,7 +26,7 @@ export const STATE_HEADER = "Estado de la carga";
 const FILM_HEADERS = [
   "Título", "Año", "Formato", "Naturaleza", "Géneros", "Duración (min)", "Director/a", "Productor/a",
   "Director/a de fotografía", "Guionista", "Casa productora", "País de la casa productora", "Nacionalidad",
-  "Presupuesto", "Moneda", "Sinopsis", "Póster (enlace)",
+  "Presupuesto", "Moneda", "Sinopsis", "Póster (enlace)", "Tráiler (enlace)", "Película completa (enlace)",
   "Lugar (texto libre)", "Departamento", "Municipio", "Sitio de rodaje", "Latitud", "Longitud",
   "Días de rodaje", "Inversión local", "Empleos",
 ];
@@ -84,7 +84,7 @@ export function normalizedTables(candidates: Candidate[], names?: PlaceNames): N
         f.title, orNull(f.year), orNull(label(FORMATS, f.format)), orNull(label(NATURES, f.nature)), orNull((f.genres ?? []).join("; ")),
         orNull(f.duration_min), orNull(f.director), orNull(f.producer), orNull(f.cinematographer), orNull(f.screenwriter),
         orNull(companies.join("; ")), null, orNull(label(NATIONALITIES, f.nationality)),
-        orNull(f.budget), orNull(f.budget != null ? f.currency : null), orNull(f.synopsis), orNull(f.poster_url),
+        orNull(f.budget), orNull(f.budget != null ? f.currency : null), orNull(f.synopsis), orNull(f.poster_url), orNull(f.trailer_url), orNull(f.film_url),
       ];
       const locs = f.locations?.length ? f.locations : [undefined];
       for (const l of locs) films.rows.push([...base(), ...locationCells(l, names), origin, state]);

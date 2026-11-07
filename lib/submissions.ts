@@ -70,6 +70,8 @@ export function diffSubmission(sub: Submission, current: Film | Org | null, gaz:
       row("Presupuesto", money(c?.budget, c?.currency), money(p.budget, p.currency), isNew),
       row("Sinopsis", c?.synopsis ?? null, p.synopsis ?? null, isNew),
       row("Locaciones", c ? locsText(c.locations, gaz) : null, locsText(p.locations ?? [], gaz), isNew),
+      row("Tráiler", c?.trailer_url ?? null, p.trailer_url ?? null, isNew),
+      row("Película completa", c?.film_url ?? null, p.film_url ?? null, isNew),
     ];
     // los aportes anteriores a la duración no la traen: no se muestra como «vaciar»
     if (p.duration_min !== undefined) {

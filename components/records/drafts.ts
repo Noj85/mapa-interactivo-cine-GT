@@ -82,6 +82,11 @@ export interface FilmDraft {
   currency: "GTQ" | "USD";
   synopsis: string;
   poster: string | null;
+  /** Enlaces de video y la miniatura que se guardó para cada uno. */
+  trailerUrl: string;
+  trailerThumb: string | null;
+  filmUrl: string;
+  filmThumb: string | null;
   locs: LocDraft[];
   fests: FestDraft[];
   companies: CompanyDraft[];
@@ -104,6 +109,10 @@ export function filmDraft(film?: Film): FilmDraft {
     currency: film?.currency ?? "GTQ",
     synopsis: film?.synopsis ?? "",
     poster: film?.poster_url ?? null,
+    trailerUrl: film?.trailer_url ?? "",
+    trailerThumb: film?.trailer_thumb ?? null,
+    filmUrl: film?.film_url ?? "",
+    filmThumb: film?.film_thumb ?? null,
     locs: film && film.locations?.length
       ? film.locations.map((l) => ({
           id: l.id,
@@ -156,6 +165,10 @@ export function filmPayload(d: FilmDraft) {
     currency: d.currency,
     synopsis: d.synopsis || null,
     poster_url: d.poster,
+    trailer_url: d.trailerUrl.trim() || null,
+    trailer_thumb: d.trailerUrl.trim() ? d.trailerThumb : null,
+    film_url: d.filmUrl.trim() || null,
+    film_thumb: d.filmUrl.trim() ? d.filmThumb : null,
     locations: d.locs
       .filter((l) => !isBlankLoc(l))
       .map((l) => ({

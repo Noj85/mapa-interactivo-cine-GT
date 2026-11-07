@@ -4,6 +4,7 @@ import { FORMATS, NATURES, type FilmFormat, type FilmNature } from "@/lib/film-t
 import { NATIONALITIES, type Nationality } from "@/lib/types";
 import { CompaniesEditor } from "./CompaniesEditor";
 import { GenresEditor } from "./GenresEditor";
+import { VideoLinkField } from "./VideoLinkField";
 import type { FilmDraft } from "./drafts";
 
 /** Campos de una producción. Los usa el editor del equipo y el formulario público. */
@@ -51,6 +52,11 @@ export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange:
           </select>
         </div>
       </div>
+      {d.nationality === "extranjera" && (
+        <p className="-mt-2 text-xs leading-relaxed text-muted">
+          Incluye producciones extranjeras rodadas en Guatemala o sobre Guatemala; si se rodó afuera, registra la locación con su país.
+        </p>
+      )}
       <GenresEditor genres={d.genres} onChange={(genres) => onChange({ genres })} />
       <CompaniesEditor companies={d.companies} nationality={d.nationality} onChange={(companies) => onChange({ companies })} />
       <div className="grid gap-4 sm:grid-cols-2">
@@ -87,6 +93,24 @@ export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange:
       <div>
         <label className="label" htmlFor="f-syn">Sinopsis</label>
         <textarea id="f-syn" className="field min-h-24" maxLength={2000} value={d.synopsis} onChange={(e) => onChange({ synopsis: e.target.value })} />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <VideoLinkField
+          id="f-trailer"
+          label="Tráiler (enlace)"
+          hint="YouTube, Vimeo u otra plataforma. Se guarda la miniatura si está disponible."
+          url={d.trailerUrl}
+          thumb={d.trailerThumb}
+          onChange={({ url, thumb }) => onChange({ trailerUrl: url, trailerThumb: thumb })}
+        />
+        <VideoLinkField
+          id="f-film"
+          label="Película completa (enlace, si está disponible)"
+          hint="Donde se puede ver completa en línea. Opcional."
+          url={d.filmUrl}
+          thumb={d.filmThumb}
+          onChange={({ url, thumb }) => onChange({ filmUrl: url, filmThumb: thumb })}
+        />
       </div>
     </section>
   );

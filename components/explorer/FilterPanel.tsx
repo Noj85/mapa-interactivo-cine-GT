@@ -261,7 +261,7 @@ export function FilterPanel(p: Props) {
   const customMetric = metricOptions.length > 1 && p.metric !== metricOptions[0];
 
   const clearAll = () => {
-    if (isFilm) p.onFilm({ ...EMPTY_FILM_FILTER, locacion: ff.locacion });
+    if (isFilm) p.onFilm({ ...EMPTY_FILM_FILTER, locacion: ff.locacion, origen: ff.origen });
     else p.onOrg({ ...EMPTY_ORG_FILTER });
     setAdded([]);
   };

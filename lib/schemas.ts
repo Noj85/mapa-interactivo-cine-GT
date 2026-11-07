@@ -20,6 +20,26 @@ const optStr = z
   .max(2000)
   .nullish()
   .transform((v) => (v ? v : null));
+/** Enlace de video (tráiler o película): http o https; sin esquema se asume https. */
+const videoUrl = z
+  .string()
+  .trim()
+  .max(500)
+  .nullish()
+  .transform((v, ctx) => {
+    const t = (v ?? "").trim();
+    if (!t) return null;
+    const withScheme = /^https?:\/\//i.test(t) ? t : /^[a-z][a-z0-9+.-]*:/i.test(t) ? "" : `https://${t}`;
+    try {
+      const u = new URL(withScheme);
+      if (!/^https?:$/.test(u.protocol) || !u.hostname.includes(".")) throw new Error();
+      return u.toString();
+    } catch {
+      ctx.addIssue({ code: "custom", message: "El enlace del video no parece válido." });
+      return z.NEVER;
+    }
+  });
+
 const optNum = z
   .union([z.number(), z.string()])
   .nullish()
@@ -110,6 +130,10 @@ export const filmSchema = z.object({
   currency: z.enum(["GTQ", "USD"]).default("GTQ"),
   synopsis: optStr,
   poster_url: optStr,
+  trailer_url: videoUrl,
+  trailer_thumb: optStr,
+  film_url: videoUrl,
+  film_thumb: optStr,
   status: z.enum(["draft", "published"]).default("draft"),
   source: optStr,
   locations: z.array(locationSchema).max(60).default([]),
@@ -242,6 +266,10 @@ export const publicFilmSchema = z.object({
   currency: z.enum(["GTQ", "USD"]).default("GTQ"),
   synopsis: pubStr(2000),
   poster_url: pubImage,
+  trailer_url: videoUrl,
+  trailer_thumb: pubImage,
+  film_url: videoUrl,
+  film_thumb: pubImage,
   locations: z.array(pubLocation).max(20).default([]),
   festivals: z.array(pubFestival).max(40).optional(),
   companies: z.array(pubCompany).max(20).optional(),

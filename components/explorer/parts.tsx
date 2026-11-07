@@ -40,35 +40,42 @@ export interface PanelCtx {
     clear(): void;
     /** Filtro público de producciones: con o sin locación registrada (null: todas). */
     locacion(v: "con" | "sin" | null): void;
+    /** Filtro público de producciones por origen: nacionales o extranjeras (null: todas). */
+    origen(v: "nacional" | "extranjera" | null): void;
   };
 }
 
 type Locacion = "con" | "sin" | null;
+type Origen = "nacional" | "extranjera" | null;
 
 const LOCACION_LABEL: Record<"con" | "sin" | "todas", string> = { con: "Con locación", sin: "Sin locación", todas: "Todas" };
+const ORIGEN_LABEL: Record<"todas" | "nacional" | "extranjera", string> = { todas: "Todas", nacional: "Nacionales", extranjera: "Extranjeras" };
 
-/**
- * Chip compacto con menú para elegir qué producciones se ven: con locación (lo normal), sin locación o todas.
- * Cada opción trae su conteo. Afecta a la lista y al mapa.
- */
-export function LocacionChip({
+/** Chip compacto con menú de una sola elección. Lo usan los filtros públicos de locación y de origen. */
+function MenuChip({
   value,
-  counts,
+  defaultId,
+  options,
+  ariaLabel,
   onChange,
-  options = ["con", "sin", "todas"],
   className,
+  prefix,
 }: {
-  value: Locacion;
-  counts: { con: number; sin: number; todas: number };
-  onChange(v: Locacion): void;
-  options?: ("con" | "sin" | "todas")[];
+  value: string;
+  /** Opción normal: el chip se ve en gris; con otra se resalta. */
+  defaultId: string;
+  options: { id: string; label: string; count: number }[];
+  ariaLabel: string;
+  onChange(id: string): void;
   className?: string;
+  /** Texto antes de la opción elegida, por ejemplo «Origen:». */
+  prefix?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
-  const key = value ?? "todas";
+  const current = options.find((o) => o.id === value) ?? options[0];
   const MENU_W = 232;
 
   const toggle = () => {
@@ -114,11 +121,12 @@ export function LocacionChip({
         onClick={toggle}
         className={cn(
           "flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors",
-          key === "con" ? "border-line bg-surface-2/60 text-ink hover:border-muted/60" : "border-accent/60 bg-accent/10 text-accent",
+          current.id === defaultId ? "border-line bg-surface-2/60 text-ink hover:border-muted/60" : "border-accent/60 bg-accent/10 text-accent",
         )}
       >
-        {LOCACION_LABEL[key]}
-        <span className="tabular-nums text-muted">{counts[key]}</span>
+        {prefix && <span className="text-muted">{prefix}</span>}
+        {current.label}
+        <span className="tabular-nums text-muted">{current.count}</span>
         <ChevronDown className={cn("h-3.5 w-3.5 text-muted transition-transform", open && "rotate-180")} aria-hidden />
       </button>
       {open &&
@@ -127,25 +135,25 @@ export function LocacionChip({
           <div
             ref={menu}
             role="menu"
-            aria-label="Qué producciones ver"
+            aria-label={ariaLabel}
             className="glass fixed z-[60] overflow-hidden rounded-xl border border-line p-1 shadow-float"
             style={{ width: MENU_W, left: pos.left, top: pos.top, bottom: pos.bottom }}
           >
             {options.map((o) => (
               <button
-                key={o}
+                key={o.id}
                 type="button"
                 role="menuitemradio"
-                aria-checked={key === o}
+                aria-checked={current.id === o.id}
                 onClick={() => {
                   setOpen(false);
-                  onChange(o === "todas" ? null : o);
+                  onChange(o.id);
                 }}
-                className={cn("flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm transition-colors hover:bg-surface-2", key === o ? "text-ink" : "text-muted")}
+                className={cn("flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm transition-colors hover:bg-surface-2", current.id === o.id ? "text-ink" : "text-muted")}
               >
-                <Check className={cn("h-4 w-4 shrink-0 text-accent", key === o ? "opacity-100" : "opacity-0")} aria-hidden />
-                <span className="flex-1">{LOCACION_LABEL[o]}</span>
-                <span className="text-xs tabular-nums text-muted">{counts[o]}</span>
+                <Check className={cn("h-4 w-4 shrink-0 text-accent", current.id === o.id ? "opacity-100" : "opacity-0")} aria-hidden />
+                <span className="flex-1">{o.label}</span>
+                <span className="text-xs tabular-nums text-muted">{o.count}</span>
               </button>
             ))}
           </div>,
@@ -153,6 +161,70 @@ export function LocacionChip({
         )}
     </div>
   );
+}
+
+/**
+ * Chip compacto con menú para elegir qué producciones se ven: con locación (lo normal), sin locación o todas.
+ * Cada opción trae su conteo. Afecta a la lista y al mapa.
+ */
+export function LocacionChip({
+  value,
+  counts,
+  onChange,
+  options = ["con", "sin", "todas"],
+  className,
+}: {
+  value: Locacion;
+  counts: { con: number; sin: number; todas: number };
+  onChange(v: Locacion): void;
+  options?: ("con" | "sin" | "todas")[];
+  className?: string;
+}) {
+  return (
+    <MenuChip
+      value={value ?? "todas"}
+      defaultId="con"
+      ariaLabel="Qué producciones ver"
+      className={className}
+      options={options.map((o) => ({ id: o, label: LOCACION_LABEL[o], count: counts[o] }))}
+      onChange={(id) => onChange(id === "todas" ? null : (id as "con" | "sin"))}
+    />
+  );
+}
+
+/**
+ * Chip de origen: todas, nacionales (guatemaltecas y coproducciones) o extranjeras sobre Guatemala.
+ * Solo aparece cuando hay producciones extranjeras registradas.
+ */
+export function OrigenChip({
+  value,
+  counts,
+  onChange,
+  className,
+}: {
+  value: Origen;
+  counts: { todas: number; nacional: number; extranjera: number };
+  onChange(v: Origen): void;
+  className?: string;
+}) {
+  const ids = ["todas", "nacional", "extranjera"] as const;
+  return (
+    <MenuChip
+      value={value ?? "todas"}
+      defaultId="todas"
+      prefix="Origen:"
+      ariaLabel="Origen de las producciones"
+      className={className}
+      options={ids.map((o) => ({ id: o, label: ORIGEN_LABEL[o], count: counts[o] }))}
+      onChange={(id) => onChange(id === "todas" ? null : (id as "nacional" | "extranjera"))}
+    />
+  );
+}
+
+/** Conteos para el chip de origen, sobre todas las producciones publicadas (sin filtrar). */
+export function origenCounts(films: Pick<Film, "nationality">[]) {
+  const extranjera = films.filter((f) => f.nationality === "extranjera").length;
+  return { todas: films.length, nacional: films.length - extranjera, extranjera };
 }
 
 /** Conteos para el chip de locación, sobre todas las producciones publicadas (sin filtrar). */
@@ -328,6 +400,7 @@ export function FilmCard({
           {sites ? ` — ${sites}` : ""}
         </span>
         <span className="mt-1 flex flex-wrap items-center gap-1.5">
+          {film.nationality === "extranjera" && <span className="chip !py-0 text-[11px] border-accent/50 text-accent">Producción extranjera</span>}
           {film.locations.length > 1 && (
             <span className="chip !py-0 text-[11px]">{film.locations.length} locaciones</span>
           )}

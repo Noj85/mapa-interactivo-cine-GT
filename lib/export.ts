@@ -112,8 +112,8 @@ export function buildTable(
   return {
     name: "producciones",
     title: "Producciones",
-    header: ["Título", "Año", "Duración (min)", "Formato", "Naturaleza", "Géneros", "Director/a", "Productor/a", "Director/a de fotografía", "Guionista", "Casas productoras", "Nacionalidad", "Presupuesto", "Moneda", "Locaciones", "Departamentos", "Fuera de Guatemala", "Días de rodaje", "Inversión local", "Empleos", "Festivales", "Sinopsis", "Registro completo (%)", "Falta", "Estado"],
-    widths: [34, 7, 10, 16, 14, 26, 26, 26, 26, 26, 40, 14, 14, 8, 10, 28, 22, 10, 14, 9, 10, 70, 12, 30, 11],
+    header: ["Título", "Año", "Duración (min)", "Formato", "Naturaleza", "Géneros", "Director/a", "Productor/a", "Director/a de fotografía", "Guionista", "Casas productoras", "Nacionalidad", "Presupuesto", "Moneda", "Locaciones", "Departamentos", "Fuera de Guatemala", "Días de rodaje", "Inversión local", "Empleos", "Festivales", "Sinopsis", "Tráiler", "Película completa", "Registro completo (%)", "Falta", "Estado"],
+    widths: [34, 7, 10, 16, 14, 26, 26, 26, 26, 26, 40, 14, 14, 8, 10, 28, 22, 10, 14, 9, 10, 70, 30, 30, 12, 30, 11],
     rows: films.map((f) => [
       f.title,
       f.year,
@@ -135,6 +135,8 @@ export function buildTable(
       sum(f, "jobs"),
       (f.festivals ?? []).length,
       f.synopsis,
+      f.trailer_url ?? "",
+      f.film_url ?? "",
       f.completeness,
       f.missing_fields.join("; "),
       estado(f.status),

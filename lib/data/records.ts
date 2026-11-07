@@ -92,6 +92,11 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string; e
     currency: input.currency ?? ("GTQ" as const),
     synopsis: str(input.synopsis),
     poster_url: str(input.poster_url),
+    trailer_url: str(input.trailer_url),
+    // sin enlace no hay miniatura
+    trailer_thumb: str(input.trailer_url) ? str(input.trailer_thumb) : null,
+    film_url: str(input.film_url),
+    film_thumb: str(input.film_url) ? str(input.film_thumb) : null,
     locations,
     companies,
   };

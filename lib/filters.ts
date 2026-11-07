@@ -50,6 +50,8 @@ export interface FilmFilter {
   soloCompletas: boolean;
   /** Con o sin locación registrada (dentro o fuera de Guatemala); null no filtra. */
   locacion: "con" | "sin" | null;
+  /** Origen de la producción: nacional (guatemalteca, coproducción o sin dato) o extranjera; null no filtra. */
+  origen: "nacional" | "extranjera" | null;
 }
 
 export interface OrgFilter {
@@ -81,6 +83,7 @@ export const EMPTY_FILM_FILTER: FilmFilter = {
   q: "",
   soloCompletas: false,
   locacion: null,
+  origen: null,
 };
 
 export const EMPTY_ORG_FILTER: OrgFilter = { capa: null, categoria: [], iniciativa: [], depto: [], q: "" };
@@ -161,6 +164,7 @@ export function parseFilmFilter(p: URLSearchParams): FilmFilter {
     q: (p.get("q") ?? "").trim().slice(0, 120),
     soloCompletas: p.get("completas") === "1",
     locacion: p.get("locacion") === "con" || p.get("locacion") === "sin" ? (p.get("locacion") as "con" | "sin") : null,
+    origen: p.get("origen") === "nacional" || p.get("origen") === "extranjera" ? (p.get("origen") as "nacional" | "extranjera") : null,
   };
 }
 
@@ -196,6 +200,7 @@ export function filmFilterToParams(f: FilmFilter, into = new URLSearchParams()) 
   if (f.q) into.set("q", f.q);
   if (f.soloCompletas) into.set("completas", "1");
   if (f.locacion) into.set("locacion", f.locacion);
+  if (f.origen) into.set("origen", f.origen);
   return into;
 }
 
@@ -259,6 +264,8 @@ export function filmMatches(f: Film, flt: FilmFilter): boolean {
   }
   if (flt.locacion === "con" && isUnlocated(f)) return false;
   if (flt.locacion === "sin" && !isUnlocated(f)) return false;
+  if (flt.origen === "extranjera" && f.nationality !== "extranjera") return false;
+  if (flt.origen === "nacional" && f.nationality === "extranjera") return false;
   if (flt.soloCompletas && !(f.locations.length > 0 && f.locations.every((l) => isAbroad(l) || l.muni_ine != null))) return false;
   if (flt.q && !norm(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${f.cinematographer ?? ""} ${f.screenwriter ?? ""} ${companyNames(f.companies).join(" ")}`).includes(norm(flt.q))) return false;
   return true;
@@ -315,6 +322,7 @@ export function describeFilmFilter(f: FilmFilter, deptoName: (code: number) => s
   range("Inversión local", f.inversionMin, f.inversionMax);
   range("Empleos", f.empleosMin, f.empleosMax);
   if (f.locacion) out.push(f.locacion === "con" ? "Con locación registrada" : "Sin locación registrada");
+  if (f.origen) out.push(f.origen === "extranjera" ? "Producciones extranjeras" : "Producciones nacionales");
   if (f.soloCompletas) out.push("Solo con todas las locaciones ubicadas en un municipio");
   if (f.q) out.push(`Búsqueda: “${f.q}”`);
   return out;

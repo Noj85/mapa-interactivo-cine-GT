@@ -65,6 +65,8 @@ const FILM_FIELDS: FieldSpec<FilmInput>[] = [
   { key: "budget", label: "Presupuesto" },
   { key: "synopsis", label: "Sinopsis" },
   { key: "festivals", label: "Festivales y premios", present: (p) => p.festivals !== undefined },
+  { key: "trailer_url", label: "Tráiler" },
+  { key: "film_url", label: "Película completa" },
 ];
 
 const ORG_FIELDS: FieldSpec<OrgInput>[] = [
@@ -144,6 +146,10 @@ function draftFromFilm(f: Film): FilmInput {
     currency: f.currency,
     synopsis: f.synopsis,
     poster_url: f.poster_url,
+    trailer_url: f.trailer_url ?? null,
+    trailer_thumb: f.trailer_thumb ?? null,
+    film_url: f.film_url ?? null,
+    film_thumb: f.film_thumb ?? null,
     status: f.status,
     locations: f.locations.map((l) => ({ ...l })),
     festivals: f.festivals.map((x) => ({ ...x })),
@@ -211,6 +217,15 @@ export function applyCorrection(sub: Submission, current: Film | Org, gaz: Gazet
     set("screenwriter");
     set("synopsis");
     set("festivals");
+    // el enlace y su miniatura van juntos; si la miniatura no vino con el aporte, se resuelve al guardar
+    if (on.has("field:trailer_url")) {
+      d.trailer_url = p.trailer_url ?? null;
+      d.trailer_thumb = p.trailer_thumb ?? null;
+    }
+    if (on.has("field:film_url")) {
+      d.film_url = p.film_url ?? null;
+      d.film_thumb = p.film_thumb ?? null;
+    }
     if (on.has("field:budget")) {
       d.budget = p.budget ?? null;
       d.currency = p.currency ?? d.currency;

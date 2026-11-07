@@ -48,6 +48,8 @@ export const FILM_FIELDS: FieldDef[] = [
   { id: "currency", label: "Moneda" },
   { id: "synopsis", label: "Sinopsis" },
   { id: "poster", label: "Póster (enlace)", hint: "URL de una imagen; se descarga y se guarda al confirmar" },
+  { id: "trailer", label: "Tráiler (enlace)", hint: "URL del tráiler en YouTube, Vimeo u otra plataforma; la miniatura se descarga al confirmar" },
+  { id: "film_link", label: "Película completa (enlace)", hint: "URL donde se puede ver la película completa, si está disponible" },
   { id: "place", label: "Lugar (texto libre)", hint: "Municipio, departamento o sitio en una sola columna" },
   { id: "muni", label: "Municipio" },
   { id: "depto", label: "Departamento" },

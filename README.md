@@ -1,6 +1,6 @@
 # Mapa del Cine de Guatemala
 
-Mapa público e interactivo de la Academia Guatemalteca de Artes y Ciencias Cinematográficas: dónde se rueda, se exhibe y se produce el cine, por departamento (22), municipio (340) y locación. Tres capas: **Producción**, **Circulación** (taxonomía del Atlas del Círculo de Industria) e **Industria**.
+Mapa público e interactivo de la Academia Guatemalteca de Artes y Ciencias Cinematográficas: dónde se filma, dónde se ve y quién hace cine en Guatemala, por departamento (22), municipio (340) y locación. Tres capas: **Producción**, **Circulación** (taxonomía del Atlas del Círculo de Industria) e **Industria**.
 
 El equipo de la Academia entra con usuario y contraseña y carga datos a mano o con un archivo CSV/Excel en cualquier formato: Claude entiende las columnas, ubica los lugares con los códigos del INE, detecta duplicados y pregunta lo que falte. Lo incompleto se publica marcado como incompleto.
 
@@ -28,7 +28,7 @@ Copia `.env.example` a `.env.local` (o configúralas en Vercel).
 ## Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0018`, ver cada sección) de `supabase/migrations/`:
+2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0019`, ver cada sección) de `supabase/migrations/`:
    - `0001_init.sql`: tablas, políticas RLS y perfiles.
    - `0002_posters.sql`: campo del póster y bucket público `posters` en Storage.
    - `0003_submissions.sql`: aportes del público.
@@ -239,6 +239,20 @@ Una producción tiene un póster (`poster_url`). Hay tres formas de subirlo y to
 3. **Con la carga de archivos**: si el Excel trae una columna «Póster (URL)», el asistente la reconoce, descarga cada imagen y la guarda como archivo propio.
 
 Con Supabase los archivos van al bucket público `posters`; en modo local, a `.data/uploads/`.
+
+## Producciones extranjeras y enlaces de video
+
+**Producciones extranjeras.** La nacionalidad «Extranjera» incluye producciones rodadas en Guatemala y producciones que tratan sobre Guatemala aunque se rodaran afuera (en ese caso la locación se registra con su país y cae en la zona «Fuera de Guatemala»). En el mapa público, cuando hay al menos una, aparece el chip **«Origen»** junto al de locación: *Todas* (por defecto), *Nacionales* (guatemaltecas, coproducciones y las que no tienen nacionalidad) o *Extranjeras*, cada una con su conteo. Se guarda en la dirección como `?origen=nacional|extranjera` y también filtra las descargas. Las extranjeras llevan la etiqueta «Producción extranjera» (con el país de las casas productoras) en la lista y en la ficha.
+
+**Tráiler y película completa.** Cada producción puede tener dos enlaces de video (`trailer_url` y `film_url`), ambos opcionales y sin efecto en la completitud. Al pegar el enlace (en el editor del equipo o en `/aportar`) se busca la miniatura y se guarda en nuestro almacenamiento (`trailer_thumb` y `film_thumb`: WebP de 1280 px y miniatura de 480 px):
+
+- YouTube (watch, `youtu.be`, shorts, embed): la imagen del propio video, en la mayor resolución disponible.
+- Vimeo: oEmbed.
+- Cualquier otra plataforma (Netflix, Prime Video, Filmin, etc.): la imagen que la página declara para compartirse (`og:image` o `twitter:image`). Si no hay ninguna, el enlace se guarda sin miniatura.
+
+La búsqueda corre en el servidor por `/api/videos/miniatura` (solo http/https, direcciones públicas, redirecciones validadas una por una, límite de tamaño y de tiempo; el público tiene un límite de 12 consultas por hora por IP y sus archivos llevan el prefijo `ap-`, así que se borran si el aporte se rechaza). Si un enlace llega sin miniatura (carga de archivo, aporte, aprobación) se resuelve al guardar, y si el enlace cambia o se borra se elimina la miniatura anterior. En la ficha, el **tráiler** de YouTube o Vimeo se reproduce ahí mismo (`youtube-nocookie.com` o `player.vimeo.com`, tras tocar la miniatura) y el de otras plataformas abre en otra pestaña; la **película completa** siempre abre en la plataforma. Las revisiones de aportes, la fusión de duplicados, la carga de archivos (columnas «Tráiler» y «Película completa») y la exportación incluyen los dos enlaces. **Con Supabase aplica `supabase/migrations/0019_film_videos.sql`; sin ella, guardar producciones falla.**
+
+**Imagen al compartir.** `app/opengraph-image.tsx` dibuja la marca (cinta y pin) y escribe «MAPA DEL CINE DE GUATEMALA» en Biennale, con la frase «Dónde se filma, dónde se ve y quién hace cine en Guatemala.». WhatsApp y las redes guardan la vista previa en caché; para verla de inmediato, comparte el enlace con `?v=2` al final.
 
 ### Logos de entidades y fotos en los aportes
 

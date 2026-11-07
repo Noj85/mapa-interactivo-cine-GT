@@ -6,6 +6,7 @@ import { cleanGenres, parseFormat, parseNature, splitGenreText } from "@/lib/fil
 import { linkFestivals, syncOrgFestivalSafe } from "@/lib/festivals-server";
 import { serverGazetteer } from "@/lib/geo/server";
 import { deletePublicImages } from "@/lib/posters";
+import { droppedVideoThumbs, ensureVideoThumbs } from "@/lib/video";
 import { filmSchema, orgSchema } from "@/lib/schemas";
 import { isAbroad } from "@/lib/completeness";
 import { applyFilmFields, applyOrgFields, createFilmFromImport, createOrgFromImport, planFilmUpdate, planOrgUpdate } from "@/lib/import/apply-server";
@@ -29,7 +30,10 @@ export async function saveFilmAction(raw: unknown): Promise<Result> {
     const store = await adminStore();
     const data = parsed.data as unknown as FilmInput;
     data.festivals = await linkFestivals(store, data.festivals);
-    const film = await store.saveFilm(data);
+    const previous = data.id ? await store.getFilm(data.id) : null;
+    const film = await store.saveFilm(await ensureVideoThumbs(data, previous));
+    const gone = droppedVideoThumbs(previous, film);
+    if (gone.length) await deletePublicImages(gone);
     refresh();
     return { ok: true, id: film.id };
   } catch (e) {
@@ -148,7 +152,8 @@ export async function mergeFilmsAction(aId: string, bId: string, raw: unknown): 
     const saved = await store.saveFilm({ ...input, id: keep.id, source: undefined });
     await store.mergeFilmInto(drop.id, keep.id);
     // los pósters que ya no usa nadie
-    const unused = [a.poster_url, b.poster_url].filter((u): u is string => !!u && u !== saved.poster_url);
+    const keepers = new Set([saved.poster_url, saved.trailer_thumb, saved.film_thumb]);
+    const unused = [a.poster_url, b.poster_url, a.trailer_thumb, b.trailer_thumb, a.film_thumb, b.film_thumb].filter((u): u is string => !!u && !keepers.has(u));
     if (unused.length) await deletePublicImages([...new Set(unused)]);
     refresh();
     revalidatePath("/admin/peliculas");
@@ -270,11 +275,15 @@ export async function approveSubmissionAction(
       const currentImage = (sub.kind === "film" ? (current as Film).poster_url : (current as Org).logo_url) ?? null;
       const dropped: (string | null)[] = [];
       if (sub.kind === "film") {
-        const input = res.input as FilmInput;
+        const input = await ensureVideoThumbs(res.input as FilmInput, current as Film);
         input.festivals = await linkFestivals(store, input.festivals);
         const film = await store.saveFilm({ ...input, id: current.id, status, source: undefined });
         recordId = film.id;
         if (currentImage && film.poster_url !== currentImage) dropped.push(currentImage);
+        // miniaturas de video: las que ya no se usan y las que el aporte propuso y no se aceptaron
+        const proposed = sub.payload as { trailer_thumb?: string | null; film_thumb?: string | null };
+        dropped.push(...droppedVideoThumbs(current as Film, film));
+        for (const t of [proposed.trailer_thumb, proposed.film_thumb]) if (t && t !== film.trailer_thumb && t !== film.film_thumb) dropped.push(t);
       } else {
         const input = res.input as OrgInput;
         const org = await store.saveOrg({ ...input, id: current.id, status, source: (current as Org).source });
@@ -316,12 +325,17 @@ export async function approveSubmissionAction(
       if (sub.target_id && !current) return { ok: false, error: "El registro a corregir ya no existe" };
       // el póster del aporte solo reemplaza al actual si trae uno nuevo
       const poster = input.poster_url || current?.poster_url || null;
+      const withVideo = await ensureVideoThumbs(input, current);
       const film = await store.saveFilm(
         current
-          ? { ...input, id: current.id, poster_url: poster, status: opts.publish ? "published" : current.status, source: undefined }
-          : { ...input, poster_url: poster, status: newStatus, source: SOURCE_PUBLIC },
+          ? { ...withVideo, id: current.id, poster_url: poster, status: opts.publish ? "published" : current.status, source: undefined }
+          : { ...withVideo, poster_url: poster, status: newStatus, source: SOURCE_PUBLIC },
       );
       if (current?.poster_url && poster !== current.poster_url) await deletePublicImages([current.poster_url]);
+      if (current) {
+        const gone = droppedVideoThumbs(current, film);
+        if (gone.length) await deletePublicImages(gone);
+      }
       recordId = film.id;
     } else {
       const parsed = orgSchema.safeParse(sub.payload);
@@ -424,11 +438,11 @@ export async function rejectSubmissionAction(id: string, note: string | null): P
     if (sub.status !== "pending") return { ok: false, error: "Este aporte ya fue revisado" };
     await store.reviewSubmission(id, { status: "rejected", reviewer_note: note?.trim() || null });
     // las imágenes que subió el público ya no hacen falta (salvo que algún registro las esté usando)
-    const p = sub.payload as { poster_url?: string | null; logo_url?: string | null };
-    const mine = [p.poster_url, p.logo_url].filter((u): u is string => !!u);
+    const p = sub.payload as { poster_url?: string | null; logo_url?: string | null; trailer_thumb?: string | null; film_thumb?: string | null };
+    const mine = [p.poster_url, p.logo_url, p.trailer_thumb, p.film_thumb].filter((u): u is string => !!u);
     if (mine.length) {
       const [films, orgs] = await Promise.all([store.listFilms({ drafts: true }), store.listOrgs({ drafts: true })]);
-      const inUse = new Set([...films.map((f) => f.poster_url), ...orgs.map((o) => o.logo_url)]);
+      const inUse = new Set([...films.flatMap((f) => [f.poster_url, f.trailer_thumb, f.film_thumb]), ...orgs.map((o) => o.logo_url)]);
       await deletePublicImages(mine.filter((u) => !inUse.has(u)));
     }
     revalidatePath("/admin");

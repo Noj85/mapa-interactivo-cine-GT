@@ -15,9 +15,11 @@ const file = (...p: string[]) => readFile(path.join(process.cwd(), ...p));
 const dataUri = (buf: Buffer, mime: string) => `data:${mime};base64,${buf.toString("base64")}`;
 
 export default async function OpenGraphImage() {
-  const [book, logo, academia, procine] = await Promise.all([
+  const [book, semibold, bold, mark, academia, procine] = await Promise.all([
     file("fonts", "biennale", "Biennale Book.otf"),
-    file("public", "brand", "mapa-logo-dark.png"),
+    file("fonts", "biennale", "Biennale SemiBold.otf"),
+    file("fonts", "biennale", "Biennale Bold.otf"),
+    file("public", "brand", "mapa-mark-dark.png"),
     file("public", "brand", "academia-dark.png"),
     file("public", "brand", "procine-dark.png"),
   ]);
@@ -41,9 +43,16 @@ export default async function OpenGraphImage() {
       >
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", flex: 1 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={dataUri(logo, "image/png")} width={900} height={203} alt="" />
-          <div style={{ marginTop: 40, fontSize: 38, fontWeight: 400, lineHeight: 1.3, color: "#c3cee6" }}>
-            Dónde se rueda, se exhibe y se produce el cine nacional.
+          {/* La marca (cinta y pin) va como imagen; el nombre se escribe en Biennale */}
+          <div style={{ display: "flex", alignItems: "center", gap: 36 }}>
+            <img src={dataUri(mark, "image/png")} width={340} height={184} alt="" />
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ fontSize: 84, fontWeight: 700, lineHeight: 1, letterSpacing: -1.5, color: "#fff" }}>MAPA DEL CINE</div>
+              <div style={{ marginTop: 14, fontSize: 50, fontWeight: 600, lineHeight: 1, letterSpacing: 12, color: "#e0369a" }}>DE GUATEMALA</div>
+            </div>
+          </div>
+          <div style={{ marginTop: 44, fontSize: 34, fontWeight: 400, lineHeight: 1.3, color: "#c3cee6" }}>
+            Dónde se filma, dónde se ve y quién hace cine en Guatemala.
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 40, borderTop: "1px solid rgba(255,255,255,0.18)", paddingTop: 32 }}>
@@ -59,6 +68,8 @@ export default async function OpenGraphImage() {
       ...size,
       fonts: [
         { name: "Biennale", data: book, weight: 400, style: "normal" },
+        { name: "Biennale", data: semibold, weight: 600, style: "normal" },
+        { name: "Biennale", data: bold, weight: 700, style: "normal" },
       ],
     },
   );

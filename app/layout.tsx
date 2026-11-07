@@ -40,7 +40,7 @@ const biennale = localFont({
 });
 
 const SITE_NAME = "Mapa del Cine de Guatemala";
-const DESCRIPTION = "Dónde se rueda, se exhibe y se produce el cine en Guatemala: departamentos, municipios y locaciones. Un proyecto de PROCINE y la Academia Guatemalteca de Artes y Ciencias Cinematográficas.";
+const DESCRIPTION = "Dónde se filma, dónde se ve y quién hace cine en Guatemala: departamentos, municipios y locaciones. Un proyecto de PROCINE y la Academia Guatemalteca de Artes y Ciencias Cinematográficas.";
 
 /**
  * Dirección pública del sitio, para que las imágenes al compartir un enlace (WhatsApp, redes, correo) lleven dirección absoluta.

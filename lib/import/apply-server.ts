@@ -2,6 +2,7 @@ import "server-only";
 import type { Store } from "@/lib/data/store";
 import { linkFestivals, syncOrgFestivalSafe } from "@/lib/festivals-server";
 import { imageFromUrl } from "@/lib/posters";
+import { ensureVideoThumbs } from "@/lib/video";
 import type { Film, FilmInput, Org, OrgInput, RecordStatus } from "@/lib/types";
 import { applyFilmUpdate, applyOrgUpdate, planFilmUpdate, planOrgUpdate, summarizeApplied, type UpdateItem, type UpdatePlan } from "./diff";
 
@@ -39,7 +40,8 @@ export async function applyFilmFields(store: Store, existing: Film, incoming: Fi
   if (!res.changed) return { saved: null, applied: [], filled: [] };
   // los festivales nuevos entran al catálogo (o se unen a uno que ya existe)
   res.input.festivals = await linkFestivals(store, res.input.festivals);
-  const saved = await store.saveFilm({ ...res.input, status: existing.status }, importId ? { import_id: importId } : undefined);
+  const input = await ensureVideoThumbs(res.input, existing);
+  const saved = await store.saveFilm({ ...input, status: existing.status }, importId ? { import_id: importId } : undefined);
   return { saved, applied: res.applied, filled: summarizeApplied(res.applied) };
 }
 
@@ -66,7 +68,8 @@ export async function createFilmFromImport(store: Store, input: FilmInput, statu
   // `image`: póster ya descargado (undefined = descargarlo ahora)
   const poster = image !== undefined ? image : input.poster_url ? await imageFromUrl(input.poster_url, "poster") : null;
   const festivals = await linkFestivals(store, input.festivals);
-  return store.saveFilm({ ...input, id: undefined, poster_url: poster, festivals, status }, importId ? { import_id: importId } : undefined);
+  const withVideo = await ensureVideoThumbs(input);
+  return store.saveFilm({ ...withVideo, id: undefined, poster_url: poster, festivals, status }, importId ? { import_id: importId } : undefined);
 }
 
 /** Crea una entidad nueva a partir de la carga (descarga el logo si trae enlace). */

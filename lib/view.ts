@@ -128,6 +128,7 @@ export function activeFilterCount(v: Pick<ViewState, "layer" | "filmFilter" | "o
   // moneda es un ajuste del presupuesto, no un filtro aparte; la locación tiene su propio chip en el panel
   params.delete("moneda");
   params.delete("locacion");
+  params.delete("origen");
   // presupuesto, año y demás rangos cuentan como un solo filtro cada uno
   const groups = new Set<string>();
   for (const k of params.keys()) groups.add(k.replace(/_(min|max)$/, "").replace(/^(desde|hasta)$/, "anio"));

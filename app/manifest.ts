@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Mapa del Cine de Guatemala",
     short_name: "Mapa del Cine GT",
-    description: "Dónde se rueda, se exhibe y se produce el cine en Guatemala.",
+    description: "Dónde se filma, dónde se ve y quién hace cine en Guatemala.",
     start_url: "/",
     display: "standalone",
     background_color: "#12274d",

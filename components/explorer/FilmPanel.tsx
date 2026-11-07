@@ -1,7 +1,7 @@
 "use client";
 
 import { isAbroad } from "@/lib/completeness";
-import { AlertCircle, Award, ExternalLink, MapPin, MessageSquarePlus, Pencil, Send } from "lucide-react";
+import { AlertCircle, Award, ExternalLink, MapPin, MessageSquarePlus, Pencil, Play, Send } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useState } from "react";
@@ -9,11 +9,59 @@ import { createPortal } from "react-dom";
 import { durationLabel, filmTypeLabel } from "@/lib/film-types";
 import { FESTIVAL_RESULTS, NATIONALITIES } from "@/lib/types";
 import { cn, fmtInt, fmtMoney } from "@/lib/utils";
+import { posterThumb } from "@/lib/poster-url";
+import { embedAutoplay, parseVideo } from "@/lib/video-url";
 import { CompletenessBadge, CompletenessMeter } from "@/components/ui/Badges";
 import { PanelShell, type PanelCtx, SectionTitle, Stat } from "./parts";
 
 // solo se carga cuando alguien del equipo lo abre
 const RequestInfoDialog = dynamic(() => import("@/components/admin/RequestInfoDialog").then((m) => m.RequestInfoDialog), { ssr: false });
+
+/** Tráiler: miniatura con botón de reproducir. YouTube y Vimeo se reproducen aquí; las demás plataformas abren en otra pestaña. */
+function Trailer({ url, thumb, title }: { url: string; thumb: string | null | undefined; title: string }) {
+  const [playing, setPlaying] = useState(false);
+  const v = parseVideo(url);
+  if (!v) return null;
+  const embed = embedAutoplay(v);
+  const frame = "relative block aspect-video w-full shrink-0 overflow-hidden rounded-xl border border-line bg-black";
+  if (playing && embed)
+    return (
+      <div className={frame}>
+        <iframe
+          src={embed}
+          title={`Tráiler de ${title}`}
+          className="absolute inset-0 h-full w-full"
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
+      </div>
+    );
+  const cover = (
+    <>
+      {thumb && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={thumb} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition group-hover:scale-[1.02]" />
+      )}
+      <span className="absolute inset-0 bg-black/25 transition group-hover:bg-black/10" />
+      <span className="absolute inset-0 flex items-center justify-center">
+        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-black shadow-float">
+          <Play className="h-5 w-5 translate-x-px" aria-hidden />
+        </span>
+      </span>
+      <span className="absolute bottom-2 left-2.5 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white">Tráiler · {v.label}</span>
+    </>
+  );
+  return embed ? (
+    <button type="button" onClick={() => setPlaying(true)} className={cn(frame, "group")} aria-label={`Ver el tráiler de ${title}`}>
+      {cover}
+    </button>
+  ) : (
+    <a href={url} target="_blank" rel="noreferrer noopener" className={cn(frame, "group")} aria-label={`Ver el tráiler de ${title} en ${v.label} (abre en otra pestaña)`}>
+      {cover}
+    </a>
+  );
+}
 
 export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
   const { data, gaz, view, go, canEdit } = ctx;
@@ -38,7 +86,11 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
     known("local_spend") && { label: "Inversión local", value: fmtMoney(spend) },
     known("jobs") && { label: "Empleos", value: fmtInt(jobs) },
   ].filter((x): x is { label: string; value: string } => !!x);
-  const meta = [film.year, kind, durationLabel(film.duration_min), nat].filter(Boolean).join(" · ");
+  const trailer = film.trailer_url ? parseVideo(film.trailer_url) : null;
+  const full = film.film_url ? parseVideo(film.film_url) : null;
+  const foreign = film.nationality === "extranjera";
+  const foreignFrom = [...new Set((film.companies ?? []).map((c) => c.country).filter((c): c is string => !!c))];
+  const meta = [film.year, kind, durationLabel(film.duration_min), foreign ? null : nat].filter(Boolean).join(" · ");
   // Lo más reciente primero; los premios antes que las selecciones dentro de un mismo año.
   const rank = (r: string) => FESTIVAL_RESULTS.findIndex((x) => x.id === r);
   const fests = [...(film.festivals ?? [])].sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || rank(a.result) - rank(b.result));
@@ -53,6 +105,12 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
       )}
       <h2 className="font-display text-[32px] leading-[1.05] tracking-tight text-ink">{film.title}</h2>
       <div className="mt-1.5 text-sm text-muted">{meta || "Datos básicos pendientes"}</div>
+      {foreign && (
+        <div className="mt-2 inline-flex flex-wrap items-center gap-1.5">
+          <span className="chip border-accent/50 text-accent">Producción extranjera</span>
+          {foreignFrom.length > 0 && <span className="text-xs text-muted">{foreignFrom.join(" · ")}</span>}
+        </div>
+      )}
       {film.genres.length > 0 && (
         <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Géneros">
           {film.genres.map((g) => (
@@ -95,6 +153,37 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
       )}
 
       {film.synopsis && <p className="mt-5 text-sm leading-relaxed text-ink/85">{film.synopsis}</p>}
+
+      {(trailer || full) && (
+        <div className="mt-5 shrink-0 space-y-2.5">
+          {trailer && <Trailer url={film.trailer_url!} thumb={film.trailer_thumb} title={film.title} />}
+          {full && (
+            <a
+              href={film.film_url!}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="group flex shrink-0 items-center gap-3 rounded-xl border border-line p-2 transition hover:border-accent/60 hover:bg-surface-2/60"
+              aria-label={`Ver la película ${film.title} en ${full.label} (abre en otra pestaña)`}
+            >
+              <span className="relative block aspect-video w-28 shrink-0 overflow-hidden rounded-lg bg-surface-2">
+                {film.film_thumb && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={posterThumb(film.film_thumb)!} alt="" loading="lazy" className="h-full w-full object-cover" />
+                )}
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white"><Play className="h-3.5 w-3.5 translate-x-px" aria-hidden /></span>
+                </span>
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm text-ink">Ver película completa</span>
+                <span className="flex items-center gap-1 text-xs text-muted">
+                  en {full.label} <ExternalLink className="h-3 w-3" aria-hidden />
+                </span>
+              </span>
+            </a>
+          )}
+        </div>
+      )}
 
       <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
         {film.director && (

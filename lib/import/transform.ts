@@ -221,6 +221,8 @@ function filmFields(row: Row, plan: SheetPlan): Omit<FilmInput, "locations" | "f
     currency: detectCurrency(val(row, plan, "currency")) ?? detectCurrency(budgetRaw) ?? "GTQ",
     synopsis: cleanText(val(row, plan, "synopsis")),
     poster_url: posterLink(val(row, plan, "poster")),
+    trailer_url: posterLink(val(row, plan, "trailer")),
+    film_url: posterLink(val(row, plan, "film_link")),
   };
 }
 

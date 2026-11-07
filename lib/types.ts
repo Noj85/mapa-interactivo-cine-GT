@@ -101,6 +101,12 @@ export interface Film {
   synopsis: string | null;
   /** Póster (900 px de ancho). La miniatura se obtiene con `posterThumb`. */
   poster_url?: string | null;
+  /** Tráiler: enlace a la plataforma (YouTube, Vimeo, etc.) y su miniatura guardada (imagen grande; la chica se obtiene con `posterThumb`). */
+  trailer_url?: string | null;
+  trailer_thumb?: string | null;
+  /** Película completa, si se puede ver en línea: enlace y miniatura. */
+  film_url?: string | null;
+  film_thumb?: string | null;
   status: RecordStatus;
   /** 0..100 */
   completeness: number;
@@ -274,6 +280,10 @@ export interface FilmInput {
   currency?: "GTQ" | "USD";
   synopsis?: string | null;
   poster_url?: string | null;
+  trailer_url?: string | null;
+  trailer_thumb?: string | null;
+  film_url?: string | null;
+  film_thumb?: string | null;
   status?: RecordStatus;
   source?: string | null;
   locations: Partial<Omit<FilmLocation, "film_id">>[];
