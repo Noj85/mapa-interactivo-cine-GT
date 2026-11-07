@@ -11,7 +11,8 @@
  *   node scripts/brand-mapa.mjs
  *
  * Escribe:
- *   public/brand/mapa-logo-{light,dark}.png   logo horizontal (marca + «MAPA DEL CINE DE GUATEMALA»)
+ *   public/brand/mapa-logo-{light,dark}.png   NO se escribe aquí: el logo horizontal, con el nombre en Biennale, lo arma
+ *                                             scripts/brand-mapa-logo.mjs a partir de la marca (córrelo después de este)
  *   public/brand/mapa-mark-{light,dark}.png   solo la marca (cinta de película + pin)
  *   app/icon.png, app/favicon.ico, app/apple-icon.png, public/icon-192.png, public/icon-512.png   íconos sobre azul institucional
  * «light» es para fondo claro y «dark» para fondo oscuro, igual que los logos de la Academia y PROCINE.
@@ -109,9 +110,8 @@ const toPng = (img) => sharp(img.data, { raw: { width: img.w, height: img.h, cha
 const logo = extract(box);
 const mark = extract(MARK);
 for (const v of ["dark", "light"]) {
-  await toPng(logo[v]).toFile(path.join(OUT, `mapa-logo-${v}.png`));
   await toPng(mark[v]).toFile(path.join(OUT, `mapa-mark-${v}.png`));
-  for (const n of ["logo", "mark"]) {
+  for (const n of ["mark"]) {
     const m = await sharp(path.join(OUT, `mapa-${n}-${v}.png`)).metadata();
     console.log(`mapa-${n}-${v}`, m.width, "x", m.height);
   }

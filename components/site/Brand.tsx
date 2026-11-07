@@ -17,14 +17,14 @@ function ThemedLogo({ name, alt, className, width, height }: { name: string; alt
 }
 
 /**
- * Logo del Mapa del Cine de Guatemala: cinta de película con el pin y el nombre. Con `markOnly` solo la cinta y el pin.
- * Tiene variantes para fondo claro y oscuro (ver scripts/brand-mapa.mjs).
+ * Logo del Mapa del Cine de Guatemala: cinta de película con el pin y el nombre escrito en Biennale. Con `markOnly` solo la cinta y el pin.
+ * Tiene variantes para fondo claro y oscuro (ver scripts/brand-mapa.mjs para la marca y scripts/brand-mapa-logo.mjs para el logo completo).
  */
 export function MapLogo({ className, markOnly }: { className?: string; markOnly?: boolean }) {
   return markOnly ? (
     <ThemedLogo name="mapa-mark" alt="Mapa del Cine de Guatemala" width={657} height={355} className={cn("h-9 shrink-0", className)} />
   ) : (
-    <ThemedLogo name="mapa-logo" alt="Mapa del Cine de Guatemala" width={1575} height={355} className={cn("h-10 shrink-0", className)} />
+    <ThemedLogo name="mapa-logo" alt="Mapa del Cine de Guatemala" width={3700} height={710} className={cn("h-10 shrink-0", className)} />
   );
 }
 
