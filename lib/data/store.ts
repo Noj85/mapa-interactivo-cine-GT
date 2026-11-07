@@ -84,6 +84,11 @@ export interface Store {
   saveFilm(input: FilmInput, extra?: { import_id?: string }): Promise<Film>;
   saveOrg(input: OrgInput, extra?: { import_id?: string }): Promise<Org>;
   deleteFilm(id: string): Promise<void>;
+  /**
+   * Última parte de una fusión: lo que apuntaba a `fromId` (aportes, solicitudes de información, preguntas de carga)
+   * pasa a `intoId`, y se borra `fromId` con sus locaciones y festivales.
+   */
+  mergeFilmInto(fromId: string, intoId: string): Promise<void>;
   deleteOrg(id: string): Promise<void>;
   saveImport(rec: ImportRecord): Promise<ImportRecord>;
   listImports(): Promise<ImportRecord[]>;
@@ -271,6 +276,22 @@ export class LocalStore implements Store {
   async deleteFilm(id: string) {
     const db = await readDb();
     db.films = db.films.filter((f) => f.id !== id);
+    await writeDb(db);
+  }
+  async mergeFilmInto(fromId: string, intoId: string) {
+    const db = await readDb();
+    const from = db.films.find((f) => f.id === fromId);
+    const into = db.films.find((f) => f.id === intoId);
+    if (!from || !into || from.id === into.id) return;
+    const swap = (id: string | null | undefined) => (id === fromId ? intoId : id);
+    db.submissions = db.submissions.map((x) => ({ ...x, target_id: swap(x.target_id) ?? null, result_id: swap(x.result_id) ?? null }));
+    db.info_requests = db.info_requests.map((r) => ({
+      ...r,
+      target_id: swap(r.target_id)!,
+      ...(r.target_ids ? { target_ids: [...new Set(r.target_ids.map((t) => swap(t)!))] } : {}),
+    }));
+    db.questions = db.questions.map((q) => (q.record_ref === `film:${from.slug}` ? { ...q, record_ref: `film:${into.slug}` } : q));
+    db.films = db.films.filter((f) => f.id !== fromId);
     await writeDb(db);
   }
   async deleteOrg(id: string) {
@@ -867,6 +888,23 @@ export class SupabaseStore implements Store {
 
   async deleteFilm(id: string) {
     must(await this.db.from("films").delete().eq("id", id));
+  }
+  async mergeFilmInto(fromId: string, intoId: string) {
+    if (fromId === intoId) return;
+    const [from, into] = await Promise.all([this.getFilm(fromId), this.getFilm(intoId)]);
+    if (!from || !into) return;
+    must(await this.db.from("submissions").update({ target_id: intoId }).eq("target_id", fromId));
+    must(await this.db.from("submissions").update({ result_id: intoId }).eq("result_id", fromId));
+    must(await this.db.from("info_requests").update({ target_id: intoId }).eq("target_id", fromId));
+    // solicitudes consolidadas: el id también puede estar en la lista de las demás producciones
+    const multi = (await this.db.from("info_requests").select("id, target_ids").contains("target_ids", [fromId])).data as { id: string; target_ids: string[] }[] | null;
+    for (const r of multi ?? []) {
+      const ids = [...new Set(r.target_ids.map((t) => (t === fromId ? intoId : t)))];
+      must(await this.db.from("info_requests").update({ target_ids: ids }).eq("id", r.id));
+    }
+    must(await this.db.from("import_questions").update({ record_ref: `film:${into.slug}` }).eq("record_ref", `film:${from.slug}`));
+    // locaciones y festivales del que se va se borran en cascada
+    must(await this.db.from("films").delete().eq("id", fromId));
   }
   async deleteOrg(id: string) {
     must(await this.db.from("organizations").delete().eq("id", id));

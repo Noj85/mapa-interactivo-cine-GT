@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, EyeOff, Landmark, Loader2, Search, Send, X } from "lucide-react";
+import { Eye, EyeOff, GitMerge, Landmark, Loader2, Search, Send, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -326,6 +326,12 @@ export function RecordsTable({
           >
             <Send className="h-3.5 w-3.5" /> Solicitar información
           </button>
+          {isFilm && selected.size === 2 && (
+            <Link className="btn-outline !min-h-0 !py-1.5 text-xs" href={`/admin/peliculas/fusionar?a=${[...selected][0]}&b=${[...selected][1]}`}>
+              <GitMerge className="h-3.5 w-3.5" /> Fusionar
+            </Link>
+          )}
+          {isFilm && selected.size > 2 && <span className="text-xs text-muted">Para fusionar, elige solo dos</span>}
           <button className="btn-ghost !min-h-0 !py-1.5 text-xs" onClick={() => setSelected(new Set())}>Quitar selección</button>
         </div>
       )}

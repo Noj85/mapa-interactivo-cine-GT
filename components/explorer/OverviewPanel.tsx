@@ -1,9 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { metricText, metricValueText } from "@/lib/format";
-import { metricValue } from "@/lib/aggregate";
-import { LAYERS, METRICS } from "@/lib/types";
+import { LAYERS } from "@/lib/types";
 import { cn, fmtInt, fmtMoney } from "@/lib/utils";
 import Link from "next/link";
 import { downloadHref } from "@/lib/view";
@@ -11,23 +9,12 @@ import { BrandFooter } from "@/components/site/Brand";
 import { hasAnchor, isAbroad } from "@/lib/completeness";
 import type { StatKey } from "@/lib/site-settings";
 import type { Film } from "@/lib/types";
-import { ChevronDown, Globe2, MapPinOff } from "lucide-react";
-import { abroadFilms, unlocatedFilms } from "@/lib/map/features";
-import { BarRow, DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid, LocacionChip, locacionCounts } from "./parts";
+import { DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid, LocacionChip, locacionCounts } from "./parts";
 
 export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
   const { data, gaz, aggs, view, go } = ctx;
   const layer = LAYERS.find((l) => l.id === view.layer)!;
   const [showAll, setShowAll] = useState(false);
-
-  const top = useMemo(() => {
-    return gaz.entries
-      .filter((e) => e.type === "depto")
-      .map((e) => ({ e, v: metricValue(aggs.depto.get(e.code), view.metric) }))
-      .filter((x) => x.v > 0)
-      .sort((a, b) => b.v - a.v)
-      .slice(0, 6);
-  }, [gaz, aggs, view.metric]);
 
   const films = useMemo(
     () => [...data.films].sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.title.localeCompare(b.title)),
@@ -43,9 +30,6 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
       : orgs.filter((o) => o.completeness < 100).length;
   const totalRecords = view.layer === "produccion" ? films.length : orgs.length;
 
-  // sobre todas: con «Con locación» las que no tienen lugar no están en `data`, pero el aviso dice cuántas faltan
-  const unlocated = useMemo(() => unlocatedFilms(ctx.allFilms).length, [ctx.allFilms]);
-  const abroad = useMemo(() => abroadFilms(data.films).length, [data.films]);
   const t = aggs.total;
   // solo para el equipo: en cuántas producciones hay dato de cada cifra
   const cover = (k: StatKey) => {
@@ -57,7 +41,6 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
   const full = ctx.sheet === "full";
   const previewN = mobile ? 8 : 6;
   const shown = showAll ? list : list.slice(0, previewN);
-  const [showDeptos, setShowDeptos] = useState(false);
 
   const counts = useMemo(() => locacionCounts(ctx.allFilms), [ctx.allFilms]);
   const loc = view.filmFilter.locacion;
@@ -110,61 +93,11 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
       </div>
     );
 
-  // avisos de las producciones que el filtro deja fuera
-  const notices = (
-    <>
-      {view.layer === "produccion" && loc !== "sin" && unlocated > 0 && (
-        <button
-          onClick={go.unlocated}
-          className="mt-3 flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-dashed border-line px-3 py-2 text-left text-xs text-muted transition hover:border-accent hover:text-ink"
-        >
-          <MapPinOff className="h-4 w-4 shrink-0" />
-          <span className="flex-1">
-            <b className="font-medium text-ink">{fmtInt(unlocated)}</b> {unlocated === 1 ? "producción no tiene" : "producciones no tienen"} lugar de rodaje
-            {loc === "con" ? " y no se muestran." : ". Están en el marcador «Sin locación»."}
-          </span>
-          <span className="shrink-0 font-medium text-accent">Ver</span>
-        </button>
-      )}
-      {view.layer === "produccion" && abroad > 0 && loc !== "sin" && (
-        <button
-          onClick={go.abroad}
-          className="mt-3 flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-dashed border-line px-3 py-2 text-left text-xs text-muted transition hover:border-accent hover:text-ink"
-        >
-          <Globe2 className="h-4 w-4 shrink-0" />
-          <span className="flex-1">
-            <b className="font-medium text-ink">{fmtInt(abroad)}</b> {abroad === 1 ? "producción se rodó" : "producciones se rodaron"} fuera de Guatemala.
-          </span>
-          <span className="shrink-0 font-medium text-accent">Ver</span>
-        </button>
-      )}
-      {!mobile && incomplete > 0 && (
-        <p className="mt-3 text-xs text-muted">
-          <span className="text-warn">{incomplete}</span> de {totalRecords} registros tienen información pendiente.
-        </p>
-      )}
-    </>
-  );
-
-  const deptos = (
-    <>
-      {top.length === 0 ? (
-        <Empty>Aún no hay registros con locación en esta capa.</Empty>
-      ) : (
-        <div className="-mx-1">
-          {top.map(({ e, v }) => (
-            <BarRow
-              key={e.code}
-              label={e.name}
-              value={v}
-              max={top[0].v}
-              text={metricText(aggs.depto.get(e.code), view.metric, view.layer) || metricValueText(v, view.metric)}
-              onClick={() => go.place({ type: "depto", code: e.code })}
-            />
-          ))}
-        </div>
-      )}
-    </>
+  // solo para el equipo: cuántos registros tienen datos pendientes
+  const pendingNote = ctx.canEdit && !mobile && incomplete > 0 && (
+    <p className="mt-3 text-xs text-muted">
+      <span className="text-warn">{incomplete}</span> de {totalRecords} registros tienen información pendiente.
+    </p>
   );
 
   const listTitle = view.layer === "produccion" ? "Producciones" : "Registros";
@@ -209,17 +142,7 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
       <PanelShell eyebrow={layer.blurb}>
         {heading}
         {listBlock}
-        {notices}
         {stats}
-        {top.length > 0 && (
-          <div className="mt-4">
-            <button className="btn-ghost min-h-[44px] w-full justify-between text-xs" aria-expanded={showDeptos} onClick={() => setShowDeptos((o) => !o)}>
-              <span>Más actividad por departamento</span>
-              <ChevronDown className={cn("h-4 w-4 transition-transform", showDeptos && "rotate-180")} />
-            </button>
-            {showDeptos && <div className="mt-1">{deptos}</div>}
-          </div>
-        )}
         {list.length > 0 && <DownloadLink href={downloadHref(view)} label="Descargar estos datos" />}
         {full && <BrandFooter bare className="mt-6 border-t border-line pt-5 [&_img]:max-h-8" />}
       </PanelShell>
@@ -230,9 +153,7 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
     <PanelShell eyebrow={layer.blurb}>
       {heading}
       {stats}
-      {notices}
-      <SectionTitle aside={METRICS[view.metric].label}>Más actividad por departamento</SectionTitle>
-      {deptos}
+      {pendingNote}
       {listBlock}
       {list.length > 0 && <DownloadLink href={downloadHref(view)} label="Descargar estos datos" />}
       <BrandFooter bare className="mt-8 border-t border-line pt-5 [&_img]:max-h-8" />

@@ -10,6 +10,8 @@ import { filmSchema, orgSchema } from "@/lib/schemas";
 import { isAbroad } from "@/lib/completeness";
 import { applyFilmFields, applyOrgFields, createFilmFromImport, createOrgFromImport, planFilmUpdate, planOrgUpdate } from "@/lib/import/apply-server";
 import { applyCorrection, planCorrection } from "@/lib/submissions-plan";
+import { applyMerge, type MergeChoice } from "@/lib/merge-films";
+import { z } from "zod";
 import type { Film, FilmInput, Org, OrgInput, QuestionStatus, RecordStatus } from "@/lib/types";
 
 type Result = { ok: true; id: string } | { ok: false; error: string };
@@ -106,6 +108,52 @@ export async function deleteFilmAction(id: string): Promise<Result> {
     await (await adminStore()).deleteFilm(id);
     refresh();
     return { ok: true, id };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+const sideSchema = z.enum(["a", "b"]);
+const mergeChoiceSchema = z.object({
+  keep: sideSchema,
+  fields: z.record(z.string(), sideSchema),
+  poster: sideSchema.optional(),
+  locations: z.array(z.string().max(120)).max(200),
+  festivals: z.array(z.string().max(120)).max(200),
+  companies: z.array(z.string().max(120)).max(100),
+  genres: z.array(z.string().max(200)).max(100),
+});
+
+/**
+ * Fusiona dos producciones duplicadas: guarda en la que se queda lo elegido de cada versión, pasa a ella los aportes,
+ * solicitudes y preguntas de la otra, y borra la otra. El plan se recalcula aquí sobre los registros de hoy.
+ */
+export async function mergeFilmsAction(aId: string, bId: string, raw: unknown): Promise<Result> {
+  await requireSession();
+  const parsedChoice = mergeChoiceSchema.safeParse(raw);
+  if (!parsedChoice.success) return { ok: false, error: "Selección inválida" };
+  if (aId === bId) return { ok: false, error: "Elige dos producciones distintas" };
+  try {
+    const store = await adminStore();
+    const [a, b] = await Promise.all([store.getFilm(aId), store.getFilm(bId)]);
+    if (!a || !b) return { ok: false, error: "Una de las producciones ya no existe. Recarga la página." };
+    const choice = parsedChoice.data as MergeChoice;
+    const merged = applyMerge(a, b, await serverGazetteer(), choice);
+    const parsed = filmSchema.safeParse(merged);
+    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+    const input = parsed.data as unknown as FilmInput;
+    input.festivals = await linkFestivals(store, input.festivals);
+    const keep = choice.keep === "a" ? a : b;
+    const drop = choice.keep === "a" ? b : a;
+    const saved = await store.saveFilm({ ...input, id: keep.id, source: undefined });
+    await store.mergeFilmInto(drop.id, keep.id);
+    // los pósters que ya no usa nadie
+    const unused = [a.poster_url, b.poster_url].filter((u): u is string => !!u && u !== saved.poster_url);
+    if (unused.length) await deletePublicImages([...new Set(unused)]);
+    refresh();
+    revalidatePath("/admin/peliculas");
+    revalidatePath("/admin/aportes");
+    return { ok: true, id: saved.id };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
