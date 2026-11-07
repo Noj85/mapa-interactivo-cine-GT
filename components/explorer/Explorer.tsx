@@ -116,6 +116,19 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
     };
   }, [view, commit, data.orgs, geo]);
 
+  // el logo lleva al inicio: vista por defecto y país completo (clic normal; con Cmd/Ctrl se abre en otra pestaña)
+  const homeHref = canEdit ? "/admin" : "/";
+  const goHome = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      setSearchOpen(false);
+      commit(forMode(DEFAULT_VIEW, canEdit));
+      mapRef.current?.reset();
+    },
+    [commit, canEdit],
+  );
+
   // atajos de teclado
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -246,7 +259,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       <div className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex flex-col gap-2.5 sm:left-4 sm:right-auto sm:top-4 sm:w-[440px]">
         {compactTop ? (
           <>
-            <MobileTopBar aportarHref={`/aportar?capa=${view.layer}`} onSearch={() => setSearchOpen(true)} theme={theme} onTheme={toggleTheme} />
+            <MobileTopBar homeHref={homeHref} onHome={goHome} aportarHref={`/aportar?capa=${view.layer}`} onSearch={() => setSearchOpen(true)} theme={theme} onTheme={toggleTheme} />
             <div className="pointer-events-none flex items-center gap-2">
               <div className="pointer-events-auto min-w-0 flex-1">
                 <LayerSwitcher layer={view.layer} onChange={go.layer} />
@@ -258,7 +271,9 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
           <>
             <div className="pointer-events-auto glass flex items-center gap-2 rounded-2xl border border-line p-2 shadow-soft">
               <h1 className="m-0 flex min-w-0 flex-1 items-center pl-1.5">
-                <MapLogo className="h-10 max-w-full object-contain object-left sm:h-12" />
+                <a href={homeHref} onClick={goHome} className="flex min-w-0 items-center" aria-label="Mapa del Cine de Guatemala, inicio" title="Ir al inicio">
+                  <MapLogo className="h-10 max-w-full object-contain object-left sm:h-12" />
+                </a>
               </h1>
               <button className="btn-ghost h-9 w-9 !p-0" onClick={() => setSearchOpen(true)} aria-label="Buscar (⌘K)" title="Buscar (⌘K)">
                 <Search className="h-4 w-4" />

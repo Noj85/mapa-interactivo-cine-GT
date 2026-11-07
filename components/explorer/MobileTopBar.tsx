@@ -10,11 +10,16 @@ import { MapLogo } from "@/components/site/Brand";
  * (descargas y tema) y, debajo, una barra de búsqueda grande que se lee como un campo de texto.
  */
 export function MobileTopBar({
+  homeHref,
+  onHome,
   aportarHref,
   onSearch,
   theme,
   onTheme,
 }: {
+  homeHref: string;
+  /** Clic en el logo: vuelve a la vista inicial. */
+  onHome(e: React.MouseEvent): void;
   aportarHref: string;
   onSearch(): void;
   theme: "light" | "dark";
@@ -35,7 +40,9 @@ export function MobileTopBar({
     <>
       <div ref={root} className="pointer-events-auto glass relative flex items-center gap-2 rounded-2xl border border-line p-2 shadow-soft">
         <h1 className="m-0 flex min-w-0 flex-1 items-center pl-1.5">
-          <MapLogo className="h-9 max-w-full object-contain object-left" />
+          <a href={homeHref} onClick={onHome} className="flex min-w-0 items-center" aria-label="Mapa del Cine de Guatemala, inicio" title="Ir al inicio">
+            <MapLogo className="h-9 max-w-full object-contain object-left" />
+          </a>
         </h1>
         <Link href={aportarHref} className="btn-primary h-10 shrink-0 gap-1.5 px-3.5" title="Aporta una producción o entidad que falta en el mapa">
           <HandHeart className="h-4 w-4" aria-hidden />
