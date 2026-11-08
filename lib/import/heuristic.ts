@@ -1,4 +1,6 @@
 import { FORMATS, parseFormat, parseNature } from "@/lib/film-types";
+import { EXTRA_ROLES } from "@/lib/crew";
+import { crewFieldId } from "./types";
 import { cleanText } from "./normalize";
 import { looksLikeCount } from "./multi";
 import { normalize } from "@/lib/utils";
@@ -48,6 +50,19 @@ const FILM_SYN: Syn[] = [
   ["jobs", [/^(empleos|empleo|puestos de trabajo|contrataciones|jobs|personas contratadas|empleos generados)$/]],
 ];
 
+// Idiomas y roles extra del equipo (edición, sonido, música original, reparto…). Van al final de cada tabla para que
+// los campos de siempre tengan prioridad cuando un encabezado podría ser de los dos.
+const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const CREW_ROLE_SYN: Syn[] = EXTRA_ROLES.filter((r) => r.aliases?.length).map((r) => [
+  crewFieldId(r.id),
+  // también el nombre del rol tal como lo escribe la plataforma («Edición / montaje»), para que un Excel descargado se vuelva a cargar sin ajustes
+  [new RegExp(`^(${[...r.aliases!, r.label].map((a) => escRe(normalize(a))).join("|")})$`)],
+]);
+const CREW_ROLE_LOOSE: Syn[] = EXTRA_ROLES.filter((r) => r.aliases?.length)
+  .map((r): Syn => [crewFieldId(r.id), r.aliases!.map(normalize).filter((a) => a.length >= 6).map((a) => new RegExp(`\\b${escRe(a)}\\b`))])
+  .filter(([, pats]) => pats.length > 0);
+FILM_SYN.push(["languages", [/^(idiomas?|lenguas?|languages?|idioma original|idioma de la (produccion|pelicula|obra)|idiomas? hablados?)$/]], ...CREW_ROLE_SYN);
+
 const ORG_SYN: Syn[] = [
   ["name", [/^(nombre|name|entidad|organizacion|iniciativa|empresa|razon social|espacio|festival|proyecto)$/]],
   ["category", [/^(categoria|tipo( de (espacio|entidad|iniciativa|servicio))?|rubro|servicio|giro|actividad|category)$/]],
@@ -90,6 +105,8 @@ const FILM_LOOSE: Syn[] = [
   ["place", [/(donde|lugar|locacion|ubicacion|filmo|rodo|rodaje)/]],
   ["days", [/\bdias\b/]],
   ["jobs", [/\b(empleos?|contrataciones)\b/]],
+  ["languages", [/\bidiomas?\b/, /\blenguas?\b/, /\blanguages?\b/]],
+  ...CREW_ROLE_LOOSE,
 ];
 const ORG_LOOSE: Syn[] = [
   ["name", [/\b(nombre|entidad|organizacion|iniciativa)\b/]],

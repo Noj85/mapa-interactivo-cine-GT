@@ -3,7 +3,9 @@
 import { FORMATS, NATURES, type FilmFormat, type FilmNature } from "@/lib/film-types";
 import { NATIONALITIES, type Nationality } from "@/lib/types";
 import { CompaniesEditor } from "./CompaniesEditor";
+import { CrewEditor } from "./CrewEditor";
 import { GenresEditor } from "./GenresEditor";
+import { LanguagesEditor } from "./LanguagesEditor";
 import { VideoLinkField } from "./VideoLinkField";
 import type { FilmDraft } from "./drafts";
 
@@ -58,6 +60,7 @@ export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange:
         </p>
       )}
       <GenresEditor genres={d.genres} onChange={(genres) => onChange({ genres })} />
+      <LanguagesEditor languages={d.languages} onChange={(languages) => onChange({ languages })} />
       <CompaniesEditor companies={d.companies} nationality={d.nationality} onChange={(companies) => onChange({ companies })} />
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -77,6 +80,7 @@ export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange:
           <input id="f-guion" className="field" maxLength={300} value={d.screenwriter} onChange={(e) => onChange({ screenwriter: e.target.value })} />
         </div>
       </div>
+      <CrewEditor crew={d.crew} onChange={(crew) => onChange({ crew })} />
       <div className="grid gap-4 sm:grid-cols-[1fr_120px]">
         <div>
           <label className="label" htmlFor="f-budget">Presupuesto</label>

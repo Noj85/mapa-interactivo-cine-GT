@@ -1,5 +1,6 @@
 import { isAbroad } from "@/lib/completeness";
 import { contactFromFields, contactParts } from "@/lib/contact";
+import { extraCrew } from "@/lib/crew";
 import { orgCategories } from "@/lib/categories";
 import type { FilmFormat, FilmNature } from "@/lib/film-types";
 import type { FestivalResult, Film, InitiativeType, Nationality, Org } from "@/lib/types";
@@ -66,6 +67,16 @@ export interface CompanyDraft {
 
 export const blankCompany = (country = ""): CompanyDraft => ({ name: "", country });
 
+/** Una persona del equipo extra o del reparto, como se escribe en el formulario. */
+export interface CrewDraft {
+  role: string;
+  name: string;
+  /** Reparto: personaje. «Otro rol»: nombre del rol. */
+  detail: string;
+}
+
+export const blankCrew = (role = "edicion"): CrewDraft => ({ role, name: "", detail: "" });
+
 export interface FilmDraft {
   title: string;
   year: string;
@@ -73,11 +84,14 @@ export interface FilmDraft {
   format: FilmFormat | "";
   nature: FilmNature | "";
   genres: string[];
+  languages: string[];
   nationality: Nationality | "";
   director: string;
   producer: string;
   cinematographer: string;
   screenwriter: string;
+  /** Equipo extra y reparto (los cuatro roles base tienen su campo arriba). */
+  crew: CrewDraft[];
   budget: string;
   currency: "GTQ" | "USD";
   synopsis: string;
@@ -100,11 +114,13 @@ export function filmDraft(film?: Film): FilmDraft {
     format: film?.format ?? "",
     nature: film?.nature ?? "",
     genres: film?.genres ?? [],
+    languages: film?.languages ?? [],
     nationality: film?.nationality ?? "",
     director: film?.director ?? "",
     producer: film?.producer ?? "",
     cinematographer: film?.cinematographer ?? "",
     screenwriter: film?.screenwriter ?? "",
+    crew: extraCrew(film?.crew).map((m) => ({ role: m.role, name: m.name, detail: m.detail ?? "" })),
     budget: s(film?.budget),
     currency: film?.currency ?? "GTQ",
     synopsis: film?.synopsis ?? "",
@@ -156,11 +172,13 @@ export function filmPayload(d: FilmDraft) {
     format: d.format || null,
     nature: d.nature || null,
     genres: d.genres,
+    languages: d.languages,
     nationality: d.nationality || null,
     director: d.director || null,
     producer: d.producer || null,
     cinematographer: d.cinematographer || null,
     screenwriter: d.screenwriter || null,
+    crew: d.crew.filter((m) => m.name.trim()).map((m) => ({ role: m.role, name: m.name.trim(), detail: m.detail.trim() || null })),
     budget: toNum(d.budget),
     currency: d.currency,
     synopsis: d.synopsis || null,

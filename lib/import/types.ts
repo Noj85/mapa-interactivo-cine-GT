@@ -1,3 +1,4 @@
+import { CAST_ROLE, EXTRA_ROLES, OTHER_ROLE } from "@/lib/crew";
 import type { Film, FilmInput, Org, OrgInput } from "@/lib/types";
 
 // ───────────────────────── archivo leído ─────────────────────────
@@ -32,7 +33,23 @@ export interface FieldDef {
   group?: MultiGroup;
   /** Solo valida: la cantidad que el archivo dice que hay (no se guarda). */
   count?: MultiGroup;
+  /** Bloque donde se agrupa en pantalla («equipo»: los roles extra y el reparto), para no alargar la lista de campos. */
+  section?: "equipo";
 }
+
+/** Un campo por cada rol extra del equipo (edición, sonido, música original, reparto…); el rol libre «Otro rol» no se carga. */
+const CREW_FIELDS: FieldDef[] = EXTRA_ROLES.filter((r) => r.id !== OTHER_ROLE).map((r) => ({
+  id: `crew_${r.id}`,
+  label: r.label,
+  hint:
+    r.id === CAST_ROLE
+      ? "Actores y actrices separados por «;». El personaje puede ir entre paréntesis: «Ana Pérez (Doña Rosa)»"
+      : `Personas con este rol, separadas por «;» (${r.label.toLowerCase()})`,
+  section: "equipo" as const,
+}));
+
+/** Id del campo de equipo de un rol. */
+export const crewFieldId = (role: string) => `crew_${role}`;
 
 /** Conceptos que una producción puede tener más de una vez. */
 export type MultiGroup = "location" | "festival" | "company";
@@ -48,6 +65,8 @@ export const FILM_FIELDS: FieldDef[] = [
   { id: "producer", label: "Productor/a", hint: "Persona productora (no la empresa)" },
   { id: "cinematographer", label: "Director/a de fotografía", hint: "Persona a cargo de la fotografía (DP, DoP, cinematografía)" },
   { id: "screenwriter", label: "Guionista", hint: "Persona que escribió el guion" },
+  { id: "languages", label: "Idiomas", hint: "Uno o varios separados por «;» o «,» (español, K'iche', inglés…); si trae uno que no es estándar, se conserva tal cual" },
+  ...CREW_FIELDS,
   { id: "company", label: "Casa productora", hint: "Empresa productora; varias separadas por «;», con el país entre paréntesis si lo trae", group: "company" },
   { id: "company_country", label: "País de la casa productora", group: "company" },
   { id: "nationality", label: "Nacionalidad", hint: "guatemalteca, coproducción, extranjera" },

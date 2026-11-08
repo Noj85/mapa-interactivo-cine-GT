@@ -1,3 +1,4 @@
+import { extraCrew } from "@/lib/crew";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { filmSchema, orgSchema } from "@/lib/schemas";
 import { diffSubmission, locText } from "@/lib/submissions";
@@ -62,6 +63,8 @@ const FILM_FIELDS: FieldSpec<FilmInput>[] = [
   { key: "producer", label: "Productor/a" },
   { key: "cinematographer", label: "Director/a de fotografía" },
   { key: "screenwriter", label: "Guionista" },
+  { key: "crew", label: "Más equipo y reparto", present: (p) => p.crew !== undefined },
+  { key: "languages", label: "Idiomas", present: (p) => p.languages !== undefined },
   { key: "budget", label: "Presupuesto" },
   { key: "synopsis", label: "Sinopsis" },
   { key: "festivals", label: "Festivales y premios", present: (p) => p.festivals !== undefined },
@@ -141,6 +144,8 @@ function draftFromFilm(f: Film): FilmInput {
     producer: f.producer,
     cinematographer: f.cinematographer,
     screenwriter: f.screenwriter,
+    crew: extraCrew(f.crew).map((m) => ({ ...m })),
+    languages: [...f.languages],
     nationality: f.nationality,
     budget: f.budget,
     currency: f.currency,
@@ -215,6 +220,8 @@ export function applyCorrection(sub: Submission, current: Film | Org, gaz: Gazet
     set("producer");
     set("cinematographer");
     set("screenwriter");
+    set("crew");
+    set("languages");
     set("synopsis");
     set("festivals");
     // el enlace y su miniatura van juntos; si la miniatura no vino con el aporte, se resuelve al guardar

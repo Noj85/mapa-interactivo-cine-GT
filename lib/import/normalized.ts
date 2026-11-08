@@ -1,5 +1,6 @@
 import { isAbroad } from "@/lib/completeness";
 import { FORMATS, NATURES } from "@/lib/film-types";
+import { CAST_ROLE, EXTRA_ROLES, OTHER_ROLE } from "@/lib/crew";
 import { FESTIVAL_RESULTS, INITIATIVE_TYPES, NATIONALITIES, type Film, type Org } from "@/lib/types";
 import { planFilmUpdate, planOrgUpdate, type PlaceNames } from "./diff";
 import type { Candidate } from "./types";
@@ -67,7 +68,9 @@ function locationCells(l: Record<string, any> | undefined, names?: PlaceNames): 
 }
 
 export function normalizedTables(candidates: Candidate[], names?: PlaceNames): NormalizedTable[] {
-  const films: NormalizedTable = { id: "produccion", title: "Producción", headers: [...FILM_HEADERS, ORIGIN_HEADER, STATE_HEADER], rows: [] };
+  // columnas de equipo extra: solo los roles que alguna producción del archivo trae
+  const usedRoles = EXTRA_ROLES.filter((r) => r.id !== OTHER_ROLE && candidates.some((c) => c.type === "film" && c.film?.crew?.some((m) => m.role === r.id)));
+  const films: NormalizedTable = { id: "produccion", title: "Producción", headers: [...FILM_HEADERS, "Idiomas", ...usedRoles.map((r) => r.label), ORIGIN_HEADER, STATE_HEADER], rows: [] };
   const fests: NormalizedTable = { id: "festivales", title: "Festivales", headers: [...FESTIVAL_HEADERS, ORIGIN_HEADER, STATE_HEADER], rows: [] };
   const circ: NormalizedTable = { id: "circulacion", title: "Circulación", headers: [...ORG_HEADERS, ORIGIN_HEADER, STATE_HEADER], rows: [] };
   const ind: NormalizedTable = { id: "industria", title: "Industria", headers: [...ORG_HEADERS, ORIGIN_HEADER, STATE_HEADER], rows: [] };
@@ -87,7 +90,12 @@ export function normalizedTables(candidates: Candidate[], names?: PlaceNames): N
         orNull(f.budget), orNull(f.budget != null ? f.currency : null), orNull(f.synopsis), orNull(f.poster_url), orNull(f.trailer_url), orNull(f.film_url),
       ];
       const locs = f.locations?.length ? f.locations : [undefined];
-      for (const l of locs) films.rows.push([...base(), ...locationCells(l, names), origin, state]);
+      const crewCells = usedRoles.map((r): Cell => {
+        const list = (f.crew ?? []).filter((m) => m.role === r.id);
+        return orNull(list.map((m) => (r.id === CAST_ROLE && m.detail ? `${m.name} (${m.detail})` : m.name)).join("; "));
+      });
+      const extra = [orNull((f.languages ?? []).join("; ")), ...crewCells];
+      for (const l of locs) films.rows.push([...base(), ...locationCells(l, names), ...extra, origin, state]);
       for (const fe of f.festivals ?? []) {
         if (!fe.name) continue;
         fests.rows.push([f.title, orNull(f.year), orNull(f.director), fe.name, orNull(fe.year), orNull(label(FESTIVAL_RESULTS, fe.result)), orNull(fe.section), orNull(fe.award), orNull(fe.url), origin, state]);

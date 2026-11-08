@@ -4,6 +4,7 @@ import { MapPinOff, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { companyNames } from "@/lib/companies";
+import { crewSearchText } from "@/lib/crew";
 import { unlocatedFilms } from "@/lib/map/features";
 import { normalize } from "@/lib/utils";
 import { Empty, FilmCard, PanelShell, type PanelCtx, SectionTitle } from "./parts";
@@ -19,7 +20,7 @@ export default function UnlocatedPanel({ ctx }: { ctx: PanelCtx }) {
 
   const list = useMemo(() => {
     const nq = normalize(q);
-    return nq ? films.filter((f) => normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${f.cinematographer ?? ""} ${f.screenwriter ?? ""} ${companyNames(f.companies).join(" ")}`).includes(nq)) : films;
+    return nq ? films.filter((f) => normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${f.cinematographer ?? ""} ${f.screenwriter ?? ""} ${crewSearchText(f.crew)} ${companyNames(f.companies).join(" ")}`).includes(nq)) : films;
   }, [films, q]);
 
   return (

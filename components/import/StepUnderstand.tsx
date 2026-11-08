@@ -5,7 +5,7 @@ import { useState } from "react";
 import { FORMATS } from "@/lib/film-types";
 import { separatorsOf, splitCell } from "@/lib/import/multi";
 import { countExtractionRows, MAX_EXTRACT_ROWS } from "@/lib/import/suggestions";
-import { FILM_FIELDS, ORG_FIELDS, type ImportPlan, type MultiGroup, type ParsedFile, type SheetPlan, type TextSource } from "@/lib/import/types";
+import { FILM_FIELDS, ORG_FIELDS, type FieldDef, type ImportPlan, type MultiGroup, type ParsedFile, type SheetPlan, type TextSource } from "@/lib/import/types";
 import { cn } from "@/lib/utils";
 
 const ENTITY_LABEL: Record<SheetPlan["entity"], string> = {
@@ -38,6 +38,20 @@ const EXTRA_SEPARATORS: { id: string; label: string }[] = [
 ];
 
 /** Una columna de un campo repetible: dice cuántos valores trae la primera celda con varios y deja sumar separadores. */
+function UnmappedRow({ f, headers, onPick }: { f: FieldDef; headers: string[]; onPick(header: string): void }) {
+  return (
+    <div className="grid grid-cols-[1fr_1.4fr] items-center gap-3 px-4 py-2">
+      <div className="text-sm text-muted">{f.label}</div>
+      <select className="field !py-1.5 text-sm" value="" onChange={(e) => onPick(e.target.value)}>
+        <option value="">Sin columna</option>
+        {headers.map((h) => (
+          <option key={h} value={h}>{h}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function ListControl({ sp, field, rows, onChange }: { sp: SheetPlan; field: string; rows: Record<string, string>[]; onChange(separators: string[]): void }) {
   const header = sp.columns[field];
   const seps = separatorsOf(sp, field);
@@ -254,6 +268,8 @@ export function StepUnderstand({
           const fields = sp.entity === "org" ? ORG_FIELDS : FILM_FIELDS;
           const mapped = fields.filter((f) => sp.columns[f.id]);
           const unmapped = fields.filter((f) => !sp.columns[f.id]);
+          const unmappedMain = unmapped.filter((f) => f.section !== "equipo");
+          const unmappedTeam = unmapped.filter((f) => f.section === "equipo");
           const open = sp.entity !== "ignore";
           // columnas del archivo que ningún campo usa (la «Página del PDF» es solo una referencia)
           const used = new Set(Object.values(sp.columns));
@@ -367,21 +383,29 @@ export function StepUnderstand({
                     <details className="group mt-3">
                       <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs text-muted hover:text-ink">
                         <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
-                        Campos sin columna ({unmapped.length})
+                        Campos sin columna ({unmappedMain.length})
                       </summary>
-                      <div className="mt-2 divide-y divide-line/70 rounded-2xl border border-line/70">
-                        {unmapped.map((f) => (
-                          <div key={f.id} className="grid grid-cols-[1fr_1.4fr] items-center gap-3 px-4 py-2">
-                            <div className="text-sm text-muted">{f.label}</div>
-                            <select className="field !py-1.5 text-sm" value="" onChange={(e) => setColumn(sp.sheet, f.id, e.target.value)}>
-                              <option value="">Sin columna</option>
-                              {sheet.headers.map((h) => (
-                                <option key={h} value={h}>{h}</option>
-                              ))}
-                            </select>
+                      {unmappedMain.length > 0 && (
+                        <div className="mt-2 divide-y divide-line/70 rounded-2xl border border-line/70">
+                          {unmappedMain.map((f) => (
+                            <UnmappedRow key={f.id} f={f} headers={sheet.headers} onPick={(h) => setColumn(sp.sheet, f.id, h)} />
+                          ))}
+                        </div>
+                      )}
+                      {unmappedTeam.length > 0 && (
+                        // los roles del equipo (edición, sonido, música, reparto…) y sus compañeros van en un solo bloque aparte
+                        <details className="group/team mt-2 rounded-2xl border border-line/70">
+                          <summary className="flex cursor-pointer list-none items-center gap-1.5 px-4 py-2 text-xs text-muted hover:text-ink">
+                            <ChevronDown className="h-3.5 w-3.5 transition-transform group-open/team:rotate-180" />
+                            Equipo y reparto ({unmappedTeam.length}): edición, sonido, música, reparto…
+                          </summary>
+                          <div className="divide-y divide-line/70 border-t border-line/70">
+                            {unmappedTeam.map((f) => (
+                              <UnmappedRow key={f.id} f={f} headers={sheet.headers} onPick={(h) => setColumn(sp.sheet, f.id, h)} />
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                        </details>
+                      )}
                     </details>
                   )}
                 </>

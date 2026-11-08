@@ -4,6 +4,7 @@ import { MAX_CATEGORIES, normalizeCategories } from "@/lib/categories";
 import { isOwnImageUrl } from "@/lib/poster-url";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
 import { cleanGenres, FORMATS, NATURES } from "@/lib/film-types";
+import { cleanCrew, cleanLanguages } from "@/lib/crew";
 import { upperTitle } from "@/lib/utils";
 
 const FORMAT_VALUES = FORMATS.map((f) => f.id) as [string, ...string[]];
@@ -13,6 +14,18 @@ const genresSchema = z
   .array(z.string().max(120))
   .max(40)
   .transform((list) => cleanGenres(list.map((g) => clean(g))));
+
+/** Idiomas: estándar o propios; sin repetidos y con el máximo permitido. */
+const languagesSchema = z
+  .array(z.string().max(120))
+  .max(40)
+  .transform((list) => cleanLanguages(list.map((g) => clean(g))));
+
+/** Equipo extra y reparto: roles válidos, nombres limpios y máximos del catálogo. */
+const crewSchema = z
+  .array(z.object({ role: z.string().max(60).nullish(), name: z.string().max(600).nullish(), detail: z.string().max(300).nullish() }))
+  .max(120)
+  .transform((list) => cleanCrew(list.map((m) => ({ role: m.role, name: clean(m.name ?? ""), detail: clean(m.detail ?? "") }))));
 
 const optStr = z
   .string()
@@ -121,10 +134,13 @@ export const filmSchema = z.object({
   nature: z.enum(NATURE_VALUES).nullish(),
   genres: genresSchema.optional(),
   duration_min: optNum,
+  languages: languagesSchema.optional(),
   director: optStr,
   producer: optStr,
   cinematographer: optStr,
   screenwriter: optStr,
+  /** Equipo extra y reparto. Sin este campo se conserva el actual. */
+  crew: crewSchema.optional(),
   nationality: z.enum(["guatemalteca", "coproduccion", "extranjera"]).nullish(),
   budget: optNum,
   currency: z.enum(["GTQ", "USD"]).default("GTQ"),
@@ -257,10 +273,12 @@ export const publicFilmSchema = z.object({
   nature: z.enum(NATURE_VALUES).nullish(),
   genres: genresSchema.optional(),
   duration_min: optNum,
+  languages: languagesSchema.optional(),
   director: pubStr(300),
   producer: pubStr(300),
   cinematographer: pubStr(300),
   screenwriter: pubStr(300),
+  crew: crewSchema.optional(),
   nationality: z.enum(["guatemalteca", "coproduccion", "extranjera"]).nullish(),
   budget: optNum,
   currency: z.enum(["GTQ", "USD"]).default("GTQ"),

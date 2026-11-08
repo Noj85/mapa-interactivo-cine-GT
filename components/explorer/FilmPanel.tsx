@@ -1,13 +1,14 @@
 "use client";
 
 import { isAbroad } from "@/lib/completeness";
-import { AlertCircle, Award, ExternalLink, MapPin, MessageSquarePlus, Pencil, Play, Send } from "lucide-react";
+import { AlertCircle, Award, ChevronDown, ExternalLink, Languages, MapPin, MessageSquarePlus, Pencil, Play, Send, Users } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { extraCrewCount, groupExtraCrew } from "@/lib/crew";
 import { createPortal } from "react-dom";
 import { durationLabel, filmTypeLabel } from "@/lib/film-types";
-import { FESTIVAL_RESULTS, NATIONALITIES } from "@/lib/types";
+import { FESTIVAL_RESULTS, NATIONALITIES, type FilmCrewMember } from "@/lib/types";
 import { cn, fmtInt, fmtMoney } from "@/lib/utils";
 import { PosterImage } from "@/components/ui/PosterImage";
 import { posterThumb } from "@/lib/poster-url";
@@ -61,6 +62,49 @@ function Trailer({ url, thumb, title }: { url: string; thumb: string | null | un
     <a href={url} target="_blank" rel="noreferrer noopener" className={cn(frame, "group")} aria-label={`Ver el tráiler de ${title} en ${v.label} (abre en otra pestaña)`}>
       {cover}
     </a>
+  );
+}
+
+/**
+ * Equipo fuera de los roles base (edición, sonido, música original, reparto…), plegado para no alargar la ficha.
+ * Si la producción no tiene a nadie más, no aparece.
+ */
+function FullCrew({ crew }: { crew: FilmCrewMember[] }) {
+  const groups = groupExtraCrew(crew);
+  if (!groups.length) return null;
+  const total = extraCrewCount(crew);
+  return (
+    <details className="group mt-4 rounded-2xl border border-line bg-surface">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-2xl px-3.5 py-2.5 text-sm text-ink marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-muted" aria-hidden /> Equipo completo
+          <span className="text-xs text-muted">{total}</span>
+        </span>
+        <ChevronDown className="h-4 w-4 text-muted transition-transform group-open:rotate-180" aria-hidden />
+      </summary>
+      <div className="space-y-3 border-t border-line px-3.5 pb-3 pt-3">
+        {groups.map((g) => (
+          <section key={g.id} aria-label={g.label}>
+            <h3 className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{g.label}</h3>
+            <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+              {g.lines.map((l) => (
+                <Fragment key={l.key}>
+                  <dt className="text-muted">{l.label}</dt>
+                  <dd className="text-ink">
+                    {l.members.map((m, i) => (
+                      <span key={i} className="block">
+                        {m.name}
+                        {m.detail && <span className="text-muted"> · {m.detail}</span>}
+                      </span>
+                    ))}
+                  </dd>
+                </Fragment>
+              ))}
+            </dl>
+          </section>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -123,6 +167,16 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
         <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Géneros">
           {film.genres.map((g) => (
             <li key={g} className="chip">{g}</li>
+          ))}
+        </ul>
+      )}
+      {film.languages.length > 0 && (
+        <ul className="mt-2 flex flex-wrap items-center gap-1.5" aria-label="Idiomas">
+          <li aria-hidden className="text-muted">
+            <Languages className="h-3.5 w-3.5" />
+          </li>
+          {film.languages.map((l) => (
+            <li key={l} className="chip">{l}</li>
           ))}
         </ul>
       )}
@@ -238,6 +292,8 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
           </>
         )}
       </dl>
+
+      <FullCrew crew={film.crew} />
 
       {figures.length > 0 && (
         <div className={cn("mt-5 grid gap-2", figures.length === 1 ? "grid-cols-1" : figures.length === 2 ? "grid-cols-2" : "grid-cols-3")}>

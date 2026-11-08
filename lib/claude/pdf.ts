@@ -2,6 +2,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { PDFDocument } from "pdf-lib";
 import { FORMATS, GENRES, NATURES } from "@/lib/film-types";
+import { CAST_ROLE, EXTRA_ROLES, OTHER_ROLE } from "@/lib/crew";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
 import type { ParsedFile, ParsedSheet } from "@/lib/import/types";
 import { CLAUDE_MODEL, claude } from "./client";
@@ -36,6 +37,20 @@ const TOOL = {
             producer: { type: "string", description: "Persona productora (no la empresa)." },
             cinematographer: { type: "string", description: "Director/a de fotografía (persona). Solo si el documento lo dice." },
             screenwriter: { type: "string", description: "Guionista (persona). Solo si el documento lo dice." },
+            languages: { type: "string", description: "Idiomas de la producción, separados por «;». Solo si el documento los dice." },
+            additional_crew: {
+              type: "array",
+              description: "Otros créditos que el documento nombre (edición, sonido, música original, dirección de arte, reparto…). Uno por persona. No repitas dirección, producción, fotografía ni guion.",
+              items: {
+                type: "object",
+                properties: {
+                  role: { type: "string", enum: EXTRA_ROLES.filter((r) => r.id !== OTHER_ROLE).map((r) => r.id), description: `Rol: ${EXTRA_ROLES.filter((r) => r.id !== OTHER_ROLE).map((r) => `${r.id} = ${r.label}`).join("; ")}.` },
+                  name: { type: "string", description: "Nombre de la persona." },
+                  character: { type: "string", description: "Solo para reparto: el personaje que interpreta, si se dice." },
+                },
+                required: ["role", "name"],
+              },
+            },
             production_company: {
               type: "string",
               description: "Casa(s) productora(s) (empresas). Si hay varias, sepáralas con «;». Si el documento indica el país de una casa, escríbelo entre paréntesis: «Casa Uno (México); Casa Dos (Guatemala)».",
@@ -122,6 +137,7 @@ Reglas:
 - Para "category" elige la categoría permitida más cercana al tipo de entidad; si la entidad hace varias cosas (por ejemplo producción y postproducción), enumera todas las que apliquen separadas por «;», la principal primero. Si ninguna encaja, la más cercana igualmente.
 - Teléfonos y correos van en "contact" (solo números de teléfono y direcciones de correo), no en la descripción.
 - Producciones: "format" es el formato (largometraje, cortometraje, serie, video musical…), "nature" es ficción, documental o híbrido, y "genres" son los géneros. Son tres datos distintos: «cortometraje documental de terror» = formato Cortometraje, naturaleza Documental, género Terror. No inventes ninguno que el documento no diga.
+- Equipo e idiomas: dirección, producción, fotografía y guion van en sus campos. Los demás créditos que el documento nombre (montaje, sonido, música original, arte, vestuario, reparto…) van uno por persona en "additional_crew" con su rol del catálogo; en reparto, "character" es el personaje. "languages" son los idiomas de la producción. Solo lo que el documento diga.
 - Duración: "duration" es la duración de la producción (minutos u horas), no los días de rodaje ni el año.
 - Festivales y lugares de una producción van en las listas "festivals" y "locations", uno por elemento; no los juntes en un solo texto.
 - Idioma de los datos: el original del documento.`;
@@ -137,6 +153,8 @@ interface RawFilm {
   producer?: string;
   cinematographer?: string;
   screenwriter?: string;
+  languages?: string;
+  additional_crew?: { role?: string; name?: string; character?: string }[];
   production_company?: string;
   production_company_country?: string;
   nationality?: string;
@@ -234,6 +252,19 @@ const key = (s?: string) =>
     .trim();
 const v = (s?: string) => (s ?? "").trim();
 
+/** Créditos extra de una producción como columnas (una por rol, con el nombre del rol de la plataforma como encabezado). */
+function extraCrewColumns(list: RawFilm["additional_crew"]): Record<string, string> {
+  const out: Record<string, string[]> = {};
+  for (const m of list ?? []) {
+    const role = EXTRA_ROLES.find((r) => r.id === m.role && r.id !== OTHER_ROLE);
+    const name = v(m.name);
+    if (!role || !name) continue;
+    const character = role.id === CAST_ROLE ? v(m.character) : "";
+    (out[role.label] ??= []).push(character ? `${name} (${character})` : name);
+  }
+  return Object.fromEntries(Object.entries(out).map(([k, names]) => [k, names.join("; ")]));
+}
+
 const FILM_HEADERS = [
   "Título",
   "Año",
@@ -243,6 +274,9 @@ const FILM_HEADERS = [
   "Géneros",
   "Director/a",
   "Productor/a",
+  "Director/a de fotografía",
+  "Guionista",
+  "Idiomas",
   "Casa productora",
   "País de la casa productora",
   "Nacionalidad",
@@ -327,6 +361,8 @@ function aggregate(results: ChunkResult[], refHeader: string | null, filename: s
         "Productor/a": v(f.producer),
         "Director/a de fotografía": v(f.cinematographer),
         Guionista: v(f.screenwriter),
+        Idiomas: v(f.languages),
+        ...extraCrewColumns(f.additional_crew),
         "Casa productora": v(f.production_company),
         "País de la casa productora": v(f.production_company_country),
         Nacionalidad: v(f.nationality),
@@ -407,9 +443,12 @@ function aggregate(results: ChunkResult[], refHeader: string | null, filename: s
   }
   // Un Word no tiene páginas: sin la columna de referencia.
   const heads = (h: string[]) => (refHeader ? h : h.filter((x) => x !== "Página del PDF"));
+  // columnas de equipo extra: solo los roles que el documento trae
+  const extraHeads = EXTRA_ROLES.map((r) => r.label).filter((l) => filmRows.some((r) => r[l]));
+  const filmHeaders = [...FILM_HEADERS.filter((h) => h !== "Página del PDF"), ...extraHeads, "Página del PDF"];
   const orgList = [...orgRows.values()];
   if (!refHeader) for (const r of [...filmRows, ...orgList]) delete r["Página del PDF"];
-  if (filmRows.length) sheets.push({ name: "Producciones", headers: heads(FILM_HEADERS), rows: filmRows, totalRows: filmRows.length });
+  if (filmRows.length) sheets.push({ name: "Producciones", headers: heads(filmHeaders), rows: filmRows, totalRows: filmRows.length });
   if (orgList.length) sheets.push({ name: "Entidades", headers: heads(ORG_HEADERS), rows: orgList, totalRows: orgList.length });
   return { file: { filename, sheets }, pages, notes: [...new Set(notes)] };
 }

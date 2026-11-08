@@ -4,7 +4,9 @@ import { cleanGenres } from "@/lib/film-types";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import type { PolyCollection } from "@/lib/geo/load";
 import { municipalityAt } from "@/lib/geo/pip";
-import type { FilmInput, OrgInput } from "@/lib/types";
+import type { FilmCrewMember, FilmInput, OrgInput } from "@/lib/types";
+import { cleanCrew, cleanLanguages, crewFromCell, EXTRA_ROLES, OTHER_ROLE, parseLanguageCell } from "@/lib/crew";
+import { crewFieldId } from "./types";
 import { normalizeCategories } from "@/lib/categories";
 import { normalize, upperTitle } from "@/lib/utils";
 import { alignLists, declaredCount, separatorsOf, splitCell, splitPlaceCell } from "./multi";
@@ -251,6 +253,18 @@ const addCompanies = (list: Company[], add: Company[]) => {
   }
 };
 
+/** Equipo extra y reparto de la fila: una columna por rol, varias personas por celda («Ana; Luis»). */
+function crewOf(row: Row, plan: SheetPlan): FilmCrewMember[] {
+  const out: FilmCrewMember[] = [];
+  for (const r of EXTRA_ROLES) {
+    if (r.id === OTHER_ROLE) continue;
+    const cell = val(row, plan, crewFieldId(r.id));
+    if (!cell.trim()) continue;
+    out.push(...crewFromCell(r.id, cell));
+  }
+  return cleanCrew(out);
+}
+
 function filmFields(row: Row, plan: SheetPlan): Omit<FilmInput, "locations" | "festivals" | "companies"> {
   const vm = plan.value_maps ?? {};
   const budgetRaw = val(row, plan, "budget");
@@ -269,6 +283,8 @@ function filmFields(row: Row, plan: SheetPlan): Omit<FilmInput, "locations" | "f
     producer: cleanText(val(row, plan, "producer")),
     cinematographer: cleanText(val(row, plan, "cinematographer")),
     screenwriter: cleanText(val(row, plan, "screenwriter")),
+    crew: crewOf(row, plan),
+    languages: parseLanguageCell(val(row, plan, "languages")),
     nationality: normalizeNationality(val(row, plan, "nationality"), vm.nationality),
     budget: parseNumber(budgetRaw),
     currency: detectCurrency(val(row, plan, "currency")) ?? detectCurrency(budgetRaw) ?? "GTQ",
@@ -283,6 +299,8 @@ const merge = <T extends object>(a: T, b: T): T => {
   const out = { ...a } as Record<string, unknown>;
   for (const [k, v] of Object.entries(b)) {
     if (k === "genres") out[k] = cleanGenres([...((out[k] as string[]) ?? []), ...((v as string[]) ?? [])]);
+    else if (k === "languages") out[k] = cleanLanguages([...((out[k] as string[]) ?? []), ...((v as string[]) ?? [])]);
+    else if (k === "crew") out[k] = cleanCrew([...((out[k] as FilmCrewMember[]) ?? []), ...((v as FilmCrewMember[]) ?? [])]);
     else if ((out[k] === null || out[k] === undefined || out[k] === "") && v != null && v !== "") out[k] = v;
   }
   return out as T;

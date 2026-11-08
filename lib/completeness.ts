@@ -29,8 +29,9 @@ export const isUnlocated = (f: { locations: (Pick<FilmLocation, "depto_ine" | "m
  */
 export function filmCompleteness(
   // Los festivales no cuentan en el porcentaje: una producción puede no haber ido a ninguno.
-  // Director/a de fotografía y guionista son opcionales: no cuentan en el porcentaje.
-  f: Omit<Film, "completeness" | "missing_fields" | "status" | "id" | "slug" | "locations" | "festivals" | "companies" | "duration_min" | "cinematographer" | "screenwriter"> & {
+  // Director/a de fotografía, guionista, el resto del equipo, el reparto y los idiomas son opcionales: no cuentan en el porcentaje.
+  // Director/a y productor/a siguen contando; su texto sale del rol base correspondiente del equipo.
+  f: Omit<Film, "completeness" | "missing_fields" | "status" | "id" | "slug" | "locations" | "festivals" | "companies" | "duration_min" | "cinematographer" | "screenwriter" | "crew" | "languages"> & {
     companies?: { name?: string | null }[];
     locations: (Pick<FilmLocation, "depto_ine" | "muni_ine" | "lat" | "lng" | "days" | "local_spend" | "jobs"> & { country?: string | null })[];
   },

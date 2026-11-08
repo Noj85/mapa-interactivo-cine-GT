@@ -22,6 +22,8 @@ interface Props {
   extraCategories: string[];
   /** Géneros propios que existen en los datos de producción. */
   extraGenres: string[];
+  /** Opciones del filtro de idioma: los que existen en los datos de producción (vacío = no se ofrece). */
+  languages: { value: string; label: string; group?: string }[];
   onFilm(f: FilmFilter): void;
   onOrg(f: OrgFilter): void;
   /** Enlace a /descargas con los mismos filtros. */
@@ -160,6 +162,19 @@ export function FilterPanel(p: Props) {
           clear: () => pf({ genero: [] }),
           node: <MultiSelect label="Género" placeholder="Todos" value={ff.genero} onChange={(genero) => pf({ genero })} options={genreOptions(p.extraGenres)} searchable />,
         },
+        // solo se ofrece si alguna producción tiene idiomas (o ya hay uno elegido en el enlace)
+        ...(p.languages.length > 0 || ff.idioma.length > 0
+          ? [
+              {
+                id: "idioma",
+                label: "Idioma",
+                ownLabel: true,
+                active: ff.idioma.length > 0,
+                clear: () => pf({ idioma: [] }),
+                node: <MultiSelect label="Idioma" placeholder="Todos" value={ff.idioma} onChange={(idioma) => pf({ idioma })} options={p.languages} searchable />,
+              } satisfies Field,
+            ]
+          : []),
         {
           id: "nacionalidad",
           label: "Nacionalidad",
@@ -249,7 +264,7 @@ export function FilterPanel(p: Props) {
       },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFilm, layer, ff, of, p.extraCategories, p.extraGenres]);
+  }, [isFilm, layer, ff, of, p.extraCategories, p.extraGenres, p.languages]);
 
   const hidden = p.hiddenFields ?? [];
   const offered = fields.filter((f) => !hidden.includes(f.id));

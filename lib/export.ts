@@ -1,6 +1,7 @@
 import { categoriesText } from "@/lib/categories";
 import { isAbroad } from "@/lib/completeness";
 import { companiesText } from "@/lib/companies";
+import { CAST_ROLE, castText, EXTRA_ROLES, namesOf, OTHER_ROLE } from "@/lib/crew";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { filmFilterActive, locDepto, locationsMatching, orgFilterActive, type ExportKind, type ExportRows, type FilmFilter, type OrgFilter } from "@/lib/filters";
 import { formatLabel, natureLabel } from "@/lib/film-types";
@@ -109,11 +110,21 @@ export function buildTable(
     const vals = f.locations.map((l) => l[k]).filter((v): v is number => typeof v === "number");
     return vals.length ? vals.reduce((a, b) => a + b, 0) : "";
   };
+  // una columna por cada rol extra que alguna de las producciones tiene (así no salen decenas de columnas vacías)
+  const usedRoles = new Set(films.flatMap((f) => (f.crew ?? []).map((m) => m.role)));
+  const roleCols = EXTRA_ROLES.filter((r) => r.id !== CAST_ROLE && r.id !== OTHER_ROLE && usedRoles.has(r.id));
+  const hasCast = usedRoles.has(CAST_ROLE);
+  const hasOther = usedRoles.has(OTHER_ROLE);
+  const otherText = (f: Film) =>
+    (f.crew ?? [])
+      .filter((m) => m.role === OTHER_ROLE)
+      .map((m) => `${m.detail || "Otro rol"}: ${m.name}`)
+      .join("; ");
   return {
     name: "producciones",
     title: "Producciones",
-    header: ["Título", "Año", "Duración (min)", "Formato", "Naturaleza", "Géneros", "Director/a", "Productor/a", "Director/a de fotografía", "Guionista", "Casas productoras", "Nacionalidad", "Presupuesto", "Moneda", "Locaciones", "Departamentos", "Fuera de Guatemala", "Días de rodaje", "Inversión local", "Empleos", "Festivales", "Sinopsis", "Tráiler", "Película completa", "Registro completo (%)", "Falta", "Estado"],
-    widths: [34, 7, 10, 16, 14, 26, 26, 26, 26, 26, 40, 14, 14, 8, 10, 28, 22, 10, 14, 9, 10, 70, 30, 30, 12, 30, 11],
+    header: ["Título", "Año", "Duración (min)", "Formato", "Naturaleza", "Géneros", "Director/a", "Productor/a", "Director/a de fotografía", "Guionista", ...roleCols.map((r) => r.label), ...(hasOther ? ["Otros roles"] : []), ...(hasCast ? ["Reparto"] : []), "Casas productoras", "Idiomas", "Nacionalidad", "Presupuesto", "Moneda", "Locaciones", "Departamentos", "Fuera de Guatemala", "Días de rodaje", "Inversión local", "Empleos", "Festivales", "Sinopsis", "Tráiler", "Película completa", "Registro completo (%)", "Falta", "Estado"],
+    widths: [34, 7, 10, 16, 14, 26, 26, 26, 26, 26, ...roleCols.map(() => 26), ...(hasOther ? [34] : []), ...(hasCast ? [44] : []), 40, 22, 14, 14, 8, 10, 28, 22, 10, 14, 9, 10, 70, 30, 30, 12, 30, 11],
     rows: films.map((f) => [
       f.title,
       f.year,
@@ -123,7 +134,11 @@ export function buildTable(
       f.producer,
       f.cinematographer,
       f.screenwriter,
+      ...roleCols.map((r) => namesOf(f.crew, r.id).join("; ")),
+      ...(hasOther ? [otherText(f)] : []),
+      ...(hasCast ? [castText(f.crew)] : []),
       companiesText(f.companies),
+      (f.languages ?? []).join("; "),
       natLabel(f.nationality),
       f.budget,
       f.currency,

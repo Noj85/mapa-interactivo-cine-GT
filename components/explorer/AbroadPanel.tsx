@@ -4,6 +4,7 @@ import { Globe2, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { isAbroad } from "@/lib/completeness";
 import { companyNames } from "@/lib/companies";
+import { crewSearchText } from "@/lib/crew";
 import { abroadFilms } from "@/lib/map/features";
 import type { Film } from "@/lib/types";
 import { normalize } from "@/lib/utils";
@@ -23,7 +24,7 @@ export default function AbroadPanel({ ctx }: { ctx: PanelCtx }) {
   const list = useMemo(() => {
     const nq = normalize(q);
     const match = (f: Film) =>
-      normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${f.cinematographer ?? ""} ${f.screenwriter ?? ""} ${companyNames(f.companies).join(" ")} ${f.locations.map((l) => `${l.city ?? ""} ${l.country ?? ""}`).join(" ")}`).includes(nq);
+      normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${f.cinematographer ?? ""} ${f.screenwriter ?? ""} ${crewSearchText(f.crew)} ${companyNames(f.companies).join(" ")} ${f.locations.map((l) => `${l.city ?? ""} ${l.country ?? ""}`).join(" ")}`).includes(nq);
     return (nq ? films.filter(match) : films).sort((a, b) => a.title.localeCompare(b.title, "es"));
   }, [films, q]);
 

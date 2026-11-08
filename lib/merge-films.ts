@@ -1,4 +1,5 @@
 import { companyLabel } from "@/lib/companies";
+import { cleanCrew, cleanLanguages, extraCrew } from "@/lib/crew";
 import { describeFestival } from "@/lib/festivals";
 import { durationLabel, formatLabel, natureLabel } from "@/lib/film-types";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
@@ -239,6 +240,9 @@ export function applyMerge(a: Film, b: Film, gaz: Gazetteer, choice: MergeChoice
     // si cualquiera de las dos estaba en el mapa, la fusionada también
     status: a.status === "published" || b.status === "published" ? "published" : "draft",
     genres,
+    // el equipo extra, el reparto y los idiomas de las dos producciones se unen (sin repetir); el del registro que se queda va primero
+    crew: extraCrew(cleanCrew([...extraCrew(keep.crew), ...extraCrew(films[choice.keep === "a" ? "b" : "a"].crew)])),
+    languages: cleanLanguages([...keep.languages, ...films[choice.keep === "a" ? "b" : "a"].languages]),
     locations,
     festivals,
     companies,

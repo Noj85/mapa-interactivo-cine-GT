@@ -28,6 +28,7 @@ import {
   type FilmFilter,
   type OrgFilter,
 } from "@/lib/filters";
+import { languageOptions } from "@/lib/crew";
 import { customGenres, filmTypeLabel, FORMATS, genreOptions, NATURES } from "@/lib/film-types";
 import { INITIATIVE_TYPES, NATIONALITIES, type Film, type Org } from "@/lib/types";
 import { cn, fmtInt } from "@/lib/utils";
@@ -59,6 +60,7 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
   const [copied, setCopied] = useState(false);
 
   const extraGenres = useMemo(() => customGenres(films), [films]);
+  const languages = useMemo(() => languageOptions(films), [films]);
   const deptoName = (c: number) => names[`depto:${c}`] ?? String(c);
   const muniName = (c: number) => names[`muni:${c}`] ?? String(c);
 
@@ -245,6 +247,9 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
                 <MultiSelect label="Formato" placeholder="Todos" value={ff.formato} onChange={(formato) => patchFilm({ formato })} options={FORMATS.map((k) => ({ value: k.id, label: k.label }))} />
                 <MultiSelect label="Naturaleza" placeholder="Cualquiera" value={ff.naturaleza} onChange={(naturaleza) => patchFilm({ naturaleza })} options={NATURES.map((k) => ({ value: k.id, label: k.label }))} />
                 <MultiSelect label="Género" placeholder="Todos" value={ff.genero} onChange={(genero) => patchFilm({ genero })} options={genreOptions(extraGenres)} searchable />
+                {(languages.length > 0 || ff.idioma.length > 0) && (
+                  <MultiSelect label="Idioma" placeholder="Todos" value={ff.idioma} onChange={(idioma) => patchFilm({ idioma })} options={languages} searchable />
+                )}
                 <MultiSelect
                   label="Nacionalidad"
                   placeholder="Cualquiera"

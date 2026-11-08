@@ -3,6 +3,7 @@ import type { RecordRow } from "@/components/admin/RecordsTable";
 import { categoriesText } from "@/lib/categories";
 import { isAbroad } from "@/lib/completeness";
 import { companyNames } from "@/lib/companies";
+import { crewSearchText } from "@/lib/crew";
 import { isUnlocated } from "@/lib/map/features";
 import { posterThumb } from "@/lib/poster-url";
 import { requestState } from "@/lib/request-state";
@@ -37,7 +38,7 @@ export function filmRows(films: Film[], gaz: Gazetteer, open: Record<string, num
       noFestivals: f.festivals.length === 0,
       openRequests: open[f.id] ?? 0,
       thumb: posterThumb(f.poster_url) ?? null,
-      search: normalize([f.title, f.director, f.producer, f.cinematographer, f.screenwriter, f.year, kind, ...f.genres, ...places, ...f.festivals.map((x) => x.name), ...companyNames(f.companies)].filter(Boolean).join(" ")),
+      search: normalize([f.title, f.director, f.producer, f.cinematographer, f.screenwriter, crewSearchText(f.crew), f.year, kind, ...f.genres, ...f.languages, ...places, ...f.festivals.map((x) => x.name), ...companyNames(f.companies)].filter(Boolean).join(" ")),
     };
   });
 }

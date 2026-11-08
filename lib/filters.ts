@@ -1,5 +1,6 @@
 import { orgCategories } from "@/lib/categories";
 import { companyNames } from "@/lib/companies";
+import { cleanLanguages, crewSearchText } from "@/lib/crew";
 import { cleanGenres, FORMATS, formatLabel, legacyKind, NATURES, natureLabel, type FilmFormat, type FilmNature } from "@/lib/film-types";
 import { isUnlocated } from "@/lib/completeness";
 import { CIRC_CATEGORIES, IND_CATEGORIES, INITIATIVE_TYPES, NATIONALITIES, type Film, type InitiativeType, type Nationality, type Org } from "@/lib/types";
@@ -32,6 +33,8 @@ export interface FilmFilter {
   naturaleza: FilmNature[];
   /** Géneros por su nombre: basta con que tenga uno de ellos. */
   genero: string[];
+  /** Idiomas por su nombre: basta con que tenga uno de ellos. */
+  idioma: string[];
   nacionalidad: Nationality[];
   desde: number | null;
   hasta: number | null;
@@ -64,6 +67,7 @@ export const EMPTY_FILM_FILTER: FilmFilter = {
   formato: [],
   naturaleza: [],
   genero: [],
+  idioma: [],
   nacionalidad: [],
   desde: null,
   hasta: null,
@@ -143,6 +147,7 @@ export function parseFilmFilter(p: URLSearchParams): FilmFilter {
     formato: formato.length ? formato : old.formato,
     naturaleza: naturaleza.length ? naturaleza : old.naturaleza,
     genero: cleanGenres(list(p, "genero")),
+    idioma: cleanLanguages(list(p, "idioma")),
     nacionalidad: pick(list(p, "nacionalidad"), NATIONALITIES),
     desde: num(p, "desde"),
     hasta: num(p, "hasta"),
@@ -177,6 +182,7 @@ export function filmFilterToParams(f: FilmFilter, into = new URLSearchParams()) 
   if (f.formato.length) into.set("formato_obra", f.formato.join(","));
   if (f.naturaleza.length) into.set("naturaleza", f.naturaleza.join(","));
   if (f.genero.length) into.set("genero", f.genero.join(","));
+  if (f.idioma.length) into.set("idioma", f.idioma.join(","));
   if (f.nacionalidad.length) into.set("nacionalidad", f.nacionalidad.join(","));
   if (f.desde != null) into.set("desde", String(f.desde));
   if (f.hasta != null) into.set("hasta", String(f.hasta));
@@ -228,6 +234,10 @@ export function filmMatches(f: Film, flt: FilmFilter): boolean {
     const have = new Set(f.genres.map(normalize));
     if (!flt.genero.some((g) => have.has(normalize(g)))) return false;
   }
+  if (flt.idioma.length) {
+    const have = new Set((f.languages ?? []).map(normalize));
+    if (!flt.idioma.some((l) => have.has(normalize(l)))) return false;
+  }
   if (flt.nacionalidad.length && (!f.nationality || !flt.nacionalidad.includes(f.nationality))) return false;
   // un rango escrito al revés (2025 a 2020) se lee igual: de 2020 a 2025
   const swap = flt.desde != null && flt.hasta != null && flt.desde > flt.hasta;
@@ -258,7 +268,7 @@ export function filmMatches(f: Film, flt: FilmFilter): boolean {
   }
   if (flt.locacion === "con" && isUnlocated(f)) return false;
   if (flt.locacion === "sin" && !isUnlocated(f)) return false;
-  if (flt.q && !norm(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${f.cinematographer ?? ""} ${f.screenwriter ?? ""} ${companyNames(f.companies).join(" ")}`).includes(norm(flt.q))) return false;
+  if (flt.q && !norm(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${f.cinematographer ?? ""} ${f.screenwriter ?? ""} ${crewSearchText(f.crew)} ${companyNames(f.companies).join(" ")}`).includes(norm(flt.q))) return false;
   return true;
 }
 
@@ -299,6 +309,7 @@ export function describeFilmFilter(f: FilmFilter, deptoName: (code: number) => s
   if (f.formato.length) out.push(`Formato: ${f.formato.map((c) => formatLabel(c) || c).join(", ")}`);
   if (f.naturaleza.length) out.push(`Naturaleza: ${f.naturaleza.map((c) => natureLabel(c) || c).join(", ")}`);
   if (f.genero.length) out.push(`Género: ${f.genero.join(", ")}`);
+  if (f.idioma.length) out.push(`Idioma: ${f.idioma.join(", ")}`);
   if (f.nacionalidad.length) out.push(`Nacionalidad: ${f.nacionalidad.map((c) => NATIONALITIES.find((k) => k.id === c)?.label ?? c).join(", ")}`);
   if (f.desde != null || f.hasta != null) out.push(`Año: ${f.desde ?? "…"} a ${f.hasta ?? "…"}`);
   if (f.presupuestoMin != null && f.presupuestoMax != null) out.push(`Presupuesto entre ${money(f.presupuestoMin, f.moneda)} y ${money(f.presupuestoMax, f.moneda)}`);

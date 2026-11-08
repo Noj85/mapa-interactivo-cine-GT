@@ -2,6 +2,7 @@
 
 import { categoriesText } from "@/lib/categories";
 import { companyNames } from "@/lib/companies";
+import { crewMatch } from "@/lib/crew";
 import { AnimatePresence, motion } from "framer-motion";
 import { Clapperboard, Landmark, MapPin, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -79,12 +80,15 @@ export function SearchPalette({
     }
     for (const f of data.films) {
       const hay = normalize(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${f.cinematographer ?? ""} ${f.screenwriter ?? ""} ${companyNames(f.companies).join(" ")} ${f.genres.join(" ")}`);
-      if (hay.includes(nq))
+      // (el equipo extra se busca aparte, abajo)
+      // si lo buscado solo coincide con alguien del equipo extra o del reparto, se dice con una línea discreta
+      const crewHit = hay.includes(nq) ? null : crewMatch(f.crew, nq);
+      if (hay.includes(nq) || crewHit)
         out.push({
           kind: "film",
           id: `f${f.id}`,
           label: f.title,
-          sub: ["Producción", f.year, filmTypeLabel(f) || null, f.genres.slice(0, 2).join(", ") || null].filter(Boolean).join(" · "),
+          sub: ["Producción", f.year, filmTypeLabel(f) || null, f.genres.slice(0, 2).join(", ") || null, crewHit ? `Equipo: ${crewHit}` : null].filter(Boolean).join(" · "),
           slug: f.slug,
           poster: f.poster_url ?? null,
         });

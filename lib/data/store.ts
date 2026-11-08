@@ -4,6 +4,7 @@ import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeCategories, orgCategories } from "@/lib/categories";
 import { buildFilm, buildOrg, newId, uniqueSlug } from "@/lib/data/records";
+import { cleanLanguages, coreFields, readCrew } from "@/lib/crew";
 import { cleanGenres, cleanMinutes, isFormat, isNature, legacyKind, upgradeFilmPayload } from "@/lib/film-types";
 import { festivalSearchKey } from "@/lib/festivals";
 import { normalize, upperTitle } from "@/lib/utils";
@@ -12,6 +13,7 @@ import { MAX_FAILED_ATTEMPTS } from "@/lib/request-state";
 import type {
   Festival,
   Film,
+  FilmCrewMember,
   FilmFestival,
   FilmInput,
   FilmLocation,
@@ -175,6 +177,7 @@ const DB_PATH = path.join(process.cwd(), ".data", "db.json");
 function readFilm(f: any): Film {
   const { kind, ...rest } = f;
   const legacy = f.format === undefined && f.nature === undefined ? legacyKind(kind) : { format: null, nature: null };
+  const crew = readCrew(f.crew, f);
   return {
     ...rest,
     title: upperTitle(f.title),
@@ -184,8 +187,10 @@ function readFilm(f: any): Film {
     duration_min: cleanMinutes(f.duration_min),
     festivals: f.festivals ?? [],
     companies: f.companies ?? [],
-    cinematographer: f.cinematographer ?? null,
-    screenwriter: f.screenwriter ?? null,
+    languages: cleanLanguages(f.languages),
+    // registros anteriores a «crew»: el equipo se arma con director, productor, fotografía y guion
+    crew,
+    ...coreFields(crew),
   } as Film;
 }
 
@@ -677,7 +682,12 @@ const rowToSubmission = (r: any): Submission => ({
   payload: r.kind === "film" ? upgradeFilmPayload(r.payload) : r.payload,
 });
 
-const rowToFilm = (r: any): Film => ({
+const rowToFilm = (r: any): Film => {
+  // filas anteriores a la migración 0020 no traen `crew`: el equipo sale de las columnas clásicas
+  const crew = readCrew(r.crew, r);
+  return rowToFilmWith(r, crew);
+};
+const rowToFilmWith = (r: any, crew: FilmCrewMember[]): Film => ({
   id: r.id,
   slug: r.slug,
   title: upperTitle(r.title),
@@ -686,10 +696,9 @@ const rowToFilm = (r: any): Film => ({
   nature: isNature(r.nature) ? r.nature : legacyKind(r.kind).nature,
   genres: Array.isArray(r.genres) ? r.genres.map(String) : [],
   duration_min: cleanMinutes(r.duration_min),
-  director: r.director,
-  producer: r.producer,
-  cinematographer: r.cinematographer ?? null,
-  screenwriter: r.screenwriter ?? null,
+  languages: cleanLanguages(r.languages),
+  crew,
+  ...coreFields(crew),
   nationality: r.nationality,
   budget: r.budget == null ? null : Number(r.budget),
   currency: r.currency,
@@ -798,10 +807,13 @@ export class SupabaseStore implements Store {
         nature: film.nature,
         genres: film.genres,
         duration_min: film.duration_min,
+        // las columnas clásicas se mantienen al día (derivadas de `crew`) para poder volver atrás
         director: film.director,
         producer: film.producer,
         cinematographer: film.cinematographer,
         screenwriter: film.screenwriter,
+        crew: film.crew,
+        languages: film.languages,
         companies: film.companies,
         nationality: film.nationality,
         budget: film.budget,

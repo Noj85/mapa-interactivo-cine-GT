@@ -1,6 +1,7 @@
 "use client";
 
 import { customGenres } from "@/lib/film-types";
+import { languageOptions } from "@/lib/crew";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
 import { filmFilterActive, filterFilms, locationsMatching, orgFilterActive, orgMatches, type FilmFilter } from "@/lib/filters";
 import { AnimatePresence, motion } from "framer-motion";
@@ -176,6 +177,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
     return [...out];
   }, [data.orgs, view.layer]);
   const extraGenres = useMemo(() => customGenres(data.films), [data.films]);
+  const languages = useMemo(() => languageOptions(data.films), [data.films]);
   const aggs = useMemo(() => aggregate(shown, view.layer), [shown, view.layer]);
   const hasSelection = !!(view.place || view.deptos.length || view.film || view.org || view.noloc || view.abroad);
   const desktop = vw.w >= 900;
@@ -201,6 +203,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       total={layerTotal}
       extraCategories={extraCategories}
       extraGenres={extraGenres}
+      languages={languages}
       onFilm={(filmFilter) => commit({ ...view, filmFilter, film: null, org: null, noloc: false, abroad: false })}
       onOrg={(orgFilter) => commit({ ...view, orgFilter, film: null, org: null, noloc: false, abroad: false })}
       downloadHref={downloadHref(view)}

@@ -28,7 +28,7 @@ Copia `.env.example` a `.env.local` (o configúralas en Vercel).
 ## Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0019`, ver cada sección) de `supabase/migrations/`:
+2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0020`, ver cada sección) de `supabase/migrations/`:
    - `0001_init.sql`: tablas, políticas RLS y perfiles.
    - `0002_posters.sql`: campo del póster y bucket público `posters` en Storage.
    - `0003_submissions.sql`: aportes del público.
@@ -196,6 +196,19 @@ Requiere `supabase/migrations/0011_film_format_genres.sql` (después de 0009 y 0
 «Director/a» es la persona que dirigió la producción y «Productor/a» la persona productora; ninguno es una dirección física. Las **casas productoras** (empresas) son una lista aparte, con su país, y lo que se pide depende de la nacionalidad elegida: en una producción **guatemalteca** solo el nombre (el país es Guatemala); en una **coproducción internacional** o **extranjera**, nombre y país de cada casa, tantas como haga falta (el país sugiere una lista, pero se puede escribir cualquiera). Se ven en la ficha, en las descargas y en la búsqueda, y suman a la completitud como «Casa productora». En archivos importados, las columnas «Productora», «Casa productora» o «Empresa» van a casas productoras (varias separadas por «;», con el país entre paréntesis o en una columna «País de la productora»), y «Productor/a» a la persona. Requiere `supabase/migrations/0009_film_companies.sql`.
 
 **Director/a de fotografía y Guionista** son dos campos de texto más por producción, opcionales: se editan junto a Director/a y Productor/a (equipo, aportes públicos y enlaces de /completar), se ven en la ficha, se buscan, salen como columnas en las descargas y se importan desde columnas como «Director/a de fotografía», «DP», «Fotografía», «Guionista» o «Guion» (y los reconoce Claude en PDF y Word). **No cuentan en el porcentaje de completitud** ni se piden en el mensaje de solicitud de información. Requieren `supabase/migrations/0016_film_crew.sql` (después de 0015); sin ella, guardar producciones falla.
+
+## Equipo, reparto e idiomas
+
+Además de Director/a, Productor/a, Director/a de fotografía y Guionista (que siguen igual, en su cuadrícula), cada producción admite una **lista flexible de equipo** con más roles, un **reparto principal** (con el personaje) e **idiomas**. Los roles están en `lib/crew.ts`, agrupados: imagen (dirección de arte, vestuario, maquillaje…), sonido y música (sonido directo, diseño sonoro, mezcla, música original, supervisión musical), edición y postproducción (edición/montaje, colorización, efectos visuales, animación…), producción y dirección (dirección de producción, asistencia de dirección, casting…), reparto y «Otro rol» (nombre libre). Una persona puede tener varios roles y un rol varias personas.
+
+- **Formulario** (registros, aportes del público, enlaces de /completar): debajo de los cuatro campos de siempre hay la sección plegable «Más equipo y reparto» (cerrada si no hay datos) y, junto a los géneros, los **idiomas** (estándar o propios, hasta 8, como los géneros).
+- **Ficha pública:** igual que antes si no hay datos nuevos. Con equipo extra aparece el bloque plegable «Equipo completo», agrupado por área; los idiomas salen como etiquetas junto a los géneros.
+- **Filtros y búsqueda:** el filtro **Idioma** solo se ofrece si alguna producción tiene idiomas (mapa y `/descargas`); la búsqueda encuentra a las personas del equipo extra y del reparto.
+- **Descargas:** la tabla de producciones suma las columnas «Idiomas», una por cada rol extra que alguna producción use, y «Reparto»; no aparecen columnas vacías.
+- **Carga de archivos:** columnas como «Edición», «Montaje», «Sonido», «Música original», «Dirección de arte», «Reparto» o «Idiomas» se reconocen solas (varias personas por celda, separadas por «;»; en reparto, `Nombre (Personaje)`). En el paso «Lo que entendimos» los roles extra van agrupados en el bloque «Equipo y reparto». Con coincidencia con un registro existente solo se **agregan** personas e idiomas que faltan. Claude también extrae estos créditos de PDF y Word. El Excel normalizado que se baja en la revisión se vuelve a cargar sin ajustes.
+- **Completitud:** no cambia; el equipo extra, el reparto y los idiomas son opcionales.
+
+**Base de datos.** Requiere `supabase/migrations/0020_film_crew_languages.sql`: agrega `films.crew` (jsonb) y `films.languages` (text[]) y copia a `crew` los cuatro campos de persona que ya existían. Las columnas `director`, `producer`, `cinematographer` y `screenwriter` se siguen escribiendo (texto derivado del equipo) para poder volver atrás. **Aplícala antes de publicar este cambio: sin ella, guardar producciones falla.** En modo local (`.data/db.json`) las producciones se convierten solas al leerlas.
 
 **Títulos en mayúsculas.** Los títulos de las producciones se guardan y se ven siempre en MAYÚSCULAS (con sus acentos: «ÚLTIMO»). La app los estandariza al guardar (editor, aportes, archivos y enlaces de /completar), y `supabase/migrations/0018_film_title_upper.sql` hace dos cosas en la base: pasa a mayúsculas los títulos que ya existían y crea un trigger que lo exige en cada insert o update. Los slugs no cambian y la búsqueda sigue ignorando mayúsculas y acentos. En modo local, `.data/db.json` se estandariza al leerlo.
 

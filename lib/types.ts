@@ -76,6 +76,14 @@ export interface FilmCompany {
   country: string | null;
 }
 
+/** Una persona del equipo o del reparto. Los roles están en `lib/crew.ts`. */
+export interface FilmCrewMember {
+  role: string;
+  name: string;
+  /** Reparto: el personaje. «Otro rol»: el nombre del rol. En los demás roles va vacío. */
+  detail: string | null;
+}
+
 export interface Film {
   id: string;
   slug: string;
@@ -89,6 +97,11 @@ export interface Film {
   genres: string[];
   /** Duración en minutos. */
   duration_min: number | null;
+  /** Idiomas de la producción (estándar o propios, por su nombre). */
+  languages: string[];
+  /** Equipo y reparto completos. */
+  crew: FilmCrewMember[];
+  /** Director/a, productor/a, fotografía y guion como texto: se derivan de `crew` (roles base). */
   director: string | null;
   producer: string | null;
   /** Director/a de fotografía (persona). */
@@ -271,10 +284,15 @@ export interface FilmInput {
   nature?: FilmNature | null;
   genres?: string[];
   duration_min?: number | null;
+  /** Sin este campo se conservan los idiomas actuales. */
+  languages?: string[];
+  /** Los cuatro roles base, como texto. Se guardan dentro de `crew`. */
   director?: string | null;
   producer?: string | null;
   cinematographer?: string | null;
   screenwriter?: string | null;
+  /** Equipo extra y reparto (los roles base de esta lista se ignoran). Sin este campo se conserva el actual. */
+  crew?: Partial<FilmCrewMember>[];
   nationality?: Nationality | null;
   budget?: number | null;
   currency?: "GTQ" | "USD";

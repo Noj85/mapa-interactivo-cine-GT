@@ -1,7 +1,8 @@
 import { filmCompleteness, isAbroad, orgCompleteness } from "@/lib/completeness";
 import { normalizeCategories } from "@/lib/categories";
 import { cleanGenres, cleanMinutes } from "@/lib/film-types";
-import { FESTIVAL_RESULTS, type Film, type FilmCompany, type FilmFestival, type FilmInput, type FilmLocation, type Org, type OrgInput } from "@/lib/types";
+import { cleanLanguages, composeCrew, coreFields } from "@/lib/crew";
+import { FESTIVAL_RESULTS, type Film, type FilmCompany, type FilmCrewMember, type FilmFestival, type FilmInput, type FilmLocation, type Org, type OrgInput } from "@/lib/types";
 import { slugify, upperTitle } from "@/lib/utils";
 
 const num = (v: unknown): number | null => {
@@ -54,6 +55,16 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string; e
   const companies: FilmCompany[] = (input.companies ?? opts.existing?.companies ?? [])
     .filter((c) => str(c.name))
     .map((c) => ({ name: str(c.name)!, country: str(c.country) }));
+  // Sin `crew` en la entrada se conserva el equipo extra y el reparto que ya tenía.
+  const crew: FilmCrewMember[] = composeCrew(
+    {
+      director: str(input.director),
+      producer: str(input.producer),
+      cinematographer: str(input.cinematographer),
+      screenwriter: str(input.screenwriter),
+    },
+    input.crew ?? opts.existing?.crew ?? [],
+  );
   const locations: FilmLocation[] = (input.locations ?? []).map((l, i) => {
     // fuera de Guatemala no hay departamento ni municipio; «Guatemala» como país es lo normal y no se guarda
     const country = str(l.country);
@@ -83,10 +94,10 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string; e
     nature: input.nature !== undefined ? input.nature : opts.existing?.nature ?? null,
     genres: input.genres !== undefined ? cleanGenres(input.genres) : opts.existing?.genres ?? [],
     duration_min: input.duration_min !== undefined ? cleanMinutes(input.duration_min) : opts.existing?.duration_min ?? null,
-    director: str(input.director),
-    producer: str(input.producer),
-    cinematographer: str(input.cinematographer),
-    screenwriter: str(input.screenwriter),
+    languages: input.languages !== undefined ? cleanLanguages(input.languages) : opts.existing?.languages ?? [],
+    // los cuatro roles base se guardan dentro de `crew`; sus textos se vuelven a leer de ahí
+    crew,
+    ...coreFields(crew),
     nationality: input.nationality ?? null,
     budget: num(input.budget),
     currency: input.currency ?? ("GTQ" as const),

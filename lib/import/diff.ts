@@ -1,5 +1,6 @@
 import { isAbroad } from "@/lib/completeness";
 import { cleanGenres, formatLabel, MAX_GENRES, natureLabel } from "@/lib/film-types";
+import { CAST_ROLE, cleanCrew, cleanLanguages, extraCrew, MAX_LANGUAGES, memberRoleLabel } from "@/lib/crew";
 import { orgCategories, normalizeCategories } from "@/lib/categories";
 import { NATIONALITIES, type Film, type FilmInput, type Org, type OrgInput } from "@/lib/types";
 import { normalize } from "@/lib/utils";
@@ -148,6 +149,30 @@ function filmItems(existing: Film, incoming: FilmInput, names?: PlaceNames): Ite
     push({ id: `add:genre:${normalize(g)}`, group: "add", label: "Género", incoming: g, apply: (d) => (d.genres = cleanGenres([...(d.genres ?? []), g])) });
   }
 
+  // idiomas: se agregan los nuevos mientras quepan
+  let langRoom = MAX_LANGUAGES - (existing.languages ?? []).length;
+  const haveLang = new Set((existing.languages ?? []).map(normalize));
+  for (const l of cleanLanguages(incoming.languages ?? [])) {
+    if (haveLang.has(normalize(l)) || langRoom <= 0) continue;
+    langRoom--;
+    push({ id: `add:language:${normalize(l)}`, group: "add", label: "Idioma", incoming: l, apply: (d) => (d.languages = cleanLanguages([...(d.languages ?? []), l])) });
+  }
+
+  // equipo extra y reparto: se agrega a quien todavía no está con ese rol
+  const haveCrew = new Set(extraCrew(existing.crew).map((m) => `${m.role}|${normalize(m.name)}`));
+  for (const m of extraCrew(cleanCrew(incoming.crew ?? []))) {
+    const k = `${m.role}|${normalize(m.name)}`;
+    if (haveCrew.has(k)) continue;
+    haveCrew.add(k);
+    push({
+      id: `add:crew:${k}`,
+      group: "add",
+      label: memberRoleLabel(m),
+      incoming: m.detail && m.role === CAST_ROLE ? `${m.name} (${m.detail})` : m.name,
+      apply: (d) => (d.crew = cleanCrew([...extraCrew(cleanCrew(d.crew ?? [])), m])),
+    });
+  }
+
   // casas productoras
   for (const nc of incoming.companies ?? []) {
     const name = (nc.name ?? "").trim();
@@ -267,6 +292,8 @@ function draftFromFilm(f: Film): FilmInput {
     producer: f.producer,
     cinematographer: f.cinematographer,
     screenwriter: f.screenwriter,
+    crew: extraCrew(f.crew).map((m) => ({ ...m })),
+    languages: [...(f.languages ?? [])],
     nationality: f.nationality,
     budget: f.budget,
     currency: f.currency,
