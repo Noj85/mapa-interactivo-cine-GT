@@ -2,17 +2,16 @@ import type { Metadata } from "next";
 import { DownloadsBuilder } from "@/components/downloads/DownloadsBuilder";
 import { BrandFooter } from "@/components/site/Brand";
 import { SiteHeader } from "@/components/site/SiteHeader";
-import { loadDataset } from "@/lib/data/load";
+import { loadDatasetCached } from "@/lib/data/load";
 import { serverGazetteer } from "@/lib/geo/server";
 
-export const revalidate = 60;
 export const metadata: Metadata = {
   title: "Descargas · Mapa del Cine de Guatemala",
   description: "Descarga en CSV o Excel las producciones, la circulación y las entidades del mapa, filtradas por departamento, tipo, año, presupuesto y más.",
 };
 
 export default async function DescargasPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const [data, gaz, sp] = await Promise.all([loadDataset(), serverGazetteer(), searchParams]);
+  const [data, gaz, sp] = await Promise.all([loadDatasetCached(), serverGazetteer(), searchParams]);
   const initial = new URLSearchParams();
   for (const [k, v] of Object.entries(sp)) if (typeof v === "string") initial.set(k, v);
 

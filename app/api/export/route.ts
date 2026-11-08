@@ -1,5 +1,5 @@
 import { adminStore, getSession } from "@/lib/auth";
-import { loadDataset } from "@/lib/data/load";
+import { loadDatasetCached } from "@/lib/data/load";
 import { buildTable, filterSlug, toCsv, toXlsx } from "@/lib/export";
 import { describeFilmFilter, describeOrgFilter, filterFilms, filterOrgs, kindLayer, parseExportRequest, parseFilmFilter, parseOrgFilter } from "@/lib/filters";
 import { serverGazetteer } from "@/lib/geo/server";
@@ -53,7 +53,7 @@ export async function GET(req: Request) {
     const store = await adminStore();
     [films, orgs] = await Promise.all([store.listFilms({ drafts: true }), store.listOrgs({ drafts: true })]);
   } else {
-    const d = await loadDataset();
+    const d = await loadDatasetCached();
     films = d.films;
     orgs = d.orgs;
   }

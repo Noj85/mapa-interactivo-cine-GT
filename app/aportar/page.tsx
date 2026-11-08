@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { ContributeForm } from "@/components/aportar/ContributeForm";
 import { BrandFooter } from "@/components/site/Brand";
 import { SiteHeader } from "@/components/site/SiteHeader";
-import { loadDataset } from "@/lib/data/load";
+import { loadDatasetCached } from "@/lib/data/load";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default async function AportarPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
-  const data = await loadDataset();
+  const data = await loadDatasetCached();
   const film = one("pelicula") ? data.films.find((f) => f.slug === one("pelicula")) : undefined;
   const org = !film && one("entidad") ? data.orgs.find((o) => o.slug === one("entidad")) : undefined;
   // la capa que se estaba viendo en el mapa: Producción abre «Producción»; Circulación o Industria abren «Entidad» con esa capa

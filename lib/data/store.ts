@@ -739,19 +739,35 @@ const must = <T,>(res: { data: T; error: { message: string } | null }) => {
   return res.data;
 };
 
+/**
+ * Supabase corta cada consulta en 1.000 filas (Max rows). Esto pide por tramos hasta traer todo,
+ * para que ninguna lista se trunque en silencio. La consulta debe traer un orden estable.
+ */
+const PAGE = 1000;
+async function pageAll<T = any>(q: { range(from: number, to: number): PromiseLike<{ data: any; error: { message: string } | null }> }): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const rows = must(await q.range(from, from + PAGE - 1)) as T[] | null;
+    if (!rows?.length) break;
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return out;
+}
+
 export class SupabaseStore implements Store {
   mode = "supabase" as const;
   constructor(private db: SupabaseClient) {}
 
   async listFilms(opts?: { drafts?: boolean }) {
-    let q = this.db.from("films").select("*, film_locations(*), film_festivals(*)").order("title");
+    let q = this.db.from("films").select("*, film_locations(*), film_festivals(*)").order("title").order("id");
     if (!opts?.drafts) q = q.eq("status", "published");
-    return (must(await q) as any[]).map(rowToFilm);
+    return (await pageAll(q)).map(rowToFilm);
   }
   async listOrgs(opts?: { drafts?: boolean }) {
-    let q = this.db.from("organizations").select("*").order("name");
+    let q = this.db.from("organizations").select("*").order("name").order("id");
     if (!opts?.drafts) q = q.eq("status", "published");
-    return (must(await q) as any[]).map(rowToOrg);
+    return (await pageAll(q)).map(rowToOrg);
   }
   async getFilm(id: string) {
     const r = must(await this.db.from("films").select("*, film_locations(*), film_festivals(*)").eq("id", id).maybeSingle());
@@ -768,7 +784,7 @@ export class SupabaseStore implements Store {
       existing?.slug ??
       uniqueSlug(
         input.title,
-        new Set((must(await this.db.from("films").select("slug")) as any[]).map((r) => r.slug)),
+        new Set((await pageAll(this.db.from("films").select("slug").order("slug"))).map((r: any) => r.slug)),
         input.year ?? null,
       );
     const film = buildFilm(input, { id: existing?.id, slug, existing });
@@ -862,7 +878,7 @@ export class SupabaseStore implements Store {
       existing?.slug ??
       uniqueSlug(
         input.name,
-        new Set((must(await this.db.from("organizations").select("slug")) as any[]).map((r) => r.slug)),
+        new Set((await pageAll(this.db.from("organizations").select("slug").order("slug"))).map((r: any) => r.slug)),
       );
     const org = buildOrg(input, { id: existing?.id, slug });
     must(
@@ -939,9 +955,9 @@ export class SupabaseStore implements Store {
     must(await this.db.from("import_questions").insert(list));
   }
   async listQuestions(opts?: { status?: QuestionStatus }) {
-    let q = this.db.from("import_questions").select("*").order("created_at", { ascending: false });
+    let q = this.db.from("import_questions").select("*").order("created_at", { ascending: false }).order("id");
     if (opts?.status) q = q.eq("status", opts.status);
-    return must(await q) as ImportQuestion[];
+    return (await pageAll(q)) as ImportQuestion[];
   }
   async answerQuestion(id: string, answer: string | null, status: QuestionStatus) {
     must(await this.db.from("import_questions").update({ answer, status }).eq("id", id));
@@ -983,9 +999,9 @@ export class SupabaseStore implements Store {
     return id;
   }
   async listSubmissions(opts?: { status?: SubmissionStatus }) {
-    let q = this.db.from("submissions").select("*").order("created_at", { ascending: false });
+    let q = this.db.from("submissions").select("*").order("created_at", { ascending: false }).order("id");
     if (opts?.status) q = q.eq("status", opts.status);
-    return (must(await q) as any[]).map(rowToSubmission);
+    return (await pageAll(q)).map(rowToSubmission);
   }
   async getSubmission(id: string) {
     const r = must(await this.db.from("submissions").select("*").eq("id", id).maybeSingle());

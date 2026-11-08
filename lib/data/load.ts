@@ -25,3 +25,25 @@ export async function loadDataset(): Promise<Dataset> {
     return { films: [], orgs: [], festivalOrgs: {}, mode: supabaseConfigured() ? "supabase" : "local", publicStats: DEFAULT_PUBLIC_STATS };
   }
 }
+
+/**
+ * Para las páginas que no pueden ser estáticas (`/aportar`, `/descargas`, `/api/export`): reutiliza el
+ * conjunto de datos unos minutos dentro de la misma instancia, en vez de consultar Supabase en cada visita.
+ * Un error o un conjunto vacío no se guardan.
+ */
+const TTL_MS = 2 * 60 * 1000;
+let memo: { at: number; data: Dataset } | null = null;
+let inflight: Promise<Dataset> | null = null;
+
+export async function loadDatasetCached(): Promise<Dataset> {
+  if (memo && Date.now() - memo.at < TTL_MS) return memo.data;
+  inflight ??= loadDataset()
+    .then((data) => {
+      if (data.films.length || data.orgs.length) memo = { at: Date.now(), data };
+      return data;
+    })
+    .finally(() => {
+      inflight = null;
+    });
+  return inflight;
+}
