@@ -2,7 +2,7 @@
 
 import { Download, HandHeart, MoreHorizontal, Moon, Search, Sun } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MapLogo } from "@/components/site/Brand";
 
 /**
@@ -16,6 +16,7 @@ export function MobileTopBar({
   onSearch,
   theme,
   onTheme,
+  filters,
 }: {
   homeHref: string;
   /** Clic en el logo: vuelve a la vista inicial. */
@@ -24,6 +25,8 @@ export function MobileTopBar({
   onSearch(): void;
   theme: "light" | "dark";
   onTheme(): void;
+  /** Botón de filtros, a la derecha de la búsqueda. */
+  filters?: ReactNode;
 }) {
   const [menu, setMenu] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -70,15 +73,18 @@ export function MobileTopBar({
           </div>
         )}
       </div>
-      <button
-        type="button"
-        onClick={onSearch}
-        className="pointer-events-auto glass flex h-11 w-full items-center gap-2.5 rounded-2xl border border-line px-4 text-left text-[15px] text-muted shadow-soft transition-colors active:bg-surface-2"
-        aria-label="Buscar un lugar, producción o entidad"
-      >
-        <Search className="h-4 w-4 shrink-0" aria-hidden />
-        <span className="truncate">Buscar un lugar o producción</span>
-      </button>
+      <div className="pointer-events-none flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onSearch}
+          className="pointer-events-auto glass flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-2xl border border-line px-4 text-left text-[15px] text-muted shadow-soft transition-colors active:bg-surface-2"
+          aria-label="Buscar un lugar, producción o entidad"
+        >
+          <Search className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="truncate">Buscar un lugar o producción</span>
+        </button>
+        {filters}
+      </div>
     </>
   );
 }

@@ -26,6 +26,10 @@ interface Props {
   onOrg(f: OrgFilter): void;
   /** Enlace a /descargas con los mismos filtros. */
   downloadHref: string;
+  /** Teléfono: el botón es solo el ícono (con la cuenta de filtros activos). */
+  compact?: boolean;
+  /** Filtros que no se ofrecen (por ejemplo, las cifras de rodaje que el público no ve). */
+  hiddenFields?: string[];
 }
 
 interface Field {
@@ -247,8 +251,10 @@ export function FilterPanel(p: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFilm, layer, ff, of, p.extraCategories, p.extraGenres]);
 
-  const shownFields = fields.filter((f) => f.active || added.includes(f.id));
-  const available = fields.filter((f) => !shownFields.includes(f));
+  const hidden = p.hiddenFields ?? [];
+  const offered = fields.filter((f) => !hidden.includes(f.id));
+  const shownFields = offered.filter((f) => f.active || added.includes(f.id));
+  const available = offered.filter((f) => !shownFields.includes(f));
   const n = activeFilterCount({ layer, filmFilter: ff, orgFilter: of });
   const clearAll = () => {
     if (isFilm) p.onFilm({ ...EMPTY_FILM_FILTER, locacion: ff.locacion });
@@ -271,19 +277,34 @@ export function FilterPanel(p: Props) {
 
   return (
     <div ref={root} className="pointer-events-auto">
-      <div className={cn("glass flex items-center gap-1 rounded-2xl border p-1 shadow-soft transition-colors", highlighted ? "border-accent/60" : "border-line")}>
+      <div
+        className={cn(
+          "glass flex items-center rounded-2xl border shadow-soft transition-colors",
+          p.compact ? "relative h-11 w-11 shrink-0 justify-center" : "gap-1 p-1",
+          highlighted ? "border-accent/60" : "border-line",
+        )}
+      >
         <button
           type="button"
-          className="flex h-9 items-center gap-2 rounded-xl px-3 text-sm font-medium text-ink outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-accent/60"
+          className={cn(
+            "flex items-center rounded-xl text-sm font-medium text-ink outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-accent/60",
+            p.compact ? "h-full w-full justify-center" : "h-9 gap-2 px-3",
+          )}
           aria-expanded={open}
           aria-controls={panelId}
+          aria-label={p.compact ? (n > 0 ? `Filtros: ${n} activos` : "Filtros") : undefined}
           onClick={() => setOpen((o) => !o)}
         >
-          <SlidersHorizontal className={cn("h-4 w-4", highlighted ? "text-accent" : "text-muted")} aria-hidden />
-          Filtros
-          {n > 0 && <span className="rounded-md bg-accent px-1.5 text-xs font-semibold leading-5 text-accent-ink">{n}</span>}
+          <SlidersHorizontal className={cn(p.compact ? "h-5 w-5" : "h-4 w-4", highlighted ? "text-accent" : "text-muted")} aria-hidden />
+          {!p.compact && "Filtros"}
+          {n > 0 && !p.compact && <span className="rounded-md bg-accent px-1.5 text-xs font-semibold leading-5 text-accent-ink">{n}</span>}
         </button>
-        {n > 0 && (
+        {p.compact && n > 0 && (
+          <span className="pointer-events-none absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold tabular-nums text-white" aria-hidden>
+            {n}
+          </span>
+        )}
+        {n > 0 && !p.compact && (
           <button
             type="button"
             className="btn-ghost h-9 w-9 !p-0"

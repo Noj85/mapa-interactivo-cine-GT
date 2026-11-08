@@ -221,7 +221,7 @@ Con `supabase/migrations/0010_festival_org_link.sql` (después de 0007, 0008 y 0
 
 ## Mapa público y filtros del equipo
 
-**El mapa público no tiene leyenda ni filtros de contenido**, solo el desplegable de **departamento** (debajo de las capas, ver abajo): se toca un departamento o municipio, una producción o una zona, y se busca con ⌘ K. Los enlaces compartidos con filtros (`formato_obra=…`) se abren con el mapa completo. Los filtros siguen existiendo para el equipo en `/admin` (y en `/descargas`, que es pública pero aparte), como herramienta secundaria detrás de un botón.
+**El mapa público no tiene leyenda.** Junto al desplegable de **departamento** (debajo de las capas, ver abajo) tiene el botón **Filtros**, el mismo del equipo: se agregan filtros uno a uno (formato, naturaleza, género, nacionalidad, año como rango, presupuesto, buscar…) y los enlaces compartidos con filtros (`formato_obra=…`) se abren ya filtrados. En el teléfono es un ícono junto al de departamento. Los filtros de **días de rodaje, inversión local y empleos** solo se ofrecen al público si esa cifra está activada en Ajustes → Cifras públicas. También hay filtros en `/descargas`.
 
 ### Cifras de la tarjeta (Ajustes → Cifras públicas)
 

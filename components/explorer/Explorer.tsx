@@ -2,7 +2,7 @@
 
 import { customGenres } from "@/lib/film-types";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
-import { EMPTY_FILM_FILTER, EMPTY_ORG_FILTER, filmFilterActive, filterFilms, locationsMatching, orgFilterActive, orgMatches, type FilmFilter } from "@/lib/filters";
+import { filmFilterActive, filterFilms, locationsMatching, orgFilterActive, orgMatches, type FilmFilter } from "@/lib/filters";
 import { AnimatePresence, motion } from "framer-motion";
 import { Download, HandHeart, Moon, Search, Sun } from "lucide-react";
 import { DepartmentFilter } from "./DepartmentFilter";
@@ -31,12 +31,6 @@ import type { PanelCtx } from "./parts";
 
 const PANEL_W = 400;
 
-/** La vista pública solo filtra por locación: un enlace con otros filtros o con otra métrica los ignora. */
-function forMode(v: ViewState, canEdit: boolean): ViewState {
-  if (canEdit) return v;
-  return { ...v, metric: LAYER_METRICS[v.layer][0], filmFilter: { ...EMPTY_FILM_FILTER, locacion: v.filmFilter.locacion }, orgFilter: EMPTY_ORG_FILTER };
-}
-
 /**
  * `public`: lo que ve cualquier persona. `admin`: el mismo mapa dentro de /admin, con las herramientas del equipo.
  * El modo lo fija la página (nunca la sesión del navegador), para que «/» sea siempre la vista pública.
@@ -44,7 +38,7 @@ function forMode(v: ViewState, canEdit: boolean): ViewState {
 export default function Explorer({ data, mode = "public" }: { data: Dataset; mode?: "public" | "admin" }) {
   const canEdit = mode === "admin";
   const [view, setView] = useState<ViewState>(() =>
-    forMode(typeof window === "undefined" ? DEFAULT_VIEW : parseView(window.location.search), canEdit),
+    typeof window === "undefined" ? DEFAULT_VIEW : parseView(window.location.search),
   );
   const [geo, setGeo] = useState<GeoBundle | null>(null);
   const [geoError, setGeoError] = useState(false);
@@ -77,10 +71,10 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
   }, []);
 
   useEffect(() => {
-    const onPop = () => setView(forMode(parseView(window.location.search), canEdit));
+    const onPop = () => setView(parseView(window.location.search));
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [canEdit]);
+  }, []);
 
   const go = useMemo<PanelCtx["go"]>(() => {
     // «Sin locación» solo se ve como lista aparte: al salir de ahí, o al elegir un lugar, se vuelve a lo normal («con locación»)
@@ -128,10 +122,10 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
       e.preventDefault();
       setSearchOpen(false);
-      commit(forMode(DEFAULT_VIEW, canEdit));
+      commit(DEFAULT_VIEW);
       mapRef.current?.reset();
     },
-    [commit, canEdit],
+    [commit],
   );
 
   // atajos de teclado
@@ -193,6 +187,25 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
   const padding = desktop
     ? { top: 20, right: PANEL_W + 16, bottom: 20, left: 460 }
     : { top: compactTop ? 168 : 190, right: 0, bottom: sheet === "peek" ? PEEK_H : Math.round(vw.h * 0.5), left: 0 };
+
+  // el público no ve los filtros de las cifras de rodaje que el equipo dejó ocultas
+  const hiddenFilters = canEdit ? [] : [!data.publicStats.days && "dias", !data.publicStats.spend && "inversion", !data.publicStats.jobs && "empleos"].filter((x): x is string => !!x);
+  const filterPanel = (compact: boolean) => (
+    <FilterPanel
+      compact={compact}
+      hiddenFields={hiddenFilters}
+      layer={view.layer}
+      filmFilter={view.filmFilter}
+      orgFilter={view.orgFilter}
+      count={layerCount}
+      total={layerTotal}
+      extraCategories={extraCategories}
+      extraGenres={extraGenres}
+      onFilm={(filmFilter) => commit({ ...view, filmFilter, film: null, org: null, noloc: false, abroad: false })}
+      onOrg={(orgFilter) => commit({ ...view, orgFilter, film: null, org: null, noloc: false, abroad: false })}
+      downloadHref={downloadHref(view)}
+    />
+  );
 
   const ctx: PanelCtx | null = geo ? { data: shown, allFilms: data.films, gaz: geo.gaz, aggs, view, go, canEdit, mobile: !desktop, sheet } : null;
 
@@ -270,7 +283,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       <div className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex flex-col gap-2.5 sm:left-4 sm:right-auto sm:top-4 sm:w-[440px]">
         {compactTop ? (
           <>
-            <MobileTopBar homeHref={homeHref} onHome={goHome} aportarHref={`/aportar?capa=${view.layer}`} onSearch={() => setSearchOpen(true)} theme={theme} onTheme={toggleTheme} />
+            <MobileTopBar homeHref={homeHref} onHome={goHome} aportarHref={`/aportar?capa=${view.layer}`} onSearch={() => setSearchOpen(true)} theme={theme} onTheme={toggleTheme} filters={filterPanel(true)} />
             <div className="pointer-events-none flex items-center gap-2">
               <div className="pointer-events-auto min-w-0 flex-1">
                 <LayerSwitcher layer={view.layer} onChange={go.layer} />
@@ -314,25 +327,10 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
             <div className="pointer-events-auto flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap">
               <LayerSwitcher layer={view.layer} onChange={go.layer} />
             </div>
-            {(canEdit || geo) && (
-              <div className="pointer-events-none relative flex flex-wrap items-start gap-2">
-                {geo && <DepartmentFilter gaz={geo.gaz} selected={selectedDeptos(view)} onChange={go.deptos} />}
-                {canEdit && (
-                  <FilterPanel
-                    layer={view.layer}
-                    filmFilter={view.filmFilter}
-                    orgFilter={view.orgFilter}
-                    count={layerCount}
-                    total={layerTotal}
-                    extraCategories={extraCategories}
-                    extraGenres={extraGenres}
-                    onFilm={(filmFilter) => commit({ ...view, filmFilter, film: null, org: null, noloc: false, abroad: false })}
-                    onOrg={(orgFilter) => commit({ ...view, orgFilter, film: null, org: null, noloc: false, abroad: false })}
-                    downloadHref={downloadHref(view)}
-                  />
-                )}
-              </div>
-            )}
+            <div className="pointer-events-none relative flex flex-wrap items-start gap-2">
+              {geo && <DepartmentFilter gaz={geo.gaz} selected={selectedDeptos(view)} onChange={go.deptos} />}
+              {filterPanel(false)}
+            </div>
           </>
         )}
       </div>
