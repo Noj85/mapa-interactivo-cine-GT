@@ -2,7 +2,7 @@
 
 import { isAbroad } from "@/lib/completeness";
 import { EMPTY_FILM_FILTER, EMPTY_ORG_FILTER } from "@/lib/filters";
-import { AlertTriangle, ArrowRight, Copy, Download, MapPin } from "lucide-react";
+import { AlertTriangle, ArrowRight, Copy, Download, MapPin, Plus, Sparkles } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import { PlaceSelect } from "@/components/records/PlaceSelect";
@@ -12,7 +12,8 @@ import { planFilmUpdate, planOrgUpdate, type PlaceNames, type UpdateGroup, type 
 import { downloadNormalized, normalizedTables, type NormalizedTable } from "@/lib/import/normalized";
 import { candidatesToDataset } from "@/lib/import/preview";
 import { candidateStatus, setCandidateLocation } from "@/lib/import/questions";
-import type { Candidate, DuplicateMatch, MatchLevel, ResolveResponse } from "@/lib/import/types";
+import { acceptAllSuggestions, acceptSuggestion } from "@/lib/import/suggestions";
+import type { Candidate, DuplicateMatch, MatchLevel, PlaceResolution, ResolveResponse } from "@/lib/import/types";
 import { CIRC_CATEGORIES, IND_CATEGORIES, LAYERS, type Film, type LayerId, type Org } from "@/lib/types";
 import type { ViewState } from "@/lib/view";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,8 @@ export function StepReview({
   candidates,
   onCandidates,
   engine,
+  places,
+  note,
   filename,
   onBack,
   onNext,
@@ -69,10 +72,14 @@ export function StepReview({
   candidates: Candidate[];
   onCandidates(c: Candidate[]): void;
   engine: ResolveResponse["engine"];
+  places: Record<string, PlaceResolution>;
+  /** Aviso de la lectura de texto libre (lotes que fallaron). */
+  note?: string | null;
   filename: string;
   onBack(): void;
   onNext(): void;
 }) {
+  const [allLocs, setAllLocs] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<Filter>("all");
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState<string | null>(null); // "key#idx"
@@ -95,6 +102,7 @@ export function StepReview({
       total: candidates.length,
       live: live.length,
       doubts: candidates.filter((c) => c.issues.length > 0).length,
+      suggestions: candidates.reduce((n, c) => n + (c.suggestions ?? []).filter((s) => !s.accepted).length, 0),
       dups: candidates.filter((c) => c.duplicate).length,
       incomplete: live.filter((c) => candidateStatus(c).completeness < 100).length,
     };
@@ -133,11 +141,13 @@ export function StepReview({
     <div>
       <div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
         <span><b className="font-display text-xl">{stats.live}</b> <span className="text-muted">registros por cargar</span></span>
-        <span className="text-muted"><b className="text-warn">{stats.doubts}</b> con dudas de lugar</span>
+        <span className="text-muted"><b className="text-warn">{stats.doubts}</b> con dudas</span>
+        {stats.suggestions > 0 && <span className="text-muted"><b className="text-accent">{stats.suggestions}</b> sugerencias del texto</span>}
         <span className="text-muted"><b className="text-warn">{stats.incomplete}</b> incompletos</span>
         {stats.dups > 0 && <span className="text-muted"><b className="text-accent">{stats.dups}</b> posibles duplicados</span>}
         {stats.dups > 0 && <span className="text-muted"><b className="text-accent">{stats.withNew}</b> existentes con datos nuevos</span>}
         {stats.toAportes > 0 && <span className="text-muted"><b className="text-warn">{stats.toAportes}</b> irán a Aportes para revisión</span>}
+        {note && <span className="w-full text-xs text-warn">{note}</span>}
         <span className="ml-auto text-xs text-muted">{engine === "claude" ? "Lugares ubicados con ayuda de Claude" : "Lugares ubicados con la lista oficial"}</span>
       </div>
 
@@ -241,7 +251,7 @@ export function StepReview({
                       </div>
 
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        {Array.from({ length: Math.max(locCount, c.type === "film" ? 0 : 1) }).slice(0, 6).map((_, i) => {
+                        {Array.from({ length: Math.max(locCount, c.type === "film" ? 0 : 1) }).slice(0, allLocs.has(c.key) ? 60 : 6).map((_, i) => {
                           const p = placeLabel(c, i);
                           const k = `${c.key}#${i}`;
                           return (
@@ -259,13 +269,63 @@ export function StepReview({
                             </button>
                           );
                         })}
-                        {c.type === "film" && locCount > 6 && <span className="text-xs text-muted">+{locCount - 6} más</span>}
+                        {c.type === "film" && locCount > 6 && (
+                          <button
+                            className="text-xs text-muted hover:text-ink"
+                            onClick={() => setAllLocs((s) => { const n = new Set(s); if (n.has(c.key)) n.delete(c.key); else n.add(c.key); return n; })}
+                          >
+                            {allLocs.has(c.key) ? "Ver menos" : `Ver las ${locCount} locaciones (+${locCount - 6})`}
+                          </button>
+                        )}
                         {c.type === "film" && locCount === 0 && (
                           <button className={cn("chip border-warn/50 text-warn")} onClick={() => setEditing(editing === `${c.key}#0` ? null : `${c.key}#0`)}>
                             <AlertTriangle className="h-3 w-3" /> Sin lugar — agregar
                           </button>
                         )}
                       </div>
+
+                      {c.issues.filter((i) => i.field.startsWith("count:") || i.field.startsWith("columns:")).map((i) => (
+                        <p key={i.field} className="mt-2 flex items-start gap-1.5 text-xs text-warn">
+                          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> {i.message}
+                        </p>
+                      ))}
+
+                      {(c.suggestions?.length ?? 0) > 0 && (
+                        <div className="mt-2 rounded-xl border border-accent/30 bg-accent/5 px-3 py-2">
+                          <div className="flex items-center gap-2 text-xs font-medium">
+                            <Sparkles className="h-3.5 w-3.5 text-accent" /> Sugerencias del texto
+                            <span className="font-normal text-muted">(Claude las encontró; confírmalas antes de agregarlas)</span>
+                            {c.suggestions!.some((s) => !s.accepted) && (
+                              <button className="ml-auto text-accent hover:underline" onClick={() => patch(c.key, (x) => acceptAllSuggestions(x, places))}>
+                                Agregar todas
+                              </button>
+                            )}
+                          </div>
+                          <ul className="mt-1.5 space-y-1.5">
+                            {c.suggestions!.map((s) => (
+                              <li key={s.id} className={cn("flex items-start gap-2 text-xs", s.accepted && "opacity-60")}>
+                                <button
+                                  className="btn-outline !h-6 shrink-0 !px-2 !py-0 text-[11px]"
+                                  disabled={s.accepted}
+                                  onClick={() => patch(c.key, (x) => acceptSuggestion(x, s.id, places))}
+                                >
+                                  {s.accepted ? "Agregada" : (<><Plus className="mr-0.5 h-3 w-3" /> Agregar</>)}
+                                </button>
+                                <div className="min-w-0">
+                                  <div className="text-ink/90">
+                                    <span className="text-muted">{s.kind === "location" ? "Locación" : s.kind === "festival" ? "Festival" : "Casa productora"}: </span>
+                                    {s.kind === "location" ? [s.text, s.site, s.country].filter(Boolean).join(" · ") : [s.name, s.year, s.country].filter(Boolean).join(" · ")}
+                                    {s.confidence < 0.6 && <span className="ml-1.5 text-warn">poco segura</span>}
+                                  </div>
+                                  <div className="truncate text-[11px] italic text-muted" title={s.evidence}>
+                                    «{s.evidence}» · {s.source}
+                                  </div>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
 
                       {editing?.startsWith(`${c.key}#`) && (
                         <div className="mt-2 max-w-sm">
@@ -294,7 +354,7 @@ export function StepReview({
                       )}
                       {c.duplicate && c.decision === "update" && <UpdatePreview c={c} plan={updatePlan(c, names)} onAccept={(accept) => patch(c.key, (x) => ({ ...x, accept }))} />}
                       {c.issues
-                        .filter((i) => i.level === "doubt" && !c.placeTexts.length)
+                        .filter((i) => i.level === "doubt" && !c.placeTexts.length && !i.field.startsWith("count:") && !i.field.startsWith("columns:"))
                         .slice(0, 1)
                         .map((i) => (
                           <p key={i.field} className="mt-2 text-xs text-warn">{i.message}</p>

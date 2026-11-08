@@ -5,11 +5,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Check, FileSpreadsheet, Loader2, Sparkles, Upload } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
-import { distinctValues } from "@/lib/import/distinct";
+import { distinctValues, multiValueStats } from "@/lib/import/distinct";
 import { decisionFor, resolveItemOf } from "@/lib/import/existing";
 import { parseFile } from "@/lib/import/parse";
 import { buildQuestions, type Question } from "@/lib/import/questions";
 import { buildCandidates, collectPlaceTexts } from "@/lib/import/transform";
+import { attachSuggestions, extractionJobs, runExtraction, suggestionPlaceTexts, type ExtractionOutcome } from "@/lib/import/suggestions";
 import type { Candidate, ImportPlan, ParsedFile, PlaceResolution, ResolveResponse } from "@/lib/import/types";
 import type { DocxResponse } from "@/app/api/import/docx/route";
 import type { PdfResponse } from "@/app/api/import/pdf/route";
@@ -52,6 +53,7 @@ async function analyze(parsed: ParsedFile, instr: string): Promise<ImportPlan> {
         layout: s.layout,
         subHeaders: s.subHeaders,
         distinct: distinctValues(s),
+        multi: multiValueStats(s),
       })),
     }),
   });
@@ -74,6 +76,7 @@ export function ImportWizard() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [engine, setEngine] = useState<ResolveResponse["engine"]>("gazetteer");
+  const [extractNote, setExtractNote] = useState<string | null>(null);
 
   const reset = () => {
     setStep("drop");
@@ -83,6 +86,7 @@ export function ImportWizard() {
     setCandidates([]);
     setQuestions([]);
     setPlaces({});
+    setExtractNote(null);
     setError(null);
   };
 
@@ -159,11 +163,22 @@ export function ImportWizard() {
       setGeo(g);
       const pre = buildCandidates(file, plan, {}, { gaz: g.gaz, muni: g.muni });
       if (!pre.length) throw new Error("Con este mapeo no salió ninguna fila. Revisa que haya una columna de título o nombre.");
+      // texto libre: solo si una persona encendió una fuente en «Esto entendimos»
+      let outcome: ExtractionOutcome | null = null;
+      setExtractNote(null);
+      const jobs = extractionJobs(file, plan, pre);
+      if (jobs.length) {
+        setBusy(`Leyendo textos con Claude (0 de ${jobs.length})…`);
+        outcome = await runExtraction(jobs, (d, t) => setBusy(`Leyendo textos con Claude (${d} de ${t})…`));
+        if (outcome.failedBatches)
+          setExtractNote(`No se pudieron leer ${outcome.failedBatches} de ${outcome.totalBatches} lotes de texto; esas filas quedaron sin sugerencias.`);
+        setBusy("Ubicando lugares y buscando duplicados…");
+      }
       const res = await fetch("/api/import/resolve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          places: collectPlaceTexts(file, plan),
+          places: [...new Set([...collectPlaceTexts(file, plan, g.gaz), ...(outcome ? suggestionPlaceTexts(outcome) : [])])],
           items: pre.map((c) => ({
             ...resolveItemOf(c),
             key: c.key,
@@ -178,7 +193,8 @@ export function ImportWizard() {
       const r = (await res.json()) as ResolveResponse;
       setEngine(r.engine);
       setPlaces(r.places);
-      const cands = buildCandidates(file, plan, r.places, { gaz: g.gaz, muni: g.muni }).map((c) => {
+      const built = buildCandidates(file, plan, r.places, { gaz: g.gaz, muni: g.muni });
+      const cands = (outcome ? attachSuggestions(built, outcome) : built).map((c) => {
         const dup = r.duplicates[c.key];
         if (!dup) return c;
         return { ...c, duplicate: dup, decision: decisionFor(c, dup) };
@@ -326,6 +342,8 @@ export function ImportWizard() {
               candidates={candidates}
               onCandidates={setCandidates}
               engine={engine}
+              places={places}
+              note={extractNote}
               filename={file?.filename ?? "carga"}
               onBack={() => setStep("understand")}
               onNext={toQuestions}

@@ -3,7 +3,9 @@
 import { ArrowRight, Bot, ChevronDown, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { FORMATS } from "@/lib/film-types";
-import { FILM_FIELDS, ORG_FIELDS, type ImportPlan, type ParsedFile, type SheetPlan } from "@/lib/import/types";
+import { separatorsOf, splitCell } from "@/lib/import/multi";
+import { countExtractionRows, MAX_EXTRACT_ROWS } from "@/lib/import/suggestions";
+import { FILM_FIELDS, ORG_FIELDS, type ImportPlan, type MultiGroup, type ParsedFile, type SheetPlan, type TextSource } from "@/lib/import/types";
 import { cn } from "@/lib/utils";
 
 const ENTITY_LABEL: Record<SheetPlan["entity"], string> = {
@@ -24,6 +26,51 @@ function ConfidenceChip({ v }: { v: number | undefined }) {
     >
       {pct}%
     </span>
+  );
+}
+
+const GROUP_LABEL: Record<MultiGroup, string> = { location: "locaciones de rodaje", festival: "festivales", company: "casas productoras" };
+
+const EXTRA_SEPARATORS: { id: string; label: string }[] = [
+  { id: ",", label: "coma" },
+  { id: "/", label: "barra /" },
+  { id: " y ", label: "«y»" },
+];
+
+/** Una columna de un campo repetible: dice cuántos valores trae la primera celda con varios y deja sumar separadores. */
+function ListControl({ sp, field, rows, onChange }: { sp: SheetPlan; field: string; rows: Record<string, string>[]; onChange(separators: string[]): void }) {
+  const header = sp.columns[field];
+  const seps = separatorsOf(sp, field);
+  const extra = sp.lists?.[field]?.separators ?? [];
+  const cells = rows.map((r) => (r[header] ?? "").trim()).filter(Boolean);
+  const many = cells.find((c) => splitCell(c, seps).length > 1);
+  return (
+    <div className="col-span-3 -mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 pb-1 text-[11px] text-muted">
+      <span>
+        Puede traer varios valores (separados por «;», salto de línea o «|»).
+        {many ? (
+          <>
+            {" "}Ej.: <span className="text-ink/80">«{many.length > 40 ? `${many.slice(0, 40)}…` : many}»</span> → {splitCell(many, seps).length} valores.
+          </>
+        ) : (
+          " En la muestra cada celda trae uno."
+        )}
+      </span>
+      <span className="flex items-center gap-2">
+        Separar también por:
+        {EXTRA_SEPARATORS.map((o) => (
+          <label key={o.id} className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              className="accent-[rgb(var(--accent))]"
+              checked={extra.includes(o.id)}
+              onChange={(e) => onChange(e.target.checked ? [...extra, o.id] : extra.filter((x) => x !== o.id))}
+            />
+            {o.label}
+          </label>
+        ))}
+      </span>
+    </div>
   );
 }
 
@@ -66,6 +113,19 @@ export function StepUnderstand({
       delete confidence[field];
     }
     update(sheet, { columns, confidence });
+  };
+
+  const setList = (sheet: string, field: string, separators: string[]) => {
+    const sp = plan.sheets.find((s) => s.sheet === sheet)!;
+    const lists = { ...sp.lists };
+    if (separators.length) lists[field] = { separators };
+    else delete lists[field];
+    update(sheet, { lists: Object.keys(lists).length ? lists : undefined });
+  };
+
+  const setSources = (sheet: string, fn: (list: TextSource[]) => TextSource[]) => {
+    const sp = plan.sheets.find((s) => s.sheet === sheet)!;
+    update(sheet, { text_sources: fn(sp.text_sources ?? []) });
   };
 
   const answerQuestion = (qid: string, value: string) => {
@@ -244,9 +304,54 @@ export function StepUnderstand({
                           ))}
                         </select>
                         <ConfidenceChip v={sp.confidence[f.id]} />
+                        {sp.entity === "film" && f.group && !f.count && <ListControl sp={sp} field={f.id} rows={sheet.rows} onChange={(seps) => setList(sp.sheet, f.id, seps)} />}
                       </div>
                     ))}
                   </div>
+                  {sp.entity === "film" && plan.engine === "claude" && (() => {
+                    const sources = sp.text_sources ?? [];
+                    const free = leftover.filter((h) => !sources.some((t) => t.header === h));
+                    const on = countExtractionRows(file, { ...plan, sheets: [sp] });
+                    return (
+                      <div className="mt-3 rounded-2xl border border-accent/30 bg-accent/5 px-4 py-3 text-xs">
+                        <p className="flex items-center gap-1.5 font-medium text-ink"><Sparkles className="h-3.5 w-3.5 text-accent" /> Datos dentro de textos</p>
+                        {sources.length === 0 && <p className="mt-1 text-muted">No vimos textos que mencionen locaciones, festivales o casas. Si alguna columna lo hace, puedes pedir que Claude la lea.</p>}
+                        {sources.map((t) => (
+                          <label key={t.header} className="mt-2 flex items-start gap-2">
+                            <input
+                              type="checkbox"
+                              className="mt-0.5 accent-[rgb(var(--accent))]"
+                              checked={t.enabled}
+                              onChange={(e) => setSources(sp.sheet, (list) => list.map((x) => (x.header === t.header ? { ...x, enabled: e.target.checked } : x)))}
+                            />
+                            <span className="min-w-0">
+                              <span className="text-ink">Buscar {t.concepts.map((c) => GROUP_LABEL[c]).join(", ")} en «{t.header}»</span>
+                              {t.reason && <span className="block text-muted">{t.reason}</span>}
+                              {t.example && <span className="block truncate italic text-muted" title={t.example}>«{t.example}»</span>}
+                            </span>
+                          </label>
+                        ))}
+                        {free.length > 0 && (
+                          <select
+                            className="field mt-2 !w-auto !py-1 text-xs"
+                            value=""
+                            onChange={(e) => e.target.value && setSources(sp.sheet, (list) => [...list, { header: e.target.value, concepts: ["location", "festival", "company"], enabled: true }])}
+                          >
+                            <option value="">Leer otra columna de texto…</option>
+                            {free.map((h) => (
+                              <option key={h} value={h}>{h}</option>
+                            ))}
+                          </select>
+                        )}
+                        {on > 0 && (
+                          <p className="mt-2 text-muted">
+                            Se leerán {Math.min(on, MAX_EXTRACT_ROWS)} filas con Claude (una consulta por cada 25), lo que tarda y consume la cuenta de Claude. Lo que encuentre llega como sugerencia en la revisión: nada se agrega solo.
+                            {on > MAX_EXTRACT_ROWS ? ` Se leen las primeras ${MAX_EXTRACT_ROWS}; divide el archivo para el resto.` : ""}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {leftover.length > 0 && (
                     <div className="mt-3 rounded-2xl border border-warn/30 bg-warn/5 px-4 py-2.5 text-xs leading-relaxed">
                       <p className="font-medium text-warn">

@@ -50,6 +50,20 @@ const sheetSchema = z.object({
   columns: z.preprocess(asObject, z.record(z.string(), z.string()).default({})),
   confidence: z.preprocess(asObject, z.record(z.string(), z.number()).default({})),
   multi_place: z.boolean().nullish(),
+  lists: z.preprocess(asObject, z.record(z.string(), z.object({ separators: z.preprocess(asArray, z.array(z.string()).default([])) })).nullish()),
+  text_sources: z.preprocess(
+    asArray,
+    z
+      .array(
+        z.object({
+          header: z.string(),
+          concepts: z.preprocess(asArray, z.array(z.string()).default([])),
+          reason: z.string().nullish(),
+          example: z.string().nullish(),
+        }),
+      )
+      .nullish(),
+  ),
   value_maps: z.preprocess(asObject, z.record(z.string(), z.record(z.string(), z.string())).nullish()),
   note: z.string().nullish(),
 });

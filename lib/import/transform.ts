@@ -7,6 +7,7 @@ import { municipalityAt } from "@/lib/geo/pip";
 import type { FilmInput, OrgInput } from "@/lib/types";
 import { normalizeCategories } from "@/lib/categories";
 import { normalize, upperTitle } from "@/lib/utils";
+import { alignLists, declaredCount, separatorsOf, splitCell, splitPlaceCell } from "./multi";
 import { sameName, sameRecordInFile, titleCore } from "./duplicates";
 import {
   cleanText,
@@ -45,30 +46,68 @@ export function locationGroupsOf(plan: SheetPlan): number[] {
   return [...set].sort((a, b) => a - b);
 }
 
-/** Consultas de lugar de una fila: "Panajachel, Sololá", "Antigua"… */
-export function placeQueries(row: Row, plan: SheetPlan, group = 1): { query: string; site: string | null }[] {
-  const place = cleanText(val(row, plan, "place", group));
-  const muni = cleanText(val(row, plan, "muni", group));
-  const depto = cleanText(val(row, plan, "depto", group));
-  const site = cleanText(val(row, plan, "site", group));
-  const out: { query: string; site: string | null }[] = [];
+/** Una locación de una fila, ya partida y alineada con sus columnas paralelas. */
+export interface LocItem {
+  q: { query: string; site: string | null } | null;
+  lat: string;
+  lng: string;
+  days: number | null;
+  spend: number | null;
+  jobs: number | null;
+}
 
-  if (place) {
-    const parts = plan.multi_place ? place.split(/[;\n|]| \/ /).map((p) => p.trim()).filter(Boolean) : [place];
-    parts.forEach((p, i) => out.push({ query: depto && !normalize(p).includes(normalize(depto)) ? `${p}, ${depto}` : p, site: i === 0 ? site : null }));
-  } else if (muni) {
-    const parts = plan.multi_place ? muni.split(/[;\n|]| \/ /).map((p) => p.trim()).filter(Boolean) : [muni];
-    parts.forEach((p, i) => out.push({ query: depto ? `${p}, ${depto}` : p, site: i === 0 ? site : null }));
-  } else if (depto) {
-    out.push({ query: depto, site });
-  } else if (site) {
-    out.push({ query: site, site });
+const LOC_LISTS = ["place", "muni", "depto", "site", "lat", "lng", "days", "local_spend", "jobs"] as const;
+
+/**
+ * Locaciones de una fila para un grupo de columnas. Cada campo de lugar puede traer varias entradas
+ * («Petén; Izabal»); las columnas del grupo se alinean por posición y un departamento único califica a todas.
+ */
+export function locationItems(row: Row, plan: SheetPlan, group = 1, gaz?: Gazetteer): { items: LocItem[]; mismatched: string[] } {
+  const lists: Record<string, string[]> = {};
+  for (const f of LOC_LISTS) {
+    const raw = cleanText(val(row, plan, f, group)) ?? "";
+    const seps = separatorsOf(plan, f);
+    lists[f] = f === "place" || f === "muni" || f === "depto" ? splitPlaceCell(raw, seps, gaz) : splitCell(raw, seps.filter((x) => x !== ","));
   }
-  return out;
+  const place = lists.place;
+  const muni = lists.muni;
+  const depto = lists.depto;
+  const site = lists.site;
+  const queryBase = place.length ? place : muni.length ? muni : depto.length ? depto : site.length ? site : [];
+  const qualifies = place.length > 0 || muni.length > 0;
+  const aligned = alignLists({ ...lists, __q: queryBase }, ["depto"]);
+  const n = Math.max(queryBase.length, lists.lat.length, lists.lng.length, lists.days.length, lists.local_spend.length, lists.jobs.length, 0);
+  const items: LocItem[] = [];
+  for (let i = 0; i < n; i++) {
+    const base = queryBase.length === 1 ? (i === 0 ? queryBase[0] : null) : (queryBase[i] ?? null);
+    let q: LocItem["q"] = null;
+    if (base) {
+      const d = qualifies ? aligned.at("depto", i) : null;
+      const query = d && !normalize(base).includes(normalize(d)) ? `${base}, ${d}` : base;
+      const siteOf = queryBase === site ? base : aligned.at("site", i);
+      q = { query, site: siteOf };
+    }
+    items.push({
+      q,
+      lat: aligned.at("lat", i) ?? "",
+      lng: aligned.at("lng", i) ?? "",
+      days: parseNumber(aligned.at("days", i) ?? ""),
+      spend: parseNumber(aligned.at("local_spend", i) ?? ""),
+      jobs: parseNumber(aligned.at("jobs", i) ?? ""),
+    });
+  }
+  return { items, mismatched: aligned.mismatched.filter((k) => k !== "__q") };
+}
+
+/** Consultas de lugar de una fila: "Panajachel, Sololá", "Antigua"… */
+export function placeQueries(row: Row, plan: SheetPlan, group = 1, gaz?: Gazetteer): { query: string; site: string | null }[] {
+  return locationItems(row, plan, group, gaz)
+    .items.map((it) => it.q)
+    .filter((q): q is { query: string; site: string | null } => !!q);
 }
 
 /** Textos de lugar únicos del archivo, para resolverlos de una vez. */
-export function collectPlaceTexts(file: ParsedFile, plan: ImportPlan): string[] {
+export function collectPlaceTexts(file: ParsedFile, plan: ImportPlan, gaz?: Gazetteer): string[] {
   const set = new Set<string>();
   for (const sp of plan.sheets) {
     if (sp.entity === "ignore") continue;
@@ -77,7 +116,7 @@ export function collectPlaceTexts(file: ParsedFile, plan: ImportPlan): string[] 
     const groups = sp.entity === "film" ? locationGroupsOf(sp) : [1];
     for (const row of sheet.rows)
       for (const g of groups)
-        for (const q of placeQueries(row, sp, g)) {
+        for (const q of placeQueries(row, sp, g, gaz)) {
           // «Oaxaca, México» ya se sabe que es fuera de Guatemala: no hay nada que buscar en el catálogo de municipios
           if (sp.entity === "film" && /[,;|]/.test(q.query) && detectCountry(q.query)) continue;
           set.add(q.query);
@@ -97,8 +136,7 @@ function resolveLocation(
   plan: SheetPlan,
   places: Record<string, PlaceResolution>,
   geo: Geo,
-  withCoords: boolean,
-  group = 1,
+  coords: { lat: string; lng: string } | null,
 ) {
   const loc: NonNullable<FilmInput["locations"]>[number] = { site: q?.site ?? null };
   let issue: Issue | null = null;
@@ -112,8 +150,8 @@ function resolveLocation(
     loc.confidence = 0.9;
     return { loc, issue };
   }
-  const lat = withCoords ? parseCoord(val(row, plan, "lat", group), "lat") : null;
-  const lng = withCoords ? parseCoord(val(row, plan, "lng", group), "lng") : null;
+  const lat = coords ? parseCoord(coords.lat, "lat") : null;
+  const lng = coords ? parseCoord(coords.lng, "lng") : null;
   if (lat != null && lng != null) {
     loc.lat = lat;
     loc.lng = lng;
@@ -152,36 +190,51 @@ const posterLink = (v: string | null | undefined) => {
 
 type Fest = NonNullable<FilmInput["festivals"]>[number];
 
-/** La participación en un festival que describe la fila, si la fila trae un festival. */
-function festivalOf(row: Row, plan: SheetPlan): Fest | null {
-  const name = cleanText(val(row, plan, "festival"));
-  if (!name) return null;
-  const award = cleanText(val(row, plan, "festival_award"));
-  const url = cleanText(val(row, plan, "festival_url"));
-  return {
-    name,
-    year: parseYear(val(row, plan, "festival_year")),
-    result: normalizeFestivalResult(val(row, plan, "festival_result"), award, plan.value_maps?.festival_result),
-    section: cleanText(val(row, plan, "festival_section")),
-    award,
-    url: url && /^https?:\/\/\S+$/i.test(url) ? url : null,
+/**
+ * Las participaciones en festivales que describe la fila. Una celda puede traer varios («Sundance; Berlinale») y las
+ * columnas de año, resultado, sección y premio se alinean por posición; un año o resultado único vale para todos.
+ */
+function festivalsOf(row: Row, plan: SheetPlan): { items: Fest[]; mismatched: string[] } {
+  const L = (f: string) => splitCell(cleanText(val(row, plan, f)) ?? "", separatorsOf(plan, f));
+  const lists = {
+    festival: L("festival"),
+    festival_year: L("festival_year"),
+    festival_result: L("festival_result"),
+    festival_section: L("festival_section"),
+    festival_award: L("festival_award"),
+    festival_url: L("festival_url"),
   };
+  const a = alignLists(lists, ["festival_year", "festival_result"]);
+  const items: Fest[] = [];
+  for (let i = 0; i < lists.festival.length; i++) {
+    const award = cleanText(a.at("festival_award", i));
+    const url = cleanText(a.at("festival_url", i));
+    items.push({
+      name: lists.festival[i],
+      year: parseYear(a.at("festival_year", i) ?? ""),
+      result: normalizeFestivalResult(a.at("festival_result", i) ?? "", award, plan.value_maps?.festival_result),
+      section: cleanText(a.at("festival_section", i)),
+      award,
+      url: url && /^https?:\/\/\S+$/i.test(url) ? url : null,
+    });
+  }
+  return { items, mismatched: a.mismatched.filter((k) => k !== "festival") };
 }
 
 const festKey = (f: Fest) => `${normalize(f.name ?? "")}|${f.year ?? ""}|${normalize(f.award ?? "")}|${normalize(f.section ?? "")}`;
 
 type Company = NonNullable<FilmInput["companies"]>[number];
 
-const splitList = (v: string) => v.split(/[;\n|]/).map((x) => x.trim()).filter(Boolean);
+const splitList = (v: string, seps?: string[]) => splitCell(v, seps);
 
 /**
  * Casas productoras de la fila: «Casa Uno (México); Casa Dos» o una columna de nombres y otra de países.
  * Si la producción es guatemalteca y no se dice el país, es Guatemala.
  */
 function companiesOf(row: Row, plan: SheetPlan, nationality: string | null | undefined): Company[] {
-  const names = splitList(cleanText(val(row, plan, "company")) ?? "");
+  const names = splitList(cleanText(val(row, plan, "company")) ?? "", separatorsOf(plan, "company"));
   if (!names.length) return [];
-  const countries = splitList(cleanText(val(row, plan, "company_country")) ?? "");
+  const countries = splitList(cleanText(val(row, plan, "company_country")) ?? "", separatorsOf(plan, "company_country"));
   return names.map((raw, i) => {
     const m = raw.match(/^(.*?)\s*\(([^()]{2,60})\)\s*$/);
     const name = (m ? m[1] : raw).trim();
@@ -267,26 +320,30 @@ function filmCandidates(sheet: ParsedSheet, plan: SheetPlan, places: Record<stri
 
     addCompanies(cand.film!.companies!, companiesOf(row, plan, cand.film!.nationality));
 
-    const fest = festivalOf(row, plan);
-    if (fest && !cand.film!.festivals!.some((x) => festKey(x) === festKey(fest))) cand.film!.festivals!.push(fest);
+    const fests = festivalsOf(row, plan);
+    for (const fest of fests.items) if (!cand.film!.festivals!.some((x) => festKey(x) === festKey(fest))) cand.film!.festivals!.push(fest);
+    const warn = (field: string, message: string) => {
+      if (!cand!.issues.some((x) => x.field === field && x.message === message)) cand!.issues.push({ field, level: "doubt", message });
+    };
+    if (fests.mismatched.length)
+      warn("columns:festival", `Las columnas ${fests.mismatched.map((m) => `«${plan.columns[m]}»`).join(", ")} traen distinta cantidad de valores que los festivales (${fests.items.length}); se asignaron en orden, revísalos.`);
 
+    let found = 0;
     for (const g of locationGroupsOf(plan)) {
-      const qs = placeQueries(row, plan, g);
-      const days = parseNumber(val(row, plan, "days", g));
-      const spend = parseNumber(val(row, plan, "local_spend", g));
-      const jobs = parseNumber(val(row, plan, "jobs", g));
-      const slots = qs.length ? qs : [null];
-      slots.forEach((q, qi) => {
-        const hasCoords = parseCoord(val(row, plan, "lat", g), "lat") != null;
-        if (!q && !hasCoords && !days && !spend && !jobs && cand!.film!.locations.length) return;
-        const { loc, issue } = resolveLocation(q, row, plan, places, geo, qi === 0, g);
-        // las cifras de cada grupo se asignan a la primera locación del grupo
-        if (qi === 0) {
-          loc.days = days;
-          loc.local_spend = spend;
-          loc.jobs = jobs;
-        }
+      const { items, mismatched } = locationItems(row, plan, g, geo.gaz);
+      if (mismatched.length)
+        warn("columns:location", `Las columnas ${mismatched.map((m) => `«${plan.columns[g > 1 ? `${m}__${g}` : m]}»`).join(", ")} traen distinta cantidad de valores que los lugares (${items.length}); se asignaron en orden, revísalos.`);
+      const slots: (LocItem | null)[] = items.length ? items : [null];
+      slots.forEach((it) => {
+        const q = it?.q ?? null;
+        const hasCoords = !!it && parseCoord(it.lat, "lat") != null;
+        if (!q && !hasCoords && !it?.days && !it?.spend && !it?.jobs && cand!.film!.locations.length) return;
+        const { loc, issue } = resolveLocation(q, row, plan, places, geo, it ? { lat: it.lat, lng: it.lng } : null);
+        loc.days = it?.days ?? null;
+        loc.local_spend = it?.spend ?? null;
+        loc.jobs = it?.jobs ?? null;
         if (!q && loc.muni_ine == null && loc.depto_ine == null && loc.lat == null) return; // fila sin lugar
+        found++;
         // si la producción se repite una fila por festival, el mismo lugar no se duplica
         if (plan.grain === "row_per_location") {
           const sig = `${q?.query ?? ""}|${q?.site ?? ""}|${loc.days ?? ""}|${loc.local_spend ?? ""}|${loc.jobs ?? ""}`;
@@ -298,6 +355,18 @@ function filmCandidates(sheet: ParsedSheet, plan: SheetPlan, places: Record<stri
         cand!.film!.locations.push(loc);
         if (issue) cand!.issues.push({ ...issue, field: `location:${cand!.film!.locations.length - 1}` });
       });
+    }
+
+    // la columna de cantidad solo avisa: si dice una cosa y se encontró otra, se muestra en la revisión
+    if (plan.grain !== "row_per_location") {
+      const dl = declaredCount(val(row, plan, "n_locations"));
+      if (dl != null && dl !== found)
+        warn("count:location", `El archivo dice ${dl} ${dl === 1 ? "locación" : "locaciones"} y encontramos ${found}.${found < dl ? " Puede que el resto esté en un texto o falte en el archivo." : ""}`);
+      const df = declaredCount(val(row, plan, "n_festivals"));
+      if (df != null && df !== fests.items.length) warn("count:festival", `El archivo dice ${df} ${df === 1 ? "festival" : "festivales"} y encontramos ${fests.items.length}.`);
+      const dc = declaredCount(val(row, plan, "n_companies"));
+      const cc = companiesOf(row, plan, null).length;
+      if (dc != null && dc !== cc) warn("count:company", `El archivo dice ${dc} ${dc === 1 ? "casa productora" : "casas productoras"} y encontramos ${cc}.`);
     }
   });
   return order.map((k) => map.get(k)!);
@@ -312,8 +381,8 @@ function orgCandidates(sheet: ParsedSheet, plan: SheetPlan, places: Record<strin
     if (!name) return;
     // hojas que mezclan Circulación e Industria: la capa sale de la categoría de cada fila
     const layer = plan.layer_by_row ? (guessLayer(splitList(val(row, plan, "category"))) ?? baseLayer) : baseLayer;
-    const qs = placeQueries(row, plan);
-    const { loc, issue } = resolveLocation(qs[0] ?? null, row, plan, places, geo, true);
+    const qs = placeQueries(row, plan, 1, geo.gaz);
+    const { loc, issue } = resolveLocation(qs[0] ?? null, row, plan, places, geo, { lat: val(row, plan, "lat"), lng: val(row, plan, "lng") });
     const contactRaw = cleanText(val(row, plan, "contact"));
     const contactParsed = contactRaw ? parseContact(contactRaw) : null;
     const cats = normalizeCategoryList(val(row, plan, "category"), layer, vm.category);

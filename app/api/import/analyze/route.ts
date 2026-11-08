@@ -21,6 +21,19 @@ const body = z.object({
         distinct: z
           .record(z.string().max(300), z.array(z.object({ v: z.string().max(200), n: z.number() })).max(40))
           .optional(),
+        // columnas con varias entradas por celda, cantidades y textos largos, calculadas sobre todas las filas
+        multi: z
+          .record(
+            z.string().max(300),
+            z.object({
+              filled: z.number(),
+              with_separator: z.record(z.string(), z.number()),
+              count_like: z.boolean().optional(),
+              avg_length: z.number(),
+              example: z.string().max(300).optional(),
+            }),
+          )
+          .optional(),
       }),
     )
     .max(40),
@@ -33,9 +46,10 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Archivo inválido" }, { status: 400 });
   const { instructions, ...file } = parsed.data;
   const distinct = Object.fromEntries(file.sheets.map((s) => [s.name, s.distinct ?? {}]));
+  const multi = Object.fromEntries(file.sheets.map((s) => [s.name, s.multi ?? {}]));
   const plan = await analyzeFile(
-    { filename: file.filename, sheets: file.sheets.map(({ distinct: _d, ...s }) => s) },
-    { instructions, distinct },
+    { filename: file.filename, sheets: file.sheets.map(({ distinct: _d, multi: _m, ...s }) => s) },
+    { instructions, distinct, multi },
   );
   return NextResponse.json(plan);
 }

@@ -28,7 +28,14 @@ export interface FieldDef {
   id: string;
   label: string;
   hint?: string;
+  /** Concepto repetible al que pertenece el campo: una celda (o varias columnas paralelas) puede traer varias entradas. */
+  group?: MultiGroup;
+  /** Solo valida: la cantidad que el archivo dice que hay (no se guarda). */
+  count?: MultiGroup;
 }
+
+/** Conceptos que una producción puede tener más de una vez. */
+export type MultiGroup = "location" | "festival" | "company";
 
 export const FILM_FIELDS: FieldDef[] = [
   { id: "title", label: "Título", hint: "Nombre de la producción o proyecto" },
@@ -41,8 +48,8 @@ export const FILM_FIELDS: FieldDef[] = [
   { id: "producer", label: "Productor/a", hint: "Persona productora (no la empresa)" },
   { id: "cinematographer", label: "Director/a de fotografía", hint: "Persona a cargo de la fotografía (DP, DoP, cinematografía)" },
   { id: "screenwriter", label: "Guionista", hint: "Persona que escribió el guion" },
-  { id: "company", label: "Casa productora", hint: "Empresa productora; varias separadas por «;», con el país entre paréntesis si lo trae" },
-  { id: "company_country", label: "País de la casa productora" },
+  { id: "company", label: "Casa productora", hint: "Empresa productora; varias separadas por «;», con el país entre paréntesis si lo trae", group: "company" },
+  { id: "company_country", label: "País de la casa productora", group: "company" },
   { id: "nationality", label: "Nacionalidad", hint: "guatemalteca, coproducción, extranjera" },
   { id: "budget", label: "Presupuesto" },
   { id: "currency", label: "Moneda" },
@@ -50,21 +57,24 @@ export const FILM_FIELDS: FieldDef[] = [
   { id: "poster", label: "Póster (enlace)", hint: "URL de una imagen; se descarga y se guarda al confirmar" },
   { id: "trailer", label: "Tráiler (enlace)", hint: "URL del tráiler en YouTube, Vimeo u otra plataforma; la miniatura se descarga al confirmar" },
   { id: "film_link", label: "Película completa (enlace)", hint: "URL donde se puede ver la película completa, si está disponible" },
-  { id: "place", label: "Lugar (texto libre)", hint: "Municipio, departamento o sitio en una sola columna" },
-  { id: "muni", label: "Municipio" },
-  { id: "depto", label: "Departamento" },
-  { id: "site", label: "Sitio de rodaje" },
-  { id: "lat", label: "Latitud" },
-  { id: "lng", label: "Longitud" },
-  { id: "days", label: "Días de rodaje" },
-  { id: "local_spend", label: "Inversión local" },
-  { id: "jobs", label: "Empleos" },
-  { id: "festival", label: "Festival", hint: "Festival donde fue seleccionada o premiada; una fila por festival repite el título" },
-  { id: "festival_year", label: "Año del festival" },
-  { id: "festival_result", label: "Resultado en el festival", hint: "selección, nominación, premio, mención" },
-  { id: "festival_section", label: "Sección del festival" },
-  { id: "festival_award", label: "Premio" },
-  { id: "festival_url", label: "Enlace del festival o premio" },
+  { id: "place", label: "Lugar (texto libre)", hint: "Municipio, departamento o sitio en una sola columna", group: "location" },
+  { id: "muni", label: "Municipio", group: "location" },
+  { id: "depto", label: "Departamento", group: "location" },
+  { id: "site", label: "Sitio de rodaje", group: "location" },
+  { id: "lat", label: "Latitud", group: "location" },
+  { id: "lng", label: "Longitud", group: "location" },
+  { id: "days", label: "Días de rodaje", group: "location" },
+  { id: "local_spend", label: "Inversión local", group: "location" },
+  { id: "jobs", label: "Empleos", group: "location" },
+  { id: "festival", label: "Festival", hint: "Festival donde fue seleccionada o premiada; una fila por festival repite el título", group: "festival" },
+  { id: "festival_year", label: "Año del festival", group: "festival" },
+  { id: "festival_result", label: "Resultado en el festival", hint: "selección, nominación, premio, mención", group: "festival" },
+  { id: "festival_section", label: "Sección del festival", group: "festival" },
+  { id: "festival_award", label: "Premio", group: "festival" },
+  { id: "festival_url", label: "Enlace del festival o premio", group: "festival" },
+  { id: "n_locations", label: "Cantidad de locaciones", hint: "Número que dice cuántas locaciones tiene la producción; solo se usa para avisar si no coincide con las que se encontraron", count: "location" },
+  { id: "n_festivals", label: "Cantidad de festivales", hint: "Número que dice cuántos festivales tiene la producción; solo se usa para avisar si no coincide", count: "festival" },
+  { id: "n_companies", label: "Cantidad de casas productoras", hint: "Número que dice cuántas casas productoras tiene la producción; solo se usa para avisar si no coincide", count: "company" },
 ];
 
 export const ORG_FIELDS: FieldDef[] = [
@@ -102,11 +112,49 @@ export interface SheetPlan {
   columns: Record<string, string>;
   /** campo destino -> 0..1 */
   confidence: Record<string, number>;
-  /** Separadores si una celda trae varios lugares ("Antigua; Panajachel"). */
+  /** Obsoleto: antes marcaba que una celda de lugar traía varios. Hoy se lee como «lists» de lugar, municipio y departamento. */
   multi_place?: boolean;
+  /** Campo -> cómo se parten sus celdas con varios valores (además de «;», salto de línea y «|», que siempre parten). */
+  lists?: Record<string, ListSpec>;
+  /** Columnas de texto libre que mencionan datos repetibles (locaciones, festivales, casas) y se pueden leer con Claude. */
+  text_sources?: TextSource[];
   /** Valores crudos -> valor canónico, para campos de lista. */
   value_maps?: Record<string, Record<string, string>>;
   note?: string;
+}
+
+/** Separadores extra de un campo de lista: «,», «/», « y ». */
+export interface ListSpec {
+  separators: string[];
+}
+
+export interface TextSource {
+  header: string;
+  concepts: MultiGroup[];
+  reason?: string;
+  example?: string;
+  /** Lo activa una persona en «Esto entendimos»; sin eso no se lee nada. */
+  enabled: boolean;
+}
+
+/** Una entrada que Claude encontró dentro de texto libre. No entra al registro hasta que alguien la acepta. */
+export interface Suggestion {
+  id: string;
+  kind: MultiGroup;
+  /** Locación: texto del lugar tal como lo dice el texto. */
+  text?: string;
+  site?: string | null;
+  country?: string | null;
+  city?: string | null;
+  /** Festival o casa: nombre. */
+  name?: string;
+  year?: number | null;
+  /** Frase literal del texto en la que se apoya. */
+  evidence: string;
+  /** Columna de donde salió. */
+  source: string;
+  confidence: number;
+  accepted?: boolean;
 }
 
 export interface PlanQuestion {
@@ -186,6 +234,8 @@ export interface Candidate {
   org?: OrgInput;
   /** Textos de lugar originales por locación (para resolver o preguntar). */
   placeTexts: string[];
+  /** Entradas halladas en texto libre; esperan que una persona las acepte. */
+  suggestions?: Suggestion[];
   /** Filas del archivo que dieron origen: "Hoja!12". */
   rows: string[];
   issues: Issue[];

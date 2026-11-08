@@ -140,7 +140,7 @@ export function StepQuestions({
       const importId = await createImportAction(filename, { engine: plan.engine, rows: live.length });
       for (let i = 0; i < live.length; i += BATCH) {
         // la copia del registro existente solo sirve para la vista previa: el servidor lo vuelve a leer
-        const chunk = live.slice(i, i + BATCH).map((c) => (c.duplicate ? { ...c, duplicate: { ...c.duplicate, record: undefined } } : c));
+        const chunk = live.slice(i, i + BATCH).map((c) => ({ ...c, suggestions: undefined, ...(c.duplicate ? { duplicate: { ...c.duplicate, record: undefined } } : {}) }));
         const r = await commitBatchAction(importId, filename, chunk, publishIncomplete);
         all.push(...r);
         setProgress({ done: Math.min(i + BATCH, live.length), total: live.length });

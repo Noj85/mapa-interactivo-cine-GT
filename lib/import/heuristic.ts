@@ -1,5 +1,6 @@
 import { FORMATS, parseFormat, parseNature } from "@/lib/film-types";
 import { cleanText } from "./normalize";
+import { looksLikeCount } from "./multi";
 import { normalize } from "@/lib/utils";
 import { guessLayer } from "./normalize";
 import type { ImportPlan, ParsedFile, ParsedSheet, PlanQuestion, SheetPlan } from "./types";
@@ -7,6 +8,10 @@ import type { ImportPlan, ParsedFile, ParsedSheet, PlanQuestion, SheetPlan } fro
 type Syn = [field: string, patterns: RegExp[]];
 
 const FILM_SYN: Syn[] = [
+  // columnas de cantidad: van primero para que «Cantidad de locaciones» no se tome por el lugar
+  ["n_locations", [/^(cantidad|numero|num|nro|no|n|total|#)\W*(de )?(locaciones|lugares|sitios|ubicaciones)( de rodaje)?$/, /^(locaciones|lugares|sitios|ubicaciones)( de rodaje)?\W*(cantidad|numero|total|n|nro|#)$/, /^(cantidad|numero|total) de (locaciones|lugares|sitios)/, /^(n|num|nro)\W*(locaciones|lugares)/]],
+  ["n_festivals", [/^(cantidad|numero|num|nro|no|n|total|#)\W*(de )?festivales$/, /^festivales\W*(cantidad|numero|total|n|nro|#)$/]],
+  ["n_companies", [/^(cantidad|numero|num|nro|no|n|total|#)\W*(de )?(casas? productoras?|productoras|empresas)$/]],
   ["festival_year", [/^(ano|anio|year|edicion|fecha)( del| de)? (festival|premio|seleccion)$/, /^(festival|premio) (ano|anio|year|edicion)$/]],
   ["festival_result", [/^(resultado|result|reconocimiento|estatus|seleccion|premiada?|ganadora?)( (en )?(el )?(festival|premio))?$/]],
   ["festival_section", [/^(seccion|section|competencia|categoria de (festival|seleccion))( del festival)?$/]],
@@ -142,6 +147,23 @@ function shareColumns(m: { columns: Record<string, string>; confidence: Record<s
   }
 }
 
+/** Una columna de lugar que solo trae números chicos es en realidad la cantidad de locaciones. */
+function countColumns(m: { columns: Record<string, string>; confidence: Record<string, number> }, sheet: ParsedSheet) {
+  const { columns, confidence } = m;
+  if (columns.n_locations) return;
+  for (const f of ["place", "muni", "depto"]) {
+    const h = columns[f];
+    if (!h) continue;
+    if (looksLikeCount(sheet.rows.map((r) => r[h] ?? ""))) {
+      columns.n_locations = h;
+      confidence.n_locations = Math.min(confidence[f] ?? 0.6, 0.6);
+      delete columns[f];
+      delete confidence[f];
+      return;
+    }
+  }
+}
+
 /** Valores de la columna de formato que no se reconocen (y que tampoco son una naturaleza): se preguntan, no se guardan como «Otro». */
 function unknownFormatQuestions(sp: SheetPlan, sheet: ParsedSheet): PlanQuestion[] {
   const col = sp.columns.format;
@@ -234,6 +256,7 @@ function planSheet(sheet: ParsedSheet, fromPdf = false): SheetPlan {
   const isFilm = filmScore >= 3 && filmScore >= orgScore;
   if (isFilm) {
     shareColumns(film, sheet);
+    countColumns(film, sheet);
     // los grupos de locación indexados mandan sobre lo que haya mapeado la pasada normal
     for (const [k, h] of Object.entries(loc.columns)) {
       film.columns[k] = h;
@@ -251,7 +274,6 @@ function planSheet(sheet: ParsedSheet, fromPdf = false): SheetPlan {
       grain,
       columns: film.columns,
       confidence: film.confidence,
-      multi_place: !!film.columns.place,
       ...(Object.keys(loc.columns).some((k) => k.includes("__")) ? { note: "Cada fila trae varias locaciones (columnas repetidas con número); se leen todas." } : {}),
     };
   }

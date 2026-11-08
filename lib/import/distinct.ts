@@ -62,3 +62,57 @@ export function distinctValues(sheet: ParsedSheet): Record<string, DistinctValue
 export function distinctFor(sheets: ParsedSheet[]): DistinctMap {
   return Object.fromEntries(sheets.map((s) => [s.name, distinctValues(s)]));
 }
+
+// ───────────────────────── columnas con varios valores ─────────────────────────
+
+export interface MultiStat {
+  /** Celdas con algún valor. */
+  filled: number;
+  /** Celdas que traen más de un valor con ese separador. */
+  with_separator: Record<string, number>;
+  /** Casi todas las celdas son un número chico: probablemente una cantidad. */
+  count_like?: boolean;
+  /** Largo promedio de las celdas; un texto largo puede mencionar lugares, festivales o casas. */
+  avg_length: number;
+  example?: string;
+}
+
+/** Hoja -> encabezado -> estadística. Solo columnas con algo que decir. */
+export type MultiStatsMap = Record<string, Record<string, MultiStat>>;
+
+const SEPARATOR_TESTS: [string, RegExp][] = [
+  [";", /;/],
+  ["salto de línea", /\n/],
+  ["|", /\|/],
+  [",", /,\s*\S/],
+  ["/", /\s\/\s|\w\/\w/],
+  [" y ", /\s(y|e)\s/i],
+];
+
+/**
+ * Qué columnas traen varias entradas en una celda, contado sobre TODAS las filas, y cuáles parecen una cantidad.
+ * Es información para Claude (que solo ve una muestra) y para el modo sin Claude.
+ */
+export function multiValueStats(sheet: ParsedSheet): Record<string, MultiStat> {
+  const out: Record<string, MultiStat> = {};
+  for (const h of sheet.headers) {
+    if (Object.keys(out).length >= 40) break;
+    const cells = sheet.rows.map((r) => (r[h] ?? "").trim()).filter(Boolean);
+    if (!cells.length) continue;
+    const with_separator: Record<string, number> = {};
+    let example: string | undefined;
+    for (const [name, re] of SEPARATOR_TESTS) {
+      const n = cells.filter((c) => re.test(c)).length;
+      if (n) with_separator[name] = n;
+      if (n && !example && name !== "," && name !== " y ") example = cells.find((c) => re.test(c));
+    }
+    const count_like = cells.length >= 3 && cells.filter((c) => /^\d{1,2}$/.test(c)).length / cells.length >= 0.9;
+    const avg = Math.round(cells.reduce((n, c) => n + c.length, 0) / cells.length);
+    const interesting = Object.keys(with_separator).length > 0 || count_like || avg >= 80;
+    if (!interesting) continue;
+    out[h] = { filled: cells.length, with_separator, ...(count_like ? { count_like } : {}), avg_length: avg, ...(example ? { example: example.slice(0, 120) } : {}) };
+  }
+  return out;
+}
+
+export const multiStatsFor = (sheets: ParsedSheet[]): MultiStatsMap => Object.fromEntries(sheets.map((s) => [s.name, multiValueStats(s)]));

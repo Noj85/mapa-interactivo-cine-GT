@@ -1,5 +1,5 @@
 import "server-only";
-import type { DistinctMap } from "@/lib/import/distinct";
+import type { DistinctMap, MultiStatsMap } from "@/lib/import/distinct";
 import { heuristicPlan } from "@/lib/import/heuristic";
 import { FILM_FIELDS, ORG_FIELDS, type ImportPlan, type ParsedFile, type SheetPlan } from "@/lib/import/types";
 import { FORMATS, GENRES, NATURES } from "@/lib/film-types";
@@ -37,7 +37,32 @@ const TOOL = {
               additionalProperties: { type: "string" },
             },
             confidence: { type: "object", description: "campo destino -> confianza 0 a 1.", additionalProperties: { type: "number" } },
-            multi_place: { type: "boolean", description: "true si una celda de lugar puede traer varios lugares separados por ; o saltos de línea." },
+            multi_place: { type: "boolean", description: "Obsoleto; usa «lists»." },
+            lists: {
+              type: "object",
+              description:
+                "Campos del catálogo marcados con «grupo» (locaciones, festivales, casas productoras) cuyas celdas pueden traer varias entradas. Llave: id del campo (place, depto, festival, company…). Valor: { separators } con los separadores EXTRA que usa ese archivo además de «;», salto de línea y «|» (que siempre parten): «,», «/» o « y ». Déjalo vacío si solo usan «;»; lo único que importa es que no marques una coma si la coma es parte de un lugar («Panajachel, Sololá»).",
+              additionalProperties: {
+                type: "object",
+                properties: { separators: { type: "array", items: { type: "string", enum: [",", "/", " y "] } } },
+                required: ["separators"],
+              },
+            },
+            text_sources: {
+              type: "array",
+              description:
+                "Columnas de texto libre (sinopsis, notas, descripción) que MENCIONAN locaciones, festivales o casas productoras. No las mapees a un campo; propónlas aquí para que una persona decida si se leen. Solo si la muestra lo evidencia.",
+              items: {
+                type: "object",
+                properties: {
+                  header: { type: "string", description: "Encabezado exacto." },
+                  concepts: { type: "array", items: { type: "string", enum: ["location", "festival", "company"] } },
+                  reason: { type: "string", description: "Una frase: qué se ve en la columna." },
+                  example: { type: "string", description: "Fragmento literal corto de la muestra que lo evidencia." },
+                },
+                required: ["header", "concepts"],
+              },
+            },
             value_maps: {
               type: "object",
               description:
@@ -84,7 +109,7 @@ function compactDistinct(distinct: DistinctMap | undefined, max: number): Distin
   );
 }
 
-function sample(file: ParsedFile, distinct?: DistinctMap, compact = false) {
+function sample(file: ParsedFile, distinct?: DistinctMap, compact = false, multi?: MultiStatsMap) {
   const rows = compact ? 20 : 60;
   const maxValues = compact ? 12 : 24;
   return file.sheets.map((s) => {
@@ -99,6 +124,8 @@ function sample(file: ParsedFile, distinct?: DistinctMap, compact = false) {
       // el navegador manda filas del inicio, del medio y del final del archivo
       sampleRows: s.rows.slice(0, rows).map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, cut(v, 110)]))),
       // valores distintos de las columnas tipo lista, contados sobre TODAS las filas (la muestra no los trae todos)
+      // columnas con varias entradas por celda, cantidades y textos largos, contados sobre TODAS las filas
+      ...(multi?.[s.name] && Object.keys(multi[s.name]).length ? { columnas_multivalor: multi[s.name] } : {}),
       valores_distintos: Object.fromEntries(Object.entries(d).map(([h, list]) => [h, list.slice(0, maxValues).map((x) => `${cut(x.v, 80)} (${x.n})`)])),
     };
   });
@@ -117,6 +144,9 @@ Reglas:
 - Si el lugar incluye un país distinto de Guatemala (ej. «Oaxaca, México»), es una locación fuera de Guatemala: déjalo en "place" tal cual, sin mapearlo a municipio ni a departamento.
 - Si hay una sola columna con el lugar completo (ej. "Panajachel, Sololá" o "Antigua; Flores"), mapea "place". Si hay columnas separadas, mapea "muni" y "depto".
 - Varias locaciones en la misma fila: si hay grupos de columnas repetidos («Lugar 1», «Días 1», «Lugar 2», «Días 2», o «Locación 1: Municipio», «Locación 2: Municipio»), mapea el primer grupo con los campos normales y los siguientes con sufijo: "place__2", "muni__2", "site__2", "days__2", "local_spend__2", "jobs__2", "lat__2", "lng__2" (y "__3"… si hay más). Con encabezados en dos filas, el encabezado completo ya une grupo y columna.
+- Campos de varias entradas: en el catálogo, los campos con «grupo» (location, festival, company) son repetibles. Una producción puede tener varias locaciones, festivales o casas, y el archivo puede traerlas (a) en una celda con separadores («Petén; Izabal»), (b) en columnas paralelas que se alinean por posición («Departamentos» + «Días»), (c) en columnas numeradas (ver arriba) o (d) solo dentro de un texto. Mapea cada columna al campo que le corresponde SIN importar si trae uno o varios valores: el código parte «;», saltos de línea y «|» por su cuenta. Usa «lists» solo para separadores extra que veas en la muestra y en "columnas_multivalor" (coma, barra o « y »). Un lugar con coma («Panajachel, Sololá») sigue siendo uno; no pidas partir por coma en ese caso. Una columna de departamentos con varios valores va a "depto" aunque traiga cinco.
+- Cantidades: una columna con un número que dice cuántas locaciones, festivales o casas tiene la producción («Locaciones», «No. de locaciones») es un conteo: mapéala a "n_locations", "n_festivals" o "n_companies". No se guarda; solo avisa si no coincide con lo que se encontró. Si "columnas_multivalor" marca count_like en una columna, probablemente sea eso.
+- Texto libre: si una columna larga (avg_length alto) describe la película y menciona dónde se rodó, en qué festivales estuvo o qué casas la produjeron, no la mapees a locaciones: agrégala a "text_sources" con los conceptos que menciona, una razón y un fragmento literal de la muestra. Una sinopsis sigue siendo "synopsis" aunque además se proponga como fuente.
 - Fichas: si la hoja viene como ficha (etiquetas y valores ya pivotados), cada fila de la muestra es una producción o entidad; mapea sus encabezados como cualquier otra columna.
 - Hojas mezcladas: si una hoja de entidades trae filas de Circulación y de Industria, entrega entity "org", layer_by_row true y como "layer" la capa más frecuente; el código decide la capa de cada fila por su categoría.
 - Entidades: "logo" es un enlace (URL) a la imagen del logo, solo si hay una columna así.
@@ -136,6 +166,8 @@ export interface AnalyzeOptions {
   instructions?: string;
   /** Valores distintos de las columnas tipo lista, calculados sobre todas las filas. */
   distinct?: DistinctMap;
+  /** Columnas con varias entradas por celda, cantidades y textos largos, sobre todas las filas. */
+  multi?: MultiStatsMap;
 }
 
 const NO_CLAUDE_NOTE = "Las instrucciones no se aplicaron: este análisis se hizo sin Claude (reconocimiento básico de columnas).";
@@ -147,7 +179,7 @@ function offline(file: ParsedFile, instructions: string): ImportPlan {
 }
 
 const catalog = {
-  campos_pelicula: FILM_FIELDS.map((f) => ({ id: f.id, nombre: f.label, pista: f.hint })),
+  campos_pelicula: FILM_FIELDS.map((f) => ({ id: f.id, nombre: f.label, pista: f.hint, ...(f.group ? { grupo: f.group } : {}), ...(f.count ? { cuenta_de: f.count } : {}) })),
   campos_entidad: ORG_FIELDS.map((f) => ({ id: f.id, nombre: f.label, pista: f.hint })),
   categorias_circulacion: CIRC_CATEGORIES,
   categorias_industria: IND_CATEGORIES,
@@ -158,7 +190,7 @@ const catalog = {
   valores_initiative_type: ["publica", "privada", "comunitaria", "transnacional"],
 };
 
-async function askPlan(file: ParsedFile, instructions: string, distinct: DistinctMap | undefined, compact: boolean) {
+async function askPlan(file: ParsedFile, instructions: string, distinct: DistinctMap | undefined, compact: boolean, multi?: MultiStatsMap) {
   const extra = compact
     ? "\n\nSé breve: prioriza columns y grain. En value_maps cubre como máximo 12 valores por columna (los más frecuentes)."
     : "";
@@ -172,7 +204,7 @@ async function askPlan(file: ParsedFile, instructions: string, distinct: Distinc
       {
         role: "user",
         content:
-          `Catálogo de campos destino:\n${JSON.stringify(catalog)}\n\nArchivo "${file.filename}":\n${JSON.stringify(sample(file, distinct, compact))}` +
+          `Catálogo de campos destino:\n${JSON.stringify(catalog)}\n\nArchivo "${file.filename}":\n${JSON.stringify(sample(file, distinct, compact, multi))}` +
           (instructions
             ? `\n\nInstrucciones del equipo para este archivo (texto libre):\n<instrucciones>\n${instructions.replace(/<\/?instrucciones>/gi, "")}\n</instrucciones>`
             : "") +
@@ -183,6 +215,36 @@ async function askPlan(file: ParsedFile, instructions: string, distinct: Distinc
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") throw new Error("Sin plan en la respuesta");
   return { input: block.input, stopReason: res.stop_reason };
+}
+
+const SEPARATORS = [",", "/", " y "];
+const GROUPS: readonly string[] = ["location", "festival", "company"];
+
+/** Solo campos repetibles y separadores conocidos; lo demás se descarta. */
+function cleanLists(lists: ClaudePlan["sheets"][number]["lists"]): SheetPlan["lists"] {
+  if (!lists) return undefined;
+  const out: NonNullable<SheetPlan["lists"]> = {};
+  for (const [field, spec] of Object.entries(lists)) {
+    if (!FILM_FIELDS.some((f) => f.id === field && f.group)) continue;
+    const separators = spec.separators.filter((x) => SEPARATORS.includes(x));
+    if (separators.length) out[field] = { separators };
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Fuentes de texto: el encabezado debe existir; nacen apagadas, las enciende una persona. */
+function cleanTextSources(src: ClaudePlan["sheets"][number]["text_sources"], headers: Set<string>): SheetPlan["text_sources"] {
+  const out = (src ?? [])
+    .filter((t) => headers.has(t.header))
+    .map((t) => ({
+      header: t.header,
+      concepts: t.concepts.filter((c): c is "location" | "festival" | "company" => GROUPS.includes(c)),
+      reason: t.reason ?? undefined,
+      example: t.example ? t.example.slice(0, 200) : undefined,
+      enabled: false,
+    }))
+    .filter((t) => t.concepts.length);
+  return out.length ? out.slice(0, 4) : undefined;
 }
 
 function toImportPlan(parsed: ClaudePlan, file: ParsedFile, instructions: string): ImportPlan {
@@ -209,6 +271,8 @@ function toImportPlan(parsed: ClaudePlan, file: ParsedFile, instructions: string
         columns,
         confidence,
         multi_place: sp.multi_place ?? false,
+        lists: cleanLists(sp.lists),
+        text_sources: cleanTextSources(sp.text_sources, headers),
         value_maps: sp.value_maps ?? undefined,
         note: sp.note ?? undefined,
       };
@@ -221,7 +285,7 @@ function toImportPlan(parsed: ClaudePlan, file: ParsedFile, instructions: string
     if (sp.entity === "film" && h.entity === "film") {
       const used = new Set(Object.values(sp.columns));
       for (const [k, header] of Object.entries(h.columns)) {
-        if (k.includes("__") && !sp.columns[k] && !used.has(header)) {
+        if ((k.includes("__") || k.startsWith("n_")) && !sp.columns[k] && !used.has(header)) {
           sp.columns[k] = header;
           sp.confidence[k] = h.confidence[k] ?? 0.7;
         }
@@ -261,7 +325,7 @@ export async function analyzeFile(file: ParsedFile, opts: AnalyzeOptions = {}): 
   for (const compact of [false, true] as const) {
     try {
       const distinct = compact ? compactDistinct(opts.distinct, 12) : opts.distinct;
-      const res = await askPlan(file, instructions, distinct, compact);
+      const res = await askPlan(file, instructions, distinct, compact, opts.multi);
       lastStop = res.stopReason;
       const parsed = parseClaudePlan(res.input);
       if (res.stopReason === "max_tokens" && !compact) {

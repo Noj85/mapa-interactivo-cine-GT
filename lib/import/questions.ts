@@ -25,7 +25,7 @@ export interface Question {
   answer?: string;
 }
 
-const MAX_QUESTIONS = 24;
+const MAX_QUESTIONS = 60;
 
 const FILM_BULK: { field: string; label: string; placeholder: string; options?: { value: string; label: string }[] }[] = [
   { field: "year", label: "el año", placeholder: "Por ejemplo 2023" },
@@ -67,18 +67,15 @@ export function buildQuestions(
   const live = candidates.filter((c) => c.include);
   const qs: Question[] = [];
 
-  // 1. Lugares dudosos (una sola pregunta por texto repetido)
+  // 1. Lugares dudosos: una pregunta por cada texto sin resolver de cada registro (los repetidos se preguntan una sola vez)
   const seen = new Set<string>();
   for (const c of live) {
-    for (const issue of c.issues) {
-      if (!issue.field.startsWith("location")) continue;
-      const text = c.placeTexts.find((t) => {
-        const r = places[t];
-        return !r || r.status !== "ok";
-      });
+    if (!c.issues.some((i) => i.field.startsWith("location"))) continue;
+    for (const text of c.placeTexts) {
       if (!text || seen.has(text)) continue;
-      seen.add(text);
       const r = places[text];
+      if (r?.status === "ok") continue;
+      seen.add(text);
       qs.push({
         id: `place:${text}`,
         kind: "place",
