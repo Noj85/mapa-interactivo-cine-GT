@@ -117,8 +117,8 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
       )}
       <div className="-mx-2 space-y-0.5">
         {view.layer === "produccion"
-          ? (shown as typeof films).map((f) => <FilmCard key={f.id} film={f} gaz={gaz} hideBadge={mobile && !ctx.canEdit} onClick={() => go.film(f.slug)} />)
-          : (shown as typeof orgs).map((o) => <OrgCard key={o.id} org={o} gaz={gaz} hideBadge={mobile && !ctx.canEdit} onClick={() => go.org(o.slug)} />)}
+          ? (shown as typeof films).map((f) => <FilmCard key={f.id} film={f} gaz={gaz} hideBadge={!ctx.canEdit} onClick={() => go.film(f.slug)} />)
+          : (shown as typeof orgs).map((o) => <OrgCard key={o.id} org={o} gaz={gaz} hideBadge={!ctx.canEdit} onClick={() => go.org(o.slug)} />)}
         {list.length === 0 && (
           <Empty>
             {view.layer !== "produccion"

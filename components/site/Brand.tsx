@@ -53,6 +53,12 @@ export function BrandFooter({ className, bare }: { className?: string; bare?: bo
         <Link href="/creditos" className={cn("w-full text-xs text-muted underline decoration-line underline-offset-2 hover:text-ink hover:decoration-accent", !bare && "sm:w-auto")}>
           Créditos y licencias
         </Link>
+        <p className="w-full text-xs leading-relaxed text-muted">
+          Datos: investigación de Alberto Jiménez (Redccapfa) y de la Comisión de Investigación y Preservación de PROCINE 2025.{" "}
+          <Link href="/creditos" className="underline decoration-line underline-offset-2 hover:text-ink hover:decoration-accent">
+            Ver créditos
+          </Link>
+        </p>
       </div>
     </footer>
   );

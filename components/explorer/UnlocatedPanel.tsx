@@ -59,7 +59,7 @@ export default function UnlocatedPanel({ ctx }: { ctx: PanelCtx }) {
       <SectionTitle aside={list.length.toLocaleString("es-GT")}>Producciones sin lugar de rodaje</SectionTitle>
       <div className="-mx-2 space-y-0.5">
         {list.length ? (
-          list.slice(0, shown).map((f) => <FilmCard key={f.id} film={f} gaz={gaz} onClick={() => go.film(f.slug)} />)
+          list.slice(0, shown).map((f) => <FilmCard key={f.id} film={f} gaz={gaz} hideBadge={!canEdit} onClick={() => go.film(f.slug)} />)
         ) : (
           <Empty>{films.length ? "Ninguna coincide con la búsqueda." : "Todas las producciones ya tienen lugar de rodaje."}</Empty>
         )}

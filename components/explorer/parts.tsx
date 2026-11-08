@@ -329,7 +329,7 @@ export function FilmCard({
   hereMuni?: number;
   hereDepto?: number;
   onClick: () => void;
-  /** Teléfono: sin la insignia de completitud, para no recargar la lista. */
+  /** Vista pública: sin la insignia de completitud (solo la ve el equipo). */
   hideBadge?: boolean;
 }) {
   const kind = filmTypeLabel(film);

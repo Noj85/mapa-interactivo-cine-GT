@@ -37,6 +37,8 @@ interface Props {
   view: ViewState;
   theme: Theme;
   satellite: boolean;
+  /** Marca los pines incompletos (anillo y nota). Solo para el equipo; el público no ve la completitud. */
+  showIncomplete?: boolean;
   padding: { top: number; right: number; bottom: number; left: number };
   onPlace(p: Place | null): void;
   onFilm(slug: string): void;
@@ -381,20 +383,23 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       },
       paint: { "text-color": readableOn(accent) },
     });
-    add({
-      id: "pin-incomplete",
-      type: "circle",
-      source: "pins",
-      filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "incomplete"], true]],
-      paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 8, 12, 12, 15, 15],
-        "circle-color": "rgba(0,0,0,0)",
-        "circle-stroke-color": INCOMPLETE_COLOR[theme],
-        "circle-stroke-width": 1.5,
-        "circle-opacity": pinFade,
-        "circle-stroke-opacity": pinFade,
-      },
-    });
+    // anillo de los pines incompletos: solo para el equipo (la vista pública no muestra completitud)
+    if (propsRef.current.showIncomplete) {
+      add({
+        id: "pin-incomplete",
+        type: "circle",
+        source: "pins",
+        filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "incomplete"], true]],
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 8, 12, 12, 15, 15],
+          "circle-color": "rgba(0,0,0,0)",
+          "circle-stroke-color": INCOMPLETE_COLOR[theme],
+          "circle-stroke-width": 1.5,
+          "circle-opacity": pinFade,
+          "circle-stroke-opacity": pinFade,
+        },
+      });
+    }
     add({
       id: "pin-point",
       type: "circle",
@@ -570,7 +575,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
 
     // pines
     (map.getSource("pins") as MapLibre.GeoJSONSource).setData(buildPins(data, view.layer, geo.gaz, deptoOf(view.place)) as any);
-    for (const id of PIN_LAYERS) map.setLayoutProperty(id, "visibility", filmMode ? "none" : "visible");
+    for (const id of PIN_LAYERS) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", filmMode ? "none" : "visible");
 
     // zona «Sin locación»: solo en Producción, sin filtro de departamento y sin entidad abierta
     const selFilm = view.film ? data.films.find((f) => f.slug === view.film) : undefined;
@@ -803,7 +808,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
             } else {
               title = p.title ?? p.site ?? "";
               sub = p.sub ?? "";
-              if (p.incomplete === true || p.incomplete === "true") note = "Información incompleta";
+              if (propsRef.current.showIncomplete && (p.incomplete === true || p.incomplete === "true")) note = "Información incompleta";
             }
             setHover(null);
           } else if (hit.kind === "nowhere") {

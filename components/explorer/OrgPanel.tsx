@@ -46,7 +46,7 @@ export default function OrgPanel({ ctx }: { ctx: PanelCtx }) {
       {org.logo_url && <OrgLogo org={org} full className="mb-4 h-24 w-24 rounded-2xl" />}
       <h2 className="font-display text-[30px] leading-[1.08] tracking-tight text-ink">{org.name}</h2>
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <CompletenessBadge pct={org.completeness} missing={org.missing_fields} />
+        {canEdit && <CompletenessBadge pct={org.completeness} missing={org.missing_fields} />}
         {type && <span className="chip">{type}</span>}
         {canEdit && (
           <Link href={`/admin/entidades/${org.id}`} className="chip transition hover:border-accent hover:text-ink">
@@ -65,7 +65,7 @@ export default function OrgPanel({ ctx }: { ctx: PanelCtx }) {
         )}
       </div>
 
-      {org.completeness < 100 && (
+      {canEdit && org.completeness < 100 && (
         <div className="mt-4 rounded-2xl border border-warn/30 bg-warn/5 px-3.5 py-3">
           <div className="flex items-center gap-2 text-sm text-warn">
             <AlertCircle className="h-4 w-4" /> Información pendiente

@@ -244,6 +244,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
           view={view}
           theme={theme}
           satellite={satellite}
+          showIncomplete={canEdit}
           padding={padding}
           onPlace={(p) => (p ? go.place(p) : go.clear())}
           onFilm={go.film}

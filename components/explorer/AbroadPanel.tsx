@@ -75,7 +75,7 @@ export default function AbroadPanel({ ctx }: { ctx: PanelCtx }) {
               <SectionTitle aside={items.length.toLocaleString("es-GT")}>{country}</SectionTitle>
               <div className="-mx-2 space-y-0.5">
                 {part.map((f) => (
-                  <FilmCard key={`${country}-${f.id}`} film={f} gaz={gaz} onClick={() => go.film(f.slug)} />
+                  <FilmCard key={`${country}-${f.id}`} film={f} gaz={gaz} hideBadge={!ctx.canEdit} onClick={() => go.film(f.slug)} />
                 ))}
               </div>
             </section>

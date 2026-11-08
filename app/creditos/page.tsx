@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { Award } from "lucide-react";
 import { BrandFooter } from "@/components/site/Brand";
 import { SiteHeader } from "@/components/site/SiteHeader";
 
 export const metadata: Metadata = {
   title: "Créditos y licencias · Mapa del Cine de Guatemala",
-  description: "Quién hizo el Mapa del Cine de Guatemala, de quién son los datos y qué mapas, librerías y fuentes de código abierto lo hacen posible.",
+  description: "Quién hizo el Mapa del Cine de Guatemala, quiénes aportaron datos a su base de datos y qué mapas, librerías y fuentes de código abierto lo hacen posible.",
 };
 
 const LIBS: { name: string; license: string; href: string }[] = [
@@ -53,7 +55,42 @@ export default function CreditosPage() {
           El Mapa del Cine de Guatemala es posible gracias a las personas, instituciones y proyectos de código abierto que se reconocen aquí.
         </p>
 
-        <div className="mt-10 grid gap-6 md:grid-cols-2">
+        <section className="mt-10" aria-labelledby="aportes">
+          <article className="relative overflow-hidden rounded-3xl border border-accent/40 bg-accent/5 p-6 sm:p-8">
+            <Award className="pointer-events-none absolute -right-4 -top-4 h-36 w-36 text-accent/10" aria-hidden />
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-accent">
+              <Award className="h-4 w-4" aria-hidden /> Agradecimiento especial
+            </p>
+            <h2 id="aportes" className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+              Alberto Jiménez
+            </h2>
+            <p className="mt-1 text-sm font-medium text-ink">
+              Director ejecutivo de la Redccapfa, Red Centroamericana y del Caribe del Patrimonio Fílmico y Audiovisual
+            </p>
+            <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-ink/85">
+              Una contribución muy valiosa a este mapa: los datos que aportó son resultado de una investigación exhaustiva del patrimonio fílmico y audiovisual. Su trabajo, minucioso y generoso, enriqueció de manera notable la información que hoy se consulta aquí.
+            </p>
+          </article>
+
+          <article className="mt-4 rounded-2xl border border-line bg-surface p-5">
+            <h2 className="font-display text-xl font-semibold">Aportes a la base de datos</h2>
+            <dl className="mt-3 text-sm leading-relaxed">
+              <dt className="font-medium text-ink">Comisión de Investigación y Preservación de PROCINE 2025</dt>
+              <dd className="text-muted">
+                Levantamiento, investigación y sistematización de información sobre obras y entidades del cine guatemalteco.
+              </dd>
+            </dl>
+            <p className="mt-4 text-xs leading-relaxed text-muted">
+              La información del mapa no se reclama como propiedad de nadie: se reconoce a quienes la investigaron y se puede descargar en cualquier momento, con filtros, desde la página de{" "}
+              <Link href="/descargas" className={A}>
+                descargas
+              </Link>
+              .
+            </p>
+          </article>
+        </section>
+
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
           <section className="rounded-2xl border border-line bg-surface p-5">
             <h2 className="font-display text-xl font-semibold">Autoría</h2>
             <dl className="mt-3 space-y-3 text-sm leading-relaxed">
@@ -65,13 +102,13 @@ export default function CreditosPage() {
                 <dt className="font-medium text-ink">Diseño gráfico y UI/UX</dt>
                 <dd className="text-muted">Por definir.</dd>
               </div>
-              <div>
-                <dt className="font-medium text-ink">Datos, marcas e institución</dt>
-                <dd className="text-muted">La Academia Guatemalteca de Artes y Ciencias Cinematográficas y PROCINE.</dd>
-              </div>
             </dl>
             <p className="mt-4 text-xs leading-relaxed text-muted">
-              El software es © {new Date().getFullYear()} Javier Oswaldo Borrayo Mazariegos, todos los derechos reservados. Los datos y contenidos del mapa pertenecen a la Academia Guatemalteca de Artes y Ciencias Cinematográficas y a PROCINE, o a quienes los aportaron. Los logotipos son marcas de sus titulares.
+              El software es © {new Date().getFullYear()} Javier Oswaldo Borrayo Mazariegos, todos los derechos reservados. La información del mapa no se reclama como propiedad de nadie y se puede descargar con filtros desde{" "}
+              <Link href="/descargas" className={A}>
+                descargas
+              </Link>
+              . Los logotipos son marcas de sus titulares.
             </p>
           </section>
 

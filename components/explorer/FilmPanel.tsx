@@ -127,7 +127,7 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
         </ul>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <CompletenessBadge pct={film.completeness} missing={film.missing_fields} />
+        {canEdit && <CompletenessBadge pct={film.completeness} missing={film.missing_fields} />}
         {film.status === "draft" && <span className="chip">Borrador</span>}
         {canEdit && (
           <Link href={`/admin/peliculas/${film.id}`} className="chip transition hover:border-accent hover:text-ink">
@@ -146,7 +146,7 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
         )}
       </div>
 
-      {film.completeness < 100 && (
+      {canEdit && film.completeness < 100 && (
         <div className="mt-4 rounded-2xl border border-warn/30 bg-warn/5 px-3.5 py-3">
           <div className="flex items-center gap-2 text-sm text-warn">
             <AlertCircle className="h-4 w-4 shrink-0" /> Información pendiente

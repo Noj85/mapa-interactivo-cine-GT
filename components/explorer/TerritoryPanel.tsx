@@ -114,7 +114,7 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
                 gaz={gaz}
                 hereMuni={place.type === "muni" ? place.code : undefined}
                 hereDepto={place.type === "depto" ? place.code : undefined}
-                hideBadge={!!ctx.mobile && !ctx.canEdit}
+                hideBadge={!ctx.canEdit}
                 onClick={() => go.film(f.slug)}
               />
             ))
@@ -122,7 +122,7 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
             <Empty>Todavía no hay producciones registradas en {entry?.name}.</Empty>
           )
         ) : orgs.length ? (
-          orgs.map((o) => <OrgCard key={o.id} org={o} gaz={gaz} hideBadge={!!ctx.mobile && !ctx.canEdit} onClick={() => go.org(o.slug)} />)
+          orgs.map((o) => <OrgCard key={o.id} org={o} gaz={gaz} hideBadge={!ctx.canEdit} onClick={() => go.org(o.slug)} />)
         ) : (
           <Empty>Sin registros en esta capa para {entry?.name}.</Empty>
         )}
