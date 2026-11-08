@@ -9,6 +9,7 @@ import { createPortal } from "react-dom";
 import { durationLabel, filmTypeLabel } from "@/lib/film-types";
 import { FESTIVAL_RESULTS, NATIONALITIES } from "@/lib/types";
 import { cn, fmtInt, fmtMoney } from "@/lib/utils";
+import { PosterImage } from "@/components/ui/PosterImage";
 import { posterThumb } from "@/lib/poster-url";
 import { embedAutoplay, parseVideo } from "@/lib/video-url";
 import { CompletenessBadge, CompletenessMeter } from "@/components/ui/Badges";
@@ -98,9 +99,16 @@ export default function FilmPanel({ ctx }: { ctx: PanelCtx }) {
   return (
     <PanelShell eyebrow="Producción" onBack={go.up} onClose={go.clear}>
       {film.poster_url && (
-        <div className="mb-4 overflow-hidden rounded-lg border border-line bg-surface-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={film.poster_url} alt={`Póster de ${film.title}`} className="mx-auto max-h-[240px] sm:max-h-[360px] w-auto max-w-full object-contain" />
+        <div className="mb-4 flex justify-center">
+          <PosterImage
+            src={film.poster_url}
+            alt={`Póster de ${film.title}`}
+            full
+            loading="eager"
+            heightClass="h-[240px] sm:h-[360px]"
+            maxWidthClass="max-w-full"
+            className="rounded-lg border border-line bg-surface-2"
+          />
         </div>
       )}
       <h2 className="font-display text-[32px] leading-[1.05] tracking-tight text-ink">{film.title}</h2>

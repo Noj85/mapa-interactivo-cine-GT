@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ImportSubmissionReview, type CargaOption } from "@/components/admin/ImportSubmissionReview";
 import { SubmissionReview } from "@/components/admin/SubmissionReview";
+import { PosterImage } from "@/components/ui/PosterImage";
 import { adminStore } from "@/lib/auth";
 import { serverGazetteer } from "@/lib/geo/server";
 import { posterThumb } from "@/lib/poster-url";
@@ -13,10 +14,11 @@ import type { Film, FilmInput, Org, OrgInput, SubmissionKind } from "@/lib/types
 import { cn } from "@/lib/utils";
 
 function ImageBox({ url, kind, alt }: { url: string; kind: SubmissionKind; alt: string }) {
+  if (kind === "film") return <PosterImage src={url} alt={alt} heightClass="h-48" maxWidthClass="max-w-[20rem]" className="rounded-lg border border-line bg-surface-2" />;
   return (
-    <div className={cn("overflow-hidden rounded-lg border border-line", kind === "org" ? "h-32 w-32 bg-white" : "h-48 w-32 bg-surface-2")}>
+    <div className="h-32 w-32 overflow-hidden rounded-lg border border-line bg-white">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={posterThumb(url) ?? url} alt={alt} className={cn("h-full w-full", kind === "org" ? "object-contain p-2" : "object-cover")} />
+      <img src={posterThumb(url) ?? url} alt={alt} className="h-full w-full object-contain p-2" />
     </div>
   );
 }

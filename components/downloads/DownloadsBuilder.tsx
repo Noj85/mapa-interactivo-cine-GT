@@ -4,6 +4,7 @@ import { categoriesText } from "@/lib/categories";
 import { Check, Clapperboard, Copy, Download, FileSpreadsheet, FileText, Landmark, Presentation, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { MultiSelect } from "@/components/ui/MultiSelect";
+import { YearRange } from "@/components/ui/YearRange";
 import {
   EMPTY_FILM_FILTER,
   EMPTY_ORG_FILTER,
@@ -251,15 +252,9 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
                   onChange={(nacionalidad) => patchFilm({ nacionalidad })}
                   options={NATIONALITIES.map((k) => ({ value: k.id, label: k.label }))}
                 />
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="label" htmlFor="f-desde">Año desde</label>
-                    <input id="f-desde" className="field" inputMode="numeric" placeholder="1950" maxLength={4} value={ff.desde ?? ""} onChange={(e) => patchFilm({ desde: digits(e.target.value) ? Number(digits(e.target.value)) : null })} />
-                  </div>
-                  <div>
-                    <label className="label" htmlFor="f-hasta">Año hasta</label>
-                    <input id="f-hasta" className="field" inputMode="numeric" placeholder="2025" maxLength={4} value={ff.hasta ?? ""} onChange={(e) => patchFilm({ hasta: digits(e.target.value) ? Number(digits(e.target.value)) : null })} />
-                  </div>
+                <div>
+                  <div className="label">Año (rango)</div>
+                  <YearRange idPrefix="f-anio" desde={ff.desde} hasta={ff.hasta} onChange={(desde, hasta) => patchFilm({ desde, hasta })} />
                 </div>
 
                 <fieldset className="min-w-0 sm:col-span-2">
@@ -287,10 +282,6 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
                     <option value="sin">Solo sin locación</option>
                   </select>
                 </div>
-                <label className="flex cursor-pointer items-center gap-2.5 text-sm sm:col-span-2">
-                  <input type="checkbox" className="h-4 w-4 accent-[rgb(var(--accent))]" checked={ff.soloCompletas} onChange={(e) => patchFilm({ soloCompletas: e.target.checked })} />
-                  Solo producciones con todas sus locaciones ubicadas en un municipio
-                </label>
               </div>
             )}
           </div>

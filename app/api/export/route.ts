@@ -28,7 +28,6 @@ export const runtime = "nodejs";
  *    presupuesto_min=500000&presupuesto_max=2000000&moneda=GTQ|USD
  *    dias_min / dias_max, inversion_min / inversion_max, empleos_min / empleos_max
  *                         totales de rodaje de la producción (suma de sus locaciones)
- *    completas=1          solo con todas las locaciones ubicadas en un municipio
  *    q=texto              título, dirección o productora
  *
  *  Filtros de circulación y entidades:

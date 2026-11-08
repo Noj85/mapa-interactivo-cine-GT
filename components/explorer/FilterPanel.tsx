@@ -4,15 +4,15 @@ import { Check, Copy, Download, Plus, SlidersHorizontal, X } from "lucide-react"
 import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { MultiSelect } from "@/components/ui/MultiSelect";
+import { YearRange } from "@/components/ui/YearRange";
 import { EMPTY_FILM_FILTER, EMPTY_ORG_FILTER, ORG_CATEGORIES, type FilmFilter, type OrgFilter } from "@/lib/filters";
 import { FORMATS, genreOptions, NATURES } from "@/lib/film-types";
-import { INITIATIVE_TYPES, LAYER_METRICS, METRICS, NATIONALITIES, type LayerId, type MetricId } from "@/lib/types";
+import { INITIATIVE_TYPES, NATIONALITIES, type LayerId } from "@/lib/types";
 import { cn, fmtInt } from "@/lib/utils";
 import { activeFilterCount } from "@/lib/view";
 
 interface Props {
   layer: LayerId;
-  metric: MetricId;
   filmFilter: FilmFilter;
   orgFilter: OrgFilter;
   /** Registros de la capa que cumplen los filtros, y cuántos hay en total. */
@@ -24,7 +24,6 @@ interface Props {
   extraGenres: string[];
   onFilm(f: FilmFilter): void;
   onOrg(f: OrgFilter): void;
-  onMetric(m: MetricId): void;
   /** Enlace a /descargas con los mismos filtros. */
   downloadHref: string;
 }
@@ -87,7 +86,7 @@ function Range({
 
 /**
  * Botón «Filtros» y su panel. Sin filtros es solo un botón; los filtros se agregan a la carta y se ven
- * como filas que se quitan con una «×». «Medir por» vive aquí para no cargar el mapa.
+ * como filas que se quitan con una «×».
  */
 export function FilterPanel(p: Props) {
   const { layer, filmFilter: ff, orgFilter: of } = p;
@@ -107,9 +106,15 @@ export function FilterPanel(p: Props) {
 
   useEffect(() => {
     if (!open) return;
-    const away = (e: MouseEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
+    const away = (e: MouseEvent) => {
+      const t = e.target as Element;
+      // los menús de los selectores se pintan fuera del card: usarlos no lo cierra
+      if (!root.current?.contains(t) && !t.closest?.("[data-floating-menu]")) setOpen(false);
+    };
     const esc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // con un menú abierto, Escape cierra primero el menú
+      if (document.querySelector("[data-floating-menu]")) return;
       e.stopPropagation();
       setOpen(false);
     };
@@ -163,10 +168,10 @@ export function FilterPanel(p: Props) {
         },
         {
           id: "anio",
-          label: "Año",
+          label: "Año (rango)",
           active: ff.desde != null || ff.hasta != null,
           clear: () => pf({ desde: null, hasta: null }),
-          node: <Range label="Año" min={ff.desde} max={ff.hasta} grouped={false} maxLength={4} onChange={(desde, hasta) => pf({ desde, hasta })} />,
+          node: <YearRange desde={ff.desde} hasta={ff.hasta} onChange={(desde, hasta) => pf({ desde, hasta })} />,
         },
         {
           id: "presupuesto",
@@ -203,18 +208,6 @@ export function FilterPanel(p: Props) {
           active: ff.empleosMin != null || ff.empleosMax != null,
           clear: () => pf({ empleosMin: null, empleosMax: null }),
           node: <Range label="Empleos" min={ff.empleosMin} max={ff.empleosMax} hints={["Mínimo", "Máximo"]} onChange={(empleosMin, empleosMax) => pf({ empleosMin, empleosMax })} />,
-        },
-        {
-          id: "completas",
-          label: "Locaciones con municipio",
-          active: ff.soloCompletas,
-          clear: () => pf({ soloCompletas: false }),
-          node: (
-            <label className="flex cursor-pointer items-center gap-2.5 text-sm">
-              <input type="checkbox" className="h-4 w-4 accent-[rgb(var(--accent))]" checked={ff.soloCompletas} onChange={(e) => pf({ soloCompletas: e.target.checked })} />
-              Solo con todas sus locaciones en un municipio
-            </label>
-          ),
         },
         {
           id: "q",
@@ -257,11 +250,8 @@ export function FilterPanel(p: Props) {
   const shownFields = fields.filter((f) => f.active || added.includes(f.id));
   const available = fields.filter((f) => !shownFields.includes(f));
   const n = activeFilterCount({ layer, filmFilter: ff, orgFilter: of });
-  const metricOptions = LAYER_METRICS[layer];
-  const customMetric = metricOptions.length > 1 && p.metric !== metricOptions[0];
-
   const clearAll = () => {
-    if (isFilm) p.onFilm({ ...EMPTY_FILM_FILTER, locacion: ff.locacion, origen: ff.origen });
+    if (isFilm) p.onFilm({ ...EMPTY_FILM_FILTER, locacion: ff.locacion });
     else p.onOrg({ ...EMPTY_ORG_FILTER });
     setAdded([]);
   };
@@ -277,7 +267,7 @@ export function FilterPanel(p: Props) {
     } catch {}
   };
   const noun = isFilm ? (p.count === 1 ? "producción" : "producciones") : p.count === 1 ? "entidad" : "entidades";
-  const highlighted = n > 0 || customMetric;
+  const highlighted = n > 0;
 
   return (
     <div ref={root} className="pointer-events-auto">
@@ -293,13 +283,12 @@ export function FilterPanel(p: Props) {
           Filtros
           {n > 0 && <span className="rounded-md bg-accent px-1.5 text-xs font-semibold leading-5 text-accent-ink">{n}</span>}
         </button>
-        {(n > 0 || customMetric) && (
+        {n > 0 && (
           <button
             type="button"
             className="btn-ghost h-9 w-9 !p-0"
             onClick={() => {
               clearAll();
-              p.onMetric(metricOptions[0]);
             }}
             aria-label="Quitar todos los filtros"
             title="Quitar todos los filtros"
@@ -317,26 +306,6 @@ export function FilterPanel(p: Props) {
           className="glass absolute left-0 top-full z-30 mt-2 w-[min(440px,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-line shadow-float"
         >
           <div className="max-h-[min(62dvh,540px)] overflow-y-auto p-4">
-            {metricOptions.length > 1 && (
-              <section className="mb-4">
-                <h3 className="label">Medir por</h3>
-                <div role="radiogroup" aria-label="Medir por" className="grid grid-cols-2 gap-1 rounded-lg border border-line bg-surface-2 p-0.5 text-sm">
-                  {metricOptions.map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      role="radio"
-                      aria-checked={p.metric === m}
-                      onClick={() => p.onMetric(m)}
-                      className={cn("rounded px-2 py-1.5 transition-colors", p.metric === m ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink")}
-                    >
-                      {METRICS[m].label}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
-
             <section>
               <h3 className="label">Filtros</h3>
               {shownFields.length === 0 && !adding && <p className="mb-2 text-sm text-muted">Sin filtros: el mapa muestra todo. Añade uno para acotar lo que ves.</p>}

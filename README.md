@@ -221,7 +221,7 @@ Con `supabase/migrations/0010_festival_org_link.sql` (después de 0007, 0008 y 0
 
 ## Mapa público y filtros del equipo
 
-**El mapa público no tiene leyenda ni filtros de contenido**, solo el desplegable de **departamento** (debajo de las capas, ver abajo): se toca un departamento o municipio, una producción o una zona, y se busca con ⌘ K. Los enlaces compartidos con filtros (`formato_obra=…`, `metrica=…`) se abren con el mapa completo. Los filtros siguen existiendo para el equipo en `/admin` (y en `/descargas`, que es pública pero aparte), como herramienta secundaria detrás de un botón.
+**El mapa público no tiene leyenda ni filtros de contenido**, solo el desplegable de **departamento** (debajo de las capas, ver abajo): se toca un departamento o municipio, una producción o una zona, y se busca con ⌘ K. Los enlaces compartidos con filtros (`formato_obra=…`) se abren con el mapa completo. Los filtros siguen existiendo para el equipo en `/admin` (y en `/descargas`, que es pública pero aparte), como herramienta secundaria detrás de un botón.
 
 ### Cifras de la tarjeta (Ajustes → Cifras públicas)
 
@@ -237,8 +237,8 @@ Solo en `/admin`, junto al departamento hay un botón **«Filtros»** que abre u
 - **Mapa público:** no tiene el panel de filtros. El mapa arranca mostrando **solo las producciones con locación** (lista y mapa). Un chip en el encabezado de la lista («Con locación 84 ▾») cambia a **Sin locación** o **Todas**, con el conteo de cada opción; recorta a la vez la lista y el mapa. En la URL, «con» no se escribe (es lo normal) y las otras son `?locacion=sin` y `?locacion=todas`; la elección se mantiene al cambiar de capa. «Sin locación» deja solo su marcador en el Pacífico. Una producción rodada solo fuera de Guatemala cuenta como «con locación».
 - **En el teléfono (público):** arriba, el logo, un botón «Aportar» compacto y un menú ⋯ (Descargas y modo oscuro); debajo, una barra de búsqueda grande que abre la búsqueda a pantalla completa con sugerencias; luego las capas y un botón de departamento. La hoja inferior tiene tres alturas: mínima (el chip de locación y «Ver lista»), media y completa; el mapa se acerca con los dedos (sin botones +/−). El equipo conserva la distribución de siempre.
 - **Circulación e Industria:** categoría (varias), naturaleza y búsqueda por texto.
-- **Medir por** (solo Producción): producciones, días de rodaje, inversión local o empleos; cambia los colores del mapa.
-- Los filtros se aplican al mapa y los paneles, y viven en la URL con los mismos parámetros que `/descargas` (`formato_obra`, `naturaleza`, `genero`, `desde`, `presupuesto_min`, `dias_min`, `categoria`…, más `metrica`), así que «Copiar enlace de esta vista» y «Descargar estos datos» llevan exactamente lo que se ve. Los enlaces anteriores con `?categoria=` o `?clase=` (el antiguo «tipo de obra») siguen funcionando: se convierten a formato y naturaleza.
+- El mapa siempre mide el número de producciones (ya no hay «Medir por»; los enlaces con `?metrica=` se abren igual). El **año** es un rango «Desde / Hasta» (cada lado opcional; solo se aplica con años de 4 dígitos y, si quedan invertidos, se intercambian). Los menús desplegables del card de filtros se muestran por encima del card, sin cortarse.
+- Los filtros se aplican al mapa y los paneles, y viven en la URL con los mismos parámetros que `/descargas` (`formato_obra`, `naturaleza`, `genero`, `desde`, `hasta`, `presupuesto_min`, `dias_min`, `categoria`…), así que «Copiar enlace de esta vista» y «Descargar estos datos» llevan exactamente lo que se ve. Los enlaces anteriores con `?categoria=` o `?clase=` (el antiguo «tipo de obra») siguen funcionando: se convierten a formato y naturaleza.
 
 ## Pósters
 
@@ -252,7 +252,7 @@ Con Supabase los archivos van al bucket público `posters`; en modo local, a `.d
 
 ## Producciones extranjeras y enlaces de video
 
-**Producciones extranjeras.** La nacionalidad «Extranjera» incluye producciones rodadas en Guatemala y producciones que tratan sobre Guatemala aunque se rodaran afuera (en ese caso la locación se registra con su país y cae en la zona «Fuera de Guatemala»). En el mapa público, cuando hay al menos una, aparece el chip **«Origen»** junto al de locación: *Todas* (por defecto), *Nacionales* (guatemaltecas, coproducciones y las que no tienen nacionalidad) o *Extranjeras*, cada una con su conteo. Se guarda en la dirección como `?origen=nacional|extranjera` y también filtra las descargas. Las extranjeras llevan la etiqueta «Producción extranjera» (con el país de las casas productoras) en la lista y en la ficha.
+**Producciones extranjeras.** La nacionalidad «Extranjera» incluye producciones rodadas en Guatemala y producciones que tratan sobre Guatemala aunque se rodaran afuera (en ese caso la locación se registra con su país y cae en la zona «Fuera de Guatemala»). Para separarlas se usa el filtro **Nacionalidad** (ya no hay chip «Origen»). Las extranjeras llevan la etiqueta «Producción extranjera» (con el país de las casas productoras) en la lista y en la ficha.
 
 **Tráiler y película completa.** Cada producción puede tener dos enlaces de video (`trailer_url` y `film_url`), ambos opcionales y sin efecto en la completitud. Al pegar el enlace (en el editor del equipo o en `/aportar`) se busca la miniatura y se guarda en nuestro almacenamiento (`trailer_thumb` y `film_thumb`: WebP de 1280 px y miniatura de 480 px):
 
@@ -296,7 +296,6 @@ La página `/descargas` es pública: cualquiera elige entre **Producciones**, **
 | `desde`, `hasta` | año |
 | `presupuesto_min`, `presupuesto_max`, `moneda` | monto y `GTQ` o `USD` (otra moneda se compara a Q 7.70 por dólar); solo salen producciones con presupuesto registrado |
 | `locacion` | `con` o `sin`: solo producciones con o sin locación registrada (dentro o fuera de Guatemala) |
-| `completas=1` | solo producciones con todas las locaciones en un municipio |
 | `q` | texto en título, director/a, productor/a o casa productora (o nombre y descripción en entidades) |
 | `categoria`, `iniciativa` | solo para `tipo=circulacion` y `tipo=entidades` |
 | `borradores=1` | incluye borradores; solo con sesión del equipo |

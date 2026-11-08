@@ -2,6 +2,7 @@
 
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { useRef, useState } from "react";
+import { PosterImage } from "@/components/ui/PosterImage";
 import { posterThumb } from "@/lib/poster-url";
 import { cn } from "@/lib/utils";
 
@@ -80,13 +81,16 @@ export function ImageField({
           void take(e.dataTransfer.files[0]);
         }}
         className={cn(
-          "relative flex w-full items-center justify-center overflow-hidden rounded-lg border border-dashed border-line text-center transition-colors",
+          "relative flex items-center justify-center overflow-hidden rounded-lg border border-dashed border-line text-center transition-colors",
           kind === "logo" ? "bg-white" : "bg-surface-2",
-          c.frame,
+          // el póster cargado se ve con su proporción real: alto fijo y el ancho lo da la imagen
+          kind === "poster" && value ? "w-fit max-w-full" : cn("w-full", c.frame),
           over && "border-accent bg-accent/10",
         )}
       >
-        {value ? (
+        {value && kind === "poster" ? (
+          <PosterImage src={value} alt={c.alt} full heightClass="h-[300px]" maxWidthClass="max-w-full" loading="eager" />
+        ) : value ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={posterThumb(value) ?? value}

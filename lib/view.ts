@@ -60,8 +60,8 @@ const LAYERS = ["produccion", "circulacion", "industria"];
 export function parseView(search: string): ViewState {
   const p = new URLSearchParams(search);
   const layer = (LAYERS.includes(p.get("capa") ?? "") ? p.get("capa") : "produccion") as LayerId;
-  const rawMetric = p.get("metrica") as MetricId | null;
-  const metric: MetricId = rawMetric && LAYER_METRICS[layer].includes(rawMetric) ? rawMetric : LAYER_METRICS[layer][0];
+  // el mapa siempre mide la métrica principal de la capa (los enlaces con ?metrica= se abren igual)
+  const metric: MetricId = LAYER_METRICS[layer][0];
   const lugar = p.get("lugar");
   let place: Place | null = null;
   if (lugar && /^[dm]\d+$/.test(lugar)) {
@@ -143,7 +143,6 @@ export function activeFilterCount(v: Pick<ViewState, "layer" | "filmFilter" | "o
   // moneda es un ajuste del presupuesto, no un filtro aparte; la locación tiene su propio chip en el panel
   params.delete("moneda");
   params.delete("locacion");
-  params.delete("origen");
   // presupuesto, año y demás rangos cuentan como un solo filtro cada uno
   const groups = new Set<string>();
   for (const k of params.keys()) groups.add(k.replace(/_(min|max)$/, "").replace(/^(desde|hasta)$/, "anio"));

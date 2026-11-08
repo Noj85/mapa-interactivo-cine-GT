@@ -7,7 +7,7 @@ import { useState, useTransition } from "react";
 import { mergeFilmsAction } from "@/app/admin/actions";
 import { CompletenessBadge } from "@/components/ui/Badges";
 import { defaultChoice, type MergeChoice, type MergeItem, type MergePlan, type Side } from "@/lib/merge-films";
-import { posterThumb } from "@/lib/poster-url";
+import { PosterImage } from "@/components/ui/PosterImage";
 import { cn } from "@/lib/utils";
 
 interface Card {
@@ -22,13 +22,10 @@ interface Card {
 
 const FROM_LABEL: Record<MergeItem["from"], string> = { a: "Solo A", b: "Solo B", both: "En ambas" };
 
-function Poster({ url, className }: { url: string | null; className?: string }) {
-  return (
-    <span className={cn("block shrink-0 overflow-hidden rounded-md bg-surface-2 ring-1 ring-line", className)}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      {url && <img src={posterThumb(url) ?? url} alt="" className="h-full w-full object-cover" />}
-    </span>
-  );
+/** El alto lo fija quien lo usa; el ancho sale de la proporción del póster. Sin póster, un marco vacío. */
+function Poster({ url, heightClass, emptyClass }: { url: string | null; heightClass: string; emptyClass: string }) {
+  if (!url) return <span className={cn("block shrink-0 rounded-md bg-surface-2 ring-1 ring-line", emptyClass)} />;
+  return <PosterImage src={url} heightClass={heightClass} maxWidthClass="max-w-[10rem]" className="rounded-md bg-surface-2 ring-1 ring-line" />;
 }
 
 /** Pantalla para fusionar dos producciones: cuál se queda, qué valor de cada campo y qué elementos de cada lista. */
@@ -94,7 +91,7 @@ export function FilmMerge({ a, b, plan }: { a: Card; b: Card; plan: MergePlan })
             return (
               <label key={s} className={cn(option(active), "p-3")}>
                 <input type="radio" name="keep" className="mt-1 accent-[rgb(var(--accent))]" checked={active} onChange={() => setChoice((c) => ({ ...c, keep: s }))} />
-                <Poster url={f.poster} className="h-16 w-11" />
+                <Poster url={f.poster} heightClass="h-16" emptyClass="h-16 w-11" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">{s.toUpperCase()}{active ? " · se queda" : " · se borra"}</span>
                   <span className="block truncate font-display text-lg text-ink">{f.title}</span>
@@ -145,7 +142,7 @@ export function FilmMerge({ a, b, plan }: { a: Card; b: Card; plan: MergePlan })
               <label key={s} className={option((choice.poster ?? plan.poster!.def) === s)}>
                 <input type="radio" name="poster" className="mt-0.5 accent-[rgb(var(--accent))]" checked={(choice.poster ?? plan.poster!.def) === s} onChange={() => setChoice((c) => ({ ...c, poster: s }))} />
                 <span className="text-[11px] font-semibold text-muted">{s.toUpperCase()}</span>
-                {plan.poster![s] ? <Poster url={plan.poster![s]} className="h-36 w-24" /> : <span className="text-sm text-muted">Sin póster</span>}
+                {plan.poster![s] ? <Poster url={plan.poster![s]} heightClass="h-36" emptyClass="h-36 w-24" /> : <span className="text-sm text-muted">Sin póster</span>}
               </label>
             ))}
           </div>

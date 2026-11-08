@@ -1,7 +1,7 @@
 import { orgCategories } from "@/lib/categories";
 import { companyNames } from "@/lib/companies";
 import { cleanGenres, FORMATS, formatLabel, legacyKind, NATURES, natureLabel, type FilmFormat, type FilmNature } from "@/lib/film-types";
-import { isAbroad, isUnlocated } from "@/lib/completeness";
+import { isUnlocated } from "@/lib/completeness";
 import { CIRC_CATEGORIES, IND_CATEGORIES, INITIATIVE_TYPES, NATIONALITIES, type Film, type InitiativeType, type Nationality, type Org } from "@/lib/types";
 import { normalize } from "@/lib/utils";
 
@@ -46,12 +46,8 @@ export interface FilmFilter {
   empleosMin: number | null;
   empleosMax: number | null;
   q: string;
-  /** Solo producciones con todas las locaciones ubicadas en un municipio. */
-  soloCompletas: boolean;
   /** Con o sin locación registrada (dentro o fuera de Guatemala); null no filtra. */
   locacion: "con" | "sin" | null;
-  /** Origen de la producción: nacional (guatemalteca, coproducción o sin dato) o extranjera; null no filtra. */
-  origen: "nacional" | "extranjera" | null;
 }
 
 export interface OrgFilter {
@@ -81,9 +77,7 @@ export const EMPTY_FILM_FILTER: FilmFilter = {
   empleosMin: null,
   empleosMax: null,
   q: "",
-  soloCompletas: false,
   locacion: null,
-  origen: null,
 };
 
 export const EMPTY_ORG_FILTER: OrgFilter = { capa: null, categoria: [], iniciativa: [], depto: [], q: "" };
@@ -162,9 +156,7 @@ export function parseFilmFilter(p: URLSearchParams): FilmFilter {
     empleosMin: num(p, "empleos_min"),
     empleosMax: num(p, "empleos_max"),
     q: (p.get("q") ?? "").trim().slice(0, 120),
-    soloCompletas: p.get("completas") === "1",
     locacion: p.get("locacion") === "con" || p.get("locacion") === "sin" ? (p.get("locacion") as "con" | "sin") : null,
-    origen: p.get("origen") === "nacional" || p.get("origen") === "extranjera" ? (p.get("origen") as "nacional" | "extranjera") : null,
   };
 }
 
@@ -198,9 +190,7 @@ export function filmFilterToParams(f: FilmFilter, into = new URLSearchParams()) 
   if (f.empleosMin != null) into.set("empleos_min", String(f.empleosMin));
   if (f.empleosMax != null) into.set("empleos_max", String(f.empleosMax));
   if (f.q) into.set("q", f.q);
-  if (f.soloCompletas) into.set("completas", "1");
   if (f.locacion) into.set("locacion", f.locacion);
-  if (f.origen) into.set("origen", f.origen);
   return into;
 }
 
@@ -239,8 +229,12 @@ export function filmMatches(f: Film, flt: FilmFilter): boolean {
     if (!flt.genero.some((g) => have.has(normalize(g)))) return false;
   }
   if (flt.nacionalidad.length && (!f.nationality || !flt.nacionalidad.includes(f.nationality))) return false;
-  if (flt.desde != null && (f.year == null || f.year < flt.desde)) return false;
-  if (flt.hasta != null && (f.year == null || f.year > flt.hasta)) return false;
+  // un rango escrito al revés (2025 a 2020) se lee igual: de 2020 a 2025
+  const swap = flt.desde != null && flt.hasta != null && flt.desde > flt.hasta;
+  const from = swap ? flt.hasta : flt.desde;
+  const to = swap ? flt.desde : flt.hasta;
+  if (from != null && (f.year == null || f.year < from)) return false;
+  if (to != null && (f.year == null || f.year > to)) return false;
   if (flt.depto.length && !f.locations.some((l) => flt.depto.includes(locDepto(l) ?? -1))) return false;
   if (flt.muni.length && !f.locations.some((l) => l.muni_ine != null && flt.muni.includes(l.muni_ine))) return false;
   if (flt.presupuestoMin != null || flt.presupuestoMax != null) {
@@ -264,9 +258,6 @@ export function filmMatches(f: Film, flt: FilmFilter): boolean {
   }
   if (flt.locacion === "con" && isUnlocated(f)) return false;
   if (flt.locacion === "sin" && !isUnlocated(f)) return false;
-  if (flt.origen === "extranjera" && f.nationality !== "extranjera") return false;
-  if (flt.origen === "nacional" && f.nationality === "extranjera") return false;
-  if (flt.soloCompletas && !(f.locations.length > 0 && f.locations.every((l) => isAbroad(l) || l.muni_ine != null))) return false;
   if (flt.q && !norm(`${f.title} ${f.director ?? ""} ${f.producer ?? ""} ${f.cinematographer ?? ""} ${f.screenwriter ?? ""} ${companyNames(f.companies).join(" ")}`).includes(norm(flt.q))) return false;
   return true;
 }
@@ -322,8 +313,6 @@ export function describeFilmFilter(f: FilmFilter, deptoName: (code: number) => s
   range("Inversión local", f.inversionMin, f.inversionMax);
   range("Empleos", f.empleosMin, f.empleosMax);
   if (f.locacion) out.push(f.locacion === "con" ? "Con locación registrada" : "Sin locación registrada");
-  if (f.origen) out.push(f.origen === "extranjera" ? "Producciones extranjeras" : "Producciones nacionales");
-  if (f.soloCompletas) out.push("Solo con todas las locaciones ubicadas en un municipio");
   if (f.q) out.push(`Búsqueda: “${f.q}”`);
   return out;
 }

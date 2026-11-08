@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronUp } from "lucide-react";
-import { LocacionChip, locacionCounts, OrigenChip, origenCounts, type PanelCtx } from "./parts";
+import { LocacionChip, locacionCounts, type PanelCtx } from "./parts";
 
 /**
  * Hoja inferior del teléfono en su altura mínima: qué se está viendo (con el chip de locación) y un botón para abrir la lista.
@@ -15,10 +15,7 @@ export function MobilePeek({ ctx, onOpen }: { ctx: PanelCtx; onOpen(): void }) {
   return (
     <div className="flex items-center gap-2 px-4 pb-2">
       {film && allFilms.length > 0 ? (
-        <>
-          <LocacionChip value={view.filmFilter.locacion} counts={locacionCounts(allFilms)} onChange={go.locacion} />
-          {origenCounts(allFilms).extranjera > 0 && <OrigenChip value={view.filmFilter.origen} counts={origenCounts(allFilms)} onChange={go.origen} />}
-        </>
+        <LocacionChip value={view.filmFilter.locacion} counts={locacionCounts(allFilms)} onChange={go.locacion} />
       ) : (
         <span className="text-sm text-ink">
           <b className="font-medium tabular-nums">{n}</b> <span className="text-muted">{noun}</span>

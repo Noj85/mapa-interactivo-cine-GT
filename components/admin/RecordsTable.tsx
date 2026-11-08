@@ -9,6 +9,7 @@ import { RequestInfoDialog, type RequestTarget } from "@/components/admin/Reques
 import { CompletenessBadge } from "@/components/ui/Badges";
 import { cn, normalize } from "@/lib/utils";
 import type { RecordStatus, SubmissionKind } from "@/lib/types";
+import { PosterImage } from "@/components/ui/PosterImage";
 
 /** Una fila del listado, ya preparada en el servidor (solo datos simples). */
 export interface RecordRow {
@@ -387,12 +388,11 @@ export function RecordsTable({
                     <td className="px-2 py-2.5">
                       <Link href={`/admin/${isFilm ? "peliculas" : "entidades"}/${r.id}`} className={cn("flex items-center gap-3 hover:text-accent", !on && "text-muted")}>
                         {isFilm ? (
-                          <span className="h-10 w-7 shrink-0 overflow-hidden rounded-[3px] bg-surface-2">
-                            {r.thumb && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={r.thumb} alt="" loading="lazy" className="h-full w-full object-cover" />
-                            )}
-                          </span>
+                          r.thumb ? (
+                            <PosterImage src={r.thumb} heightClass="h-10" maxWidthClass="max-w-[3.5rem]" className="rounded-[3px] bg-surface-2" />
+                          ) : (
+                            <span className="h-10 w-7 shrink-0 rounded-[3px] bg-surface-2" />
+                          )
                         ) : (
                           <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-2 text-accent">
                             {r.thumb ? (

@@ -9,7 +9,7 @@ import { BrandFooter } from "@/components/site/Brand";
 import { hasAnchor, isAbroad } from "@/lib/completeness";
 import type { StatKey } from "@/lib/site-settings";
 import type { Film } from "@/lib/types";
-import { DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid, LocacionChip, locacionCounts, OrigenChip, origenCounts } from "./parts";
+import { DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid, LocacionChip, locacionCounts } from "./parts";
 
 export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
   const { data, gaz, aggs, view, go } = ctx;
@@ -43,7 +43,6 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
   const shown = showAll ? list : list.slice(0, previewN);
 
   const counts = useMemo(() => locacionCounts(ctx.allFilms), [ctx.allFilms]);
-  const origenN = useMemo(() => origenCounts(ctx.allFilms), [ctx.allFilms]);
   const loc = view.filmFilter.locacion;
 
   const heading = (
@@ -110,7 +109,6 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
             {listTitle} <span className="tabular-nums">{list.length}</span>
           </h3>
           <div className="flex items-center gap-1.5">
-            {origenN.extranjera > 0 && <OrigenChip value={view.filmFilter.origen} counts={origenN} onChange={go.origen} />}
             <LocacionChip value={loc} counts={counts} onChange={go.locacion} />
           </div>
         </div>

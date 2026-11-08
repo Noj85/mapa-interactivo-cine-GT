@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Clapperboard, Landmark, MapPin, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { filmTypeLabel } from "@/lib/film-types";
-import { posterThumb } from "@/lib/poster-url";
+import { PosterImage } from "@/components/ui/PosterImage";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import type { Dataset } from "@/lib/types";
 import type { Place } from "@/lib/view";
@@ -22,13 +22,10 @@ type Result =
 /** Icono del resultado; las producciones con póster muestran su miniatura (si no carga, vuelve el icono). */
 function ResultIcon({ result }: { result: Result }) {
   const [failed, setFailed] = useState(false);
-  const poster = result.kind === "film" && !failed ? posterThumb(result.poster) : null;
+  const poster = result.kind === "film" && !failed ? result.poster : null;
   if (poster)
     return (
-      <span className="block h-12 w-8 shrink-0 overflow-hidden rounded-md bg-surface-2 ring-1 ring-line">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={poster} alt="" loading="lazy" className="h-full w-full object-cover" onError={() => setFailed(true)} />
-      </span>
+      <PosterImage src={poster} heightClass="h-12" maxWidthClass="max-w-[4.5rem]" className="rounded-md bg-surface-2 ring-1 ring-line" onBroken={() => setFailed(true)} />
     );
   const Icon = result.kind === "place" ? MapPin : result.kind === "film" ? Clapperboard : Landmark;
   return (

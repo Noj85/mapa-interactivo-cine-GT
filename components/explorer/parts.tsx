@@ -1,6 +1,7 @@
 "use client";
 
 import { categoriesText } from "@/lib/categories";
+import { PosterImage } from "@/components/ui/PosterImage";
 import { posterThumb } from "@/lib/poster-url";
 import { ArrowLeft, Check, ChevronDown, Clapperboard, Download, Landmark, X } from "lucide-react";
 import Link from "next/link";
@@ -41,18 +42,14 @@ export interface PanelCtx {
     clear(): void;
     /** Filtro público de producciones: con o sin locación registrada (null: todas). */
     locacion(v: "con" | "sin" | null): void;
-    /** Filtro público de producciones por origen: nacionales o extranjeras (null: todas). */
-    origen(v: "nacional" | "extranjera" | null): void;
   };
 }
 
 type Locacion = "con" | "sin" | null;
-type Origen = "nacional" | "extranjera" | null;
 
 const LOCACION_LABEL: Record<"con" | "sin" | "todas", string> = { con: "Con locación", sin: "Sin locación", todas: "Todas" };
-const ORIGEN_LABEL: Record<"todas" | "nacional" | "extranjera", string> = { todas: "Todas", nacional: "Nacionales", extranjera: "Extranjeras" };
 
-/** Chip compacto con menú de una sola elección. Lo usan los filtros públicos de locación y de origen. */
+/** Chip compacto con menú de una sola elección. Lo usa el filtro público de locación. */
 function MenuChip({
   value,
   defaultId,
@@ -191,41 +188,6 @@ export function LocacionChip({
       onChange={(id) => onChange(id === "todas" ? null : (id as "con" | "sin"))}
     />
   );
-}
-
-/**
- * Chip de origen: todas, nacionales (guatemaltecas y coproducciones) o extranjeras sobre Guatemala.
- * Solo aparece cuando hay producciones extranjeras registradas.
- */
-export function OrigenChip({
-  value,
-  counts,
-  onChange,
-  className,
-}: {
-  value: Origen;
-  counts: { todas: number; nacional: number; extranjera: number };
-  onChange(v: Origen): void;
-  className?: string;
-}) {
-  const ids = ["todas", "nacional", "extranjera"] as const;
-  return (
-    <MenuChip
-      value={value ?? "todas"}
-      defaultId="todas"
-      prefix="Origen:"
-      ariaLabel="Origen de las producciones"
-      className={className}
-      options={ids.map((o) => ({ id: o, label: ORIGEN_LABEL[o], count: counts[o] }))}
-      onChange={(id) => onChange(id === "todas" ? null : (id as "nacional" | "extranjera"))}
-    />
-  );
-}
-
-/** Conteos para el chip de origen, sobre todas las producciones publicadas (sin filtrar). */
-export function origenCounts(films: Pick<Film, "nationality">[]) {
-  const extranjera = films.filter((f) => f.nationality === "extranjera").length;
-  return { todas: films.length, nacional: films.length - extranjera, extranjera };
 }
 
 /** Conteos para el chip de locación, sobre todas las producciones publicadas (sin filtrar). */
@@ -385,10 +347,7 @@ export function FilmCard({
       className="group flex min-h-[48px] w-full items-start gap-3 rounded-2xl border border-transparent px-3 py-2.5 text-left transition hover:border-line hover:bg-surface-2/70"
     >
       {film.poster_url ? (
-        <span className="mt-0.5 block h-14 w-10 shrink-0 overflow-hidden rounded-md bg-surface-2 ring-1 ring-line">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={posterThumb(film.poster_url)!} alt="" loading="lazy" className="h-full w-full object-cover" />
-        </span>
+        <PosterImage src={film.poster_url} heightClass="h-14" maxWidthClass="max-w-[5.5rem]" className="mt-0.5 rounded-md bg-surface-2 ring-1 ring-line" />
       ) : (
         <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/12 text-accent">
           <Clapperboard className="h-4 w-4" />
