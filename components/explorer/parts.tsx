@@ -31,6 +31,7 @@ export interface PanelCtx {
   sheet?: "peek" | "half" | "full";
   go: {
     place(p: Place | null): void;
+    deptos(codes: number[]): void;
     film(slug: string): void;
     org(slug: string): void;
     unlocated(): void;

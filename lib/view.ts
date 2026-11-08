@@ -23,6 +23,8 @@ export interface ViewState {
   layer: LayerId;
   metric: MetricId;
   place: Place | null;
+  /** varios departamentos a la vez (desplegable con casillas); solo con 2 o más — con uno se usa `place` */
+  deptos: number[];
   /** slug de producción seleccionada */
   film: string | null;
   /** slug de organización seleccionada */
@@ -44,6 +46,7 @@ export const DEFAULT_VIEW: ViewState = {
   layer: "produccion",
   metric: "films",
   place: null,
+  deptos: [],
   film: null,
   org: null,
   filmFilter: DEFAULT_FILM_FILTER,
@@ -64,6 +67,10 @@ export function parseView(search: string): ViewState {
   if (lugar && /^[dm]\d+$/.test(lugar)) {
     place = { type: lugar[0] === "d" ? "depto" : "muni", code: Number(lugar.slice(1)) };
   }
+  // ?deptos=1,7,9: varios departamentos; el lugar (?lugar=) manda si vienen los dos
+  const deptos = place
+    ? []
+    : [...new Set((p.get("deptos") ?? "").split(",").map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 22))].sort((a, b) => a - b);
   // Los filtros usan los mismos parámetros que /descargas; el lugar y la capa los fijan `lugar` y `capa`.
   // locación: sin parámetro es «con» (lo que sale por defecto); `sin` y `todas` se piden; ?sinlugar=1 (enlaces anteriores) abre «sin»
   const locParam = p.get("locacion");
@@ -78,15 +85,16 @@ export function parseView(search: string): ViewState {
   } else {
     orgFilter = { ...parseOrgFilter(p), capa: null, depto: [] };
   }
-  const noloc = layer === "produccion" && p.get("sinlugar") === "1" && !place && !p.get("pelicula") && !p.get("entidad");
-  const abroad = layer === "produccion" && p.get("fuera") === "1" && !place && !noloc && !p.get("pelicula") && !p.get("entidad");
-  return { layer, metric, place, film: p.get("pelicula"), org: p.get("entidad"), filmFilter, orgFilter, noloc, abroad };
+  const noloc = layer === "produccion" && p.get("sinlugar") === "1" && !place && deptos.length < 2 && !p.get("pelicula") && !p.get("entidad");
+  const abroad = layer === "produccion" && p.get("fuera") === "1" && !place && deptos.length < 2 && !noloc && !p.get("pelicula") && !p.get("entidad");
+  return { layer, metric, place, deptos: deptos.length >= 2 ? deptos : [], film: p.get("pelicula"), org: p.get("entidad"), filmFilter, orgFilter, noloc, abroad };
 }
 
 export function serializeView(v: ViewState): string {
   const p = new URLSearchParams();
   if (v.layer !== "produccion") p.set("capa", v.layer);
   if (v.place) p.set("lugar", (v.place.type === "depto" ? "d" : "m") + v.place.code);
+  if (!v.place && v.deptos.length >= 2) p.set("deptos", v.deptos.join(","));
   if (v.film) p.set("pelicula", v.film);
   if (v.org) p.set("entidad", v.org);
   if (v.metric !== LAYER_METRICS[v.layer][0]) p.set("metrica", v.metric);
@@ -103,7 +111,7 @@ export function serializeView(v: ViewState): string {
 }
 
 /** Enlace a /descargas con lo que se está viendo en el mapa ya filtrado. */
-export function downloadHref(v: Pick<ViewState, "layer" | "place" | "filmFilter" | "orgFilter">): string {
+export function downloadHref(v: Pick<ViewState, "layer" | "place" | "filmFilter" | "orgFilter"> & { deptos?: number[] }): string {
   const p = new URLSearchParams();
   p.set("tipo", v.layer === "produccion" ? "producciones" : v.layer === "circulacion" ? "circulacion" : "entidades");
   if (v.layer === "produccion") filmFilterToParams({ ...v.filmFilter, depto: [], muni: [] }, p);
@@ -112,7 +120,7 @@ export function downloadHref(v: Pick<ViewState, "layer" | "place" | "filmFilter"
     const depto = v.place.type === "depto" ? v.place.code : Math.floor(v.place.code / 100);
     p.set("depto", String(depto));
     if (v.place.type === "muni" && v.layer === "produccion") p.set("muni", String(v.place.code));
-  }
+  } else if (v.deptos && v.deptos.length >= 2) p.set("depto", v.deptos.join(","));
   return `/descargas?${p.toString()}`;
 }
 
@@ -120,6 +128,13 @@ export function downloadHref(v: Pick<ViewState, "layer" | "place" | "filmFilter"
 export function deptoOf(place: Place | null | undefined): number | null {
   if (!place) return null;
   return place.type === "depto" ? place.code : Math.floor(place.code / 100);
+}
+
+/** Departamentos que el desplegable tiene marcados: la lista múltiple o el del lugar elegido. */
+export function selectedDeptos(v: Pick<ViewState, "place" | "deptos">): number[] {
+  if (v.deptos.length) return v.deptos;
+  const d = deptoOf(v.place);
+  return d == null ? [] : [d];
 }
 
 /** Cuántos filtros de la capa activa están en uso (para el botón «Filtros»). */

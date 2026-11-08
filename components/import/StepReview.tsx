@@ -117,7 +117,7 @@ export function StepReview({
     return out;
   }, [preview]);
   const activeLayer = layers.includes(layer) ? layer : (layers[0] ?? "produccion");
-  const view: ViewState = { layer: activeLayer, metric: activeLayer === "produccion" ? "films" : "orgs", place: null, film: null, org: null, filmFilter: EMPTY_FILM_FILTER, orgFilter: EMPTY_ORG_FILTER, noloc: false, abroad: false };
+  const view: ViewState = { layer: activeLayer, metric: activeLayer === "produccion" ? "films" : "orgs", place: null, deptos: [], film: null, org: null, filmFilter: EMPTY_FILM_FILTER, orgFilter: EMPTY_ORG_FILTER, noloc: false, abroad: false };
   const theme = typeof document !== "undefined" && document.documentElement.dataset.theme === "light" ? "light" : "dark";
 
   const placeLabel = (c: Candidate, idx: number) => {

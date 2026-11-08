@@ -13,7 +13,7 @@ import { abroadFilms, ABROAD_BBOX, buildAbroad, buildFilmRoute, buildLabels, bui
 import { loadZoneIcons } from "@/lib/map/zone-icons";
 import { buildStyle, firstSymbolId } from "@/lib/map/style";
 import type { Dataset } from "@/lib/types";
-import { deptoOf, type Place, type ViewState } from "@/lib/view";
+import { deptoOf, selectedDeptos, type Place, type ViewState } from "@/lib/view";
 
 /** A partir de este zoom el territorio activo pasa de departamentos a municipios. */
 export const Z_MUNI = 7.8;
@@ -59,7 +59,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
   const ready = useRef(false);
   const scopeRef = useRef<"depto" | "muni">("depto");
   const themeApplied = useRef<Theme | null>(null);
-  const prevSel = useRef<{ source: string; id: number } | null>(null);
+  const prevSel = useRef<{ source: string; id: number }[]>([]);
   const prevHot = useRef<{ source: string; id: number }[]>([]);
   const prevHover = useRef<{ source: string; id: number } | null>(null);
   const logoMarker = useRef<MapLibre.Marker | null>(null);
@@ -574,11 +574,11 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
 
     // zona «Sin locación»: solo en Producción, sin filtro de departamento y sin entidad abierta
     const selFilm = view.film ? data.films.find((f) => f.slug === view.film) : undefined;
-    const showZone = view.layer === "produccion" && !view.place && !view.org && (!view.film || (!!selFilm && isUnlocated(selFilm)));
+    const showZone = view.layer === "produccion" && !view.place && !view.deptos.length && !view.org && (!view.film || (!!selFilm && isUnlocated(selFilm)));
     const unlocatedCount = showZone ? (view.film ? 1 : unlocatedFilms(data.films).length) : 0;
     const zoneTotal = showZone ? unlocatedFilms(data.films).length : 0;
     // zona «Fuera de Guatemala»: las producciones con alguna locación en otro país
-    const showAbroad = view.layer === "produccion" && !view.place && !view.org && (!view.film || (!!selFilm && hasAbroad(selFilm)));
+    const showAbroad = view.layer === "produccion" && !view.place && !view.deptos.length && !view.org && (!view.film || (!!selFilm && hasAbroad(selFilm)));
     const abroadTotal = showAbroad ? abroadFilms(data.films).length : 0;
     const zones = [buildNowhere(zoneTotal, view.noloc || (!!view.film && unlocatedCount > 0)), buildAbroad(abroadTotal, view.abroad || (!!view.film && abroadTotal > 0))];
     (map.getSource("nowhere") as MapLibre.GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: zones.flatMap((z) => z.features) } as any);
@@ -657,19 +657,17 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
     const map = mapRef.current;
     if (!map || !ready.current || !map.getSource("depto")) return;
     const { view } = propsRef.current;
-    if (prevSel.current) map.setFeatureState(prevSel.current, { sel: false });
-    prevSel.current = null;
-    if (view.place) {
-      const s = { source: view.place.type, id: view.place.code };
-      map.setFeatureState(s, { sel: true });
-      prevSel.current = s;
-    }
+    for (const s of prevSel.current) map.setFeatureState(s, { sel: false });
+    prevSel.current = [];
+    if (view.place) prevSel.current.push({ source: view.place.type, id: view.place.code });
+    else for (const d of view.deptos) prevSel.current.push({ source: "depto", id: d });
+    for (const s of prevSel.current) map.setFeatureState(s, { sel: true });
     // el resto de los departamentos se atenúa
-    const dept = deptoOf(view.place);
+    const chosen = selectedDeptos(view);
     const geo = propsRef.current.geo;
     (map.getSource("dim") as MapLibre.GeoJSONSource | undefined)?.setData({
       type: "FeatureCollection",
-      features: dept == null ? [] : geo.depto.features.filter((f) => f.properties?.depto_ine !== dept),
+      features: !chosen.length ? [] : geo.depto.features.filter((f) => !chosen.includes(f.properties?.depto_ine as number)),
     } as any);
   }, []);
 
@@ -892,11 +890,11 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
   // datos y vista
   useEffect(() => {
     applyData();
-  }, [props.data, props.view.layer, props.view.metric, props.view.film, props.view.org, props.view.place, props.view.noloc, props.view.abroad, props.geo, applyData]);
+  }, [props.data, props.view.layer, props.view.metric, props.view.film, props.view.org, props.view.place, props.view.deptos, props.view.noloc, props.view.abroad, props.geo, applyData]);
 
   useEffect(() => {
     applySelection();
-  }, [props.view.place, applySelection]);
+  }, [props.view.place, props.view.deptos, applySelection]);
 
   // satélite
   useEffect(() => {
@@ -909,7 +907,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
   const { view, padding, geo, data } = props;
   const zoneOn = view.layer === "produccion" && data.films.some(isUnlocated);
   const abroadOn = view.layer === "produccion" && data.films.some(hasAbroad);
-  const camKey = `${view.place?.type}${view.place?.code}|${view.film}|${view.org}|${view.noloc}|${view.abroad}|${zoneOn}|${abroadOn}`;
+  const camKey = `${view.place?.type}${view.place?.code}|${view.deptos.join(",")}|${view.film}|${view.org}|${view.noloc}|${view.abroad}|${zoneOn}|${abroadOn}`;
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -951,6 +949,17 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
         const org = data.orgs.find((o) => o.slug === view.org);
         const p = org && locationPoint(org, geo.gaz);
         if (p) map.flyTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), 12), padding: pad, duration: 1000 });
+      } else if (!view.place && view.deptos.length) {
+        // varios departamentos: se encuadran juntos
+        const b = new (getMaplibre().LngLatBounds)();
+        for (const d of view.deptos) {
+          const e = geo.gaz.depto(d);
+          if (e) {
+            b.extend([e.bbox[0], e.bbox[1]]);
+            b.extend([e.bbox[2], e.bbox[3]]);
+          }
+        }
+        if (!b.isEmpty()) map.fitBounds(b, { padding: pad, maxZoom: 9.2, duration: 1000 });
       } else if (view.place) {
         const e = view.place.type === "muni" ? geo.gaz.muni(view.place.code) : geo.gaz.depto(view.place.code);
         if (!e) return;
