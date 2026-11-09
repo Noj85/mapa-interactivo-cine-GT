@@ -27,6 +27,7 @@ import {
   normalizeWeb,
   parseCoord,
   parseNumber,
+  parseWhole,
   parseYear,
   parseDuration,
 } from "./normalize";
@@ -57,6 +58,8 @@ export interface LocItem {
   days: number | null;
   spend: number | null;
   jobs: number | null;
+  /** Días o empleos con decimales, ya redondeados: el aviso va a la revisión. */
+  rounds: { field: string; message: string }[];
 }
 
 const LOC_LISTS = ["place", "muni", "depto", "site", "lat", "lng", "days", "local_spend", "jobs"] as const;
@@ -90,13 +93,19 @@ export function locationItems(row: Row, plan: SheetPlan, group = 1, gaz?: Gazett
       const siteOf = queryBase === site ? base : aligned.at("site", i);
       q = { query, site: siteOf };
     }
+    const days = parseWhole(aligned.at("days", i) ?? "");
+    const jobs = parseWhole(aligned.at("jobs", i) ?? "");
     items.push({
       q,
       lat: aligned.at("lat", i) ?? "",
       lng: aligned.at("lng", i) ?? "",
-      days: parseNumber(aligned.at("days", i) ?? ""),
+      days: days.value,
       spend: parseNumber(aligned.at("local_spend", i) ?? ""),
-      jobs: parseNumber(aligned.at("jobs", i) ?? ""),
+      jobs: jobs.value,
+      rounds: [
+        days.from != null ? { field: "days", message: `Días de rodaje con decimales (${days.from}): se guardará como ${days.value}.` } : null,
+        jobs.from != null ? { field: "jobs", message: `Empleos con decimales (${jobs.from}): se guardará como ${jobs.value}.` } : null,
+      ].filter((x): x is { field: string; message: string } => !!x),
     });
   }
   return { items, mismatched: aligned.mismatched.filter((k) => k !== "__q") };
@@ -373,6 +382,7 @@ function filmCandidates(sheet: ParsedSheet, plan: SheetPlan, places: Record<stri
         if (q) cand!.placeTexts.push(q.query);
         cand!.film!.locations.push(loc);
         if (issue) cand!.issues.push({ ...issue, field: `location:${cand!.film!.locations.length - 1}` });
+        for (const note of it?.rounds ?? []) warn(note.field, note.message);
       });
     }
 

@@ -1,10 +1,12 @@
 import { formatContact, parseContact } from "@/lib/contact";
+import { parseLooseNumber } from "@/lib/numbers";
 import { z } from "zod";
 import { MAX_CATEGORIES, normalizeCategories } from "@/lib/categories";
 import { isOwnImageUrl } from "@/lib/poster-url";
 import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
 import { cleanGenres, FORMATS, NATURES } from "@/lib/film-types";
 import { cleanCrew, cleanLanguages } from "@/lib/crew";
+import { cleanCredits, cleanPersonRoles, MAX_BIO, MAX_PERSON_ROLES } from "@/lib/people";
 import { upperTitle } from "@/lib/utils";
 
 const FORMAT_VALUES = FORMATS.map((f) => f.id) as [string, ...string[]];
@@ -56,11 +58,7 @@ const videoUrl = z
 const optNum = z
   .union([z.number(), z.string()])
   .nullish()
-  .transform((v) => {
-    if (v === null || v === undefined || v === "") return null;
-    const n = typeof v === "number" ? v : Number(String(v).replace(/[^0-9.\-]/g, ""));
-    return Number.isFinite(n) ? n : null;
-  });
+  .transform((v) => parseLooseNumber(v));
 
 /** Contacto de una entidad: teléfono y/o correo, guardado en formato estándar. Cualquier otra cosa se rechaza. */
 function contactField(strip = false) {
@@ -189,6 +187,45 @@ export const orgSchema = z.object({
   source: optStr,
 }).transform(withCategories);
 
+const personCreditSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  year: optNum,
+  role: optStr,
+});
+
+const personFields = {
+  id: z.string().optional(),
+  name: z.string().trim().min(1, "El nombre es obligatorio").max(300),
+  roles: z.array(z.string().max(80)).max(MAX_PERSON_ROLES * 2).optional().transform((list) => cleanPersonRoles(list ?? [])),
+  other_role: optStr,
+  depto_ine: optNum,
+  muni_ine: optNum,
+  languages: languagesSchema.optional(),
+  bio: z.string().trim().max(MAX_BIO * 2).nullish().transform((v) => {
+    const t = (v ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_BIO);
+    return t || null;
+  }),
+  web: optStr,
+  instagram: optStr,
+  imdb: optStr,
+  portfolio: optStr,
+  public_email: optStr,
+  public_phone: optStr,
+  photo_url: optStr,
+  credits: z.array(personCreditSchema).max(20).optional().transform((list) => cleanCredits(list ?? [])),
+  status: z.enum(["draft", "published"]).default("draft"),
+  source: optStr,
+};
+
+function withPersonRole(p: { roles?: string[]; other_role?: string | null }, ctx: z.RefinementCtx) {
+  if (!(p.roles?.length) && !p.other_role?.trim()) {
+    ctx.addIssue({ code: "custom", message: "Elige al menos un oficio.", path: ["roles"] });
+  }
+}
+
+/** Alta o edición de una persona en el admin. */
+export const personSchema = z.object(personFields).superRefine(withPersonRole);
+
 // ───────────────────────── aportes del público ─────────────────────────
 
 const clean = (v: string) =>
@@ -311,9 +348,51 @@ export const publicOrgSchema = z.object({
   logo_url: pubImage,
 }).transform(withCategories);
 
+/** Registro de una persona desde el formulario público. El consentimiento no se guarda: sin él no se acepta el aporte. */
+export const publicPersonSchema = z
+  .object({
+    name: z.string().trim().min(1, "El nombre es obligatorio").max(300).transform(clean),
+    roles: z.array(z.string().max(80)).max(MAX_PERSON_ROLES * 2).default([]).transform((list) => cleanPersonRoles(list)),
+    other_role: pubStr(120),
+    depto_ine: optNum,
+    muni_ine: optNum,
+    languages: languagesSchema.optional(),
+    bio: pubStr(MAX_BIO),
+    web: pubUrl,
+    instagram: pubStr(100),
+    imdb: pubUrl,
+    portfolio: pubUrl,
+    public_email: z
+      .string()
+      .max(200)
+      .nullish()
+      .transform((v) => {
+        const t = (v ?? "").trim().toLowerCase();
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t) ? t : null;
+      }),
+    public_phone: pubStr(40),
+    photo_url: pubImage,
+    credits: z
+      .array(
+        z.object({
+          title: z.string().max(400).transform((v) => clean(v).trim().slice(0, 200)),
+          year: optNum,
+          role: pubStr(120),
+        }),
+      )
+      .max(12)
+      .optional()
+      .transform((list) => cleanCredits((list ?? []).filter((c) => c.title))),
+    consent: z.literal(true, { error: "Autoriza la publicación para continuar." }),
+  })
+  .superRefine((p, ctx) => {
+    if (!p.roles.length && !p.other_role) ctx.addIssue({ code: "custom", message: "Elige al menos un oficio.", path: ["roles"] });
+  });
+
 export const submissionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("film"), data: publicFilmSchema }),
   z.object({ kind: z.literal("org"), data: publicOrgSchema }),
+  z.object({ kind: z.literal("person"), data: publicPersonSchema }),
 ]);
 
 export const submissionMetaSchema = z.object({

@@ -1,21 +1,24 @@
 "use client";
 
-import { CheckCircle2, Clapperboard, Landmark, Loader2, Send } from "lucide-react";
+import { CheckCircle2, Clapperboard, Landmark, Loader2, Send, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { submitCollectedAction } from "@/app/completar/actions";
-import { filmDraft, filmPayload, orgContactErrors, orgDraft, orgPayload, type FilmDraft, type OrgDraft, type OrgLayerId } from "@/components/records/drafts";
+import { filmDraft, filmPayload, orgContactErrors, orgDraft, orgPayload, personDraft, personEmailError, personPayload, type FilmDraft, type OrgDraft, type OrgLayerId, type PersonDraft } from "@/components/records/drafts";
 import { FestivalsEditor } from "@/components/records/FestivalsEditor";
 import { FilmFields } from "@/components/records/FilmFields";
 import { ImageField } from "@/components/records/ImageField";
 import { LocationsEditor } from "@/components/records/LocationsEditor";
 import { OrgFields } from "@/components/records/OrgFields";
+import { PersonFields } from "@/components/records/PersonFields";
 import { CompletenessMeter } from "@/components/ui/Badges";
-import { filmCompleteness, orgCompleteness } from "@/lib/completeness";
+import { filmCompleteness, orgCompleteness, personCompleteness } from "@/lib/completeness";
 import type { Film, Org } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type Kind = "film" | "org";
+type Kind = "film" | "org" | "person";
+
+const PERSON_NOTE = "Registro directo en el directorio de la Academia.";
 
 /**
  * Formulario público para sugerir un registro nuevo o corregir uno existente.
@@ -27,6 +30,7 @@ export function ContributeForm({
   org,
   initialKind,
   defaultLayer,
+  defaultCategories,
   collect,
   onBack,
   onSent,
@@ -37,6 +41,8 @@ export function ContributeForm({
   initialKind?: Kind;
   /** Capa de entidades con la que arranca el formulario (la que se veía en el mapa). */
   defaultLayer?: OrgLayerId;
+  /** Categorías ya marcadas al abrir (el enlace de empresas marca Productoras). */
+  defaultCategories?: string[];
   /** Enlace privado de una solicitud de información: el aporte llega como «recopilación». */
   collect?: { token: string; password: string; targetId?: string | null };
   /** Solo en un enlace con varias producciones: volver a la lista. */
@@ -53,9 +59,16 @@ export function ContributeForm({
   const [error, setError] = useState<string | null>(null);
 
   const [f, setF] = useState<FilmDraft>(() => filmDraft(film));
-  const [o, setO] = useState<OrgDraft>(() => orgDraft(org, defaultLayer));
+  const [o, setO] = useState<OrgDraft>(() => {
+    const d = orgDraft(org, defaultLayer);
+    if (!org && defaultCategories?.length) d.categories = defaultCategories;
+    return d;
+  });
+  const [p, setP] = useState<PersonDraft>(() => personDraft());
+  const [consent, setConsent] = useState(false);
   const setFilm = (patch: Partial<FilmDraft>) => setF((x) => ({ ...x, ...patch }));
   const setOrg = (patch: Partial<OrgDraft>) => setO((x) => ({ ...x, ...patch }));
+  const setPerson = (patch: Partial<PersonDraft>) => setP((x) => ({ ...x, ...patch }));
 
   // ---- comunes
   const [note, setNote] = useState("");
@@ -65,54 +78,88 @@ export function ContributeForm({
 
   const filmData = useMemo(() => filmPayload(f), [f]);
   const orgData = useMemo(() => orgPayload(o), [o]);
+  const personData = useMemo(() => personPayload(p), [p]);
 
-  const comp = useMemo(
-    () =>
-      kind === "film"
-        ? filmCompleteness({
-            title: f.title,
-            year: filmData.year,
-            format: filmData.format,
-            nature: filmData.nature,
-            genres: filmData.genres,
-            director: filmData.director,
-            producer: filmData.producer,
-            nationality: filmData.nationality,
-            budget: filmData.budget,
-            currency: f.currency,
-            synopsis: filmData.synopsis,
-            companies: filmData.companies,
-            locations: filmData.locations as never,
-          })
-        : orgCompleteness({
-            name: o.name,
-            category: o.categories[0] ?? "",
-            initiative_type: orgData.initiative_type,
-            depto_ine: o.depto_ine,
-            muni_ine: o.muni_ine,
-            lat: o.lat,
-            lng: o.lng,
-            web: orgData.web,
-            instagram: orgData.instagram,
-            contact: orgData.contact,
-            description: orgData.description,
-          }),
-    [kind, f.title, f.currency, filmData, o.name, o.categories, o.depto_ine, o.muni_ine, o.lat, o.lng, orgData],
-  );
+  const comp = useMemo(() => {
+    if (kind === "film") {
+      return filmCompleteness({
+        title: f.title,
+        year: filmData.year,
+        format: filmData.format,
+        nature: filmData.nature,
+        genres: filmData.genres,
+        director: filmData.director,
+        producer: filmData.producer,
+        nationality: filmData.nationality,
+        budget: filmData.budget,
+        currency: f.currency,
+        synopsis: filmData.synopsis,
+        companies: filmData.companies,
+        locations: filmData.locations as never,
+      });
+    }
+    if (kind === "person") {
+      return personCompleteness({
+        name: p.name,
+        roles: personData.roles,
+        other_role: personData.other_role,
+        depto_ine: p.depto_ine,
+        muni_ine: p.muni_ine,
+        languages: personData.languages,
+        bio: personData.bio,
+        web: personData.web,
+        instagram: personData.instagram,
+        public_email: personData.public_email,
+        public_phone: personData.public_phone,
+        credits: personData.credits,
+      });
+    }
+    return orgCompleteness({
+      name: o.name,
+      category: o.categories[0] ?? "",
+      initiative_type: orgData.initiative_type,
+      depto_ine: o.depto_ine,
+      muni_ine: o.muni_ine,
+      lat: o.lat,
+      lng: o.lng,
+      web: orgData.web,
+      instagram: orgData.instagram,
+      contact: orgData.contact,
+      description: orgData.description,
+    });
+  }, [kind, f.title, f.currency, filmData, o.name, o.categories, o.depto_ine, o.muni_ine, o.lat, o.lng, orgData, p.name, p.depto_ine, p.muni_ine, personData]);
 
   // con enlace de recopilación la fuente es el propio equipo; la nota es opcional
-  const sourceOk = collect ? true : note.trim().length >= 8;
+  const personMail = kind === "person" ? personEmailError(p) : null;
+  const sourceOk = collect || kind === "person" ? true : note.trim().length >= 8;
   const submitterOk = !collect || submitter.trim().length >= 3;
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const contactOk = kind === "film" || orgContactErrors(o).ok;
-  const recordOk = kind === "film" ? f.title.trim().length > 0 : o.name.trim().length > 0 && o.categories.length > 0;
+  const contactOk = kind !== "org" || orgContactErrors(o).ok;
+  const recordOk =
+    kind === "film"
+      ? f.title.trim().length > 0
+      : kind === "person"
+        ? p.name.trim().length > 0 && ((personData.roles?.length ?? 0) > 0 || !!personData.other_role) && consent && !personMail
+        : o.name.trim().length > 0 && o.categories.length > 0;
   const ready = recordOk && contactOk && sourceOk && emailOk && submitterOk;
   const missingNow = [
-    !recordOk ? (kind === "film" ? "el título" : "el nombre y al menos una categoría") : null,
+    !recordOk
+      ? kind === "film"
+        ? "el título"
+        : kind === "person"
+          ? !p.name.trim()
+            ? "el nombre"
+            : !consent
+              ? "la autorización para publicar"
+              : personMail
+                ? "un correo público válido"
+                : "al menos un oficio"
+          : "el nombre y al menos una categoría"
+      : null,
     !contactOk ? "corregir el teléfono o correo de la entidad" : null,
     !sourceOk ? "la fuente" : null,
     !submitterOk ? "tu nombre y rol" : null,
-    !emailOk ? "tu correo" : null,
+    !emailOk ? (kind === "person" ? "tu correo de verificación" : "tu correo") : null,
   ].filter(Boolean);
 
   const send = async () => {
@@ -127,7 +174,9 @@ export function ContributeForm({
               locations: filmData.locations.map(({ id: _id, ...l }) => l),
               festivals: filmData.festivals.map(({ id: _fid, ...x }) => x),
             }
-          : orgData;
+          : kind === "person"
+            ? { ...personData, consent: true as const }
+            : orgData;
       if (collect) {
         const r = await submitCollectedAction({
           token: collect.token,
@@ -151,7 +200,7 @@ export function ContributeForm({
           kind,
           data,
           target_id: film?.id ?? org?.id ?? null,
-          note: note.trim(),
+          note: kind === "person" && note.trim().length < 8 ? (note.trim() ? `${PERSON_NOTE} ${note.trim()}` : PERSON_NOTE) : note.trim(),
           contact: email.trim(),
           website_url_hp: trap,
           opened_at: opened.current,
@@ -175,7 +224,9 @@ export function ContributeForm({
         <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-muted">
           {collect
             ? <>Recibimos la información. El equipo de PROCINE y la Academia la revisará antes de publicarla. Si necesitamos aclarar algo, te escribiremos a <b>{email.trim()}</b>.</>
-            : <>Tu aporte quedó pendiente. El equipo de la Academia lo verificará antes de que aparezca en el mapa; la revisión y aprobación puede tomar hasta tres días hábiles. Si necesitamos aclarar algo, te escribiremos a <b>{email.trim()}</b>.</>}
+            : kind === "person"
+              ? <>Tu registro quedó pendiente. El equipo de la Academia lo verificará antes de publicarlo en el directorio; la revisión puede tomar hasta tres días hábiles. Si necesitamos aclarar algo, te escribiremos a <b>{email.trim()}</b>. Ese correo no se publica.</>
+              : <>Tu aporte quedó pendiente. El equipo de la Academia lo verificará antes de que aparezca en el mapa; la revisión y aprobación puede tomar hasta tres días hábiles. Si necesitamos aclarar algo, te escribiremos a <b>{email.trim()}</b>.</>}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           {collect ? (
@@ -201,6 +252,7 @@ export function ContributeForm({
           {([
             ["film", "Una producción", Clapperboard],
             ["org", "Una entidad", Landmark],
+            ["person", "Una persona", UserRound],
           ] as const).map(([id, label, Icon]) => (
             <button
               key={id}
@@ -240,6 +292,8 @@ export function ContributeForm({
               <LocationsEditor locs={f.locs} onChange={(locs) => setFilm({ locs })} />
               <FestivalsEditor fests={f.fests} onChange={(fests) => setFilm({ fests })} />
             </>
+          ) : kind === "person" ? (
+            <PersonFields draft={p} onChange={setPerson} />
           ) : (
             <OrgFields draft={o} onChange={setOrg} />
           )}
@@ -249,6 +303,8 @@ export function ContributeForm({
           <div className="rounded-2xl border border-line bg-surface p-4">
             {kind === "film" ? (
               <ImageField key="poster" kind="poster" audience="public" value={f.poster} onChange={(poster) => setFilm({ poster })} />
+            ) : kind === "person" ? (
+              <ImageField key="photo" kind="poster" audience="public" value={p.photo} onChange={(photo) => setPerson({ photo })} />
             ) : (
               <ImageField key="logo" kind="logo" audience="public" value={o.logo} onChange={(logo) => setOrg({ logo })} />
             )}
@@ -279,13 +335,13 @@ export function ContributeForm({
               </>
             ) : (
               <>
-                <label className="label" htmlFor="c-note">Fuente de la información *</label>
+                <label className="label" htmlFor="c-note">{kind === "person" ? "Algo que ayude a verificarte (opcional)" : "Fuente de la información *"}</label>
                 <textarea
                   id="c-note"
                   className="field min-h-20"
-                  required
-                  aria-required
-                  placeholder="Un enlace, el catálogo donde la viste, o cómo lo sabes. El equipo la usa para verificar el dato."
+                  required={kind !== "person"}
+                  aria-required={kind !== "person"}
+                  placeholder={kind === "person" ? "Un enlace a tu trabajo, un crédito o cómo contactarte. Opcional." : "Un enlace, el catálogo donde la viste, o cómo lo sabes. El equipo la usa para verificar el dato."}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   maxLength={1500}
@@ -294,8 +350,8 @@ export function ContributeForm({
             )}
           </div>
           <div>
-            <label className="label" htmlFor="c-mail">Tu correo *</label>
-            <input id="c-mail" type="email" required aria-required autoComplete="email" className="field" placeholder="Para que el equipo te escriba si tiene dudas; no se publica." value={email} onChange={(e) => setEmail(e.target.value)} />
+            <label className="label" htmlFor="c-mail">{kind === "person" ? "Correo para verificar *" : "Tu correo *"}</label>
+            <input id="c-mail" type="email" required aria-required autoComplete="email" className="field" placeholder={kind === "person" ? "Solo para que el equipo te escriba. No se publica." : "Para que el equipo te escriba si tiene dudas; no se publica."} value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
         </div>
         {/* campo trampa contra robots: las personas no lo ven */}
@@ -305,10 +361,16 @@ export function ContributeForm({
             <input tabIndex={-1} autoComplete="off" value={trap} onChange={(e) => setTrap(e.target.value)} />
           </label>
         </div>
+        {kind === "person" && (
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <span>Autorizo que estos datos se publiquen en el Directorio de la Academia.</span>
+          </label>
+        )}
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
         <div className="flex flex-wrap items-center gap-3">
           <button className="btn-primary" disabled={!ready || status === "sending"} onClick={send}>
-            {status === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar aporte
+            {status === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} {kind === "person" ? "Enviar mi registro" : "Enviar aporte"}
           </button>
           <span className="text-xs text-muted">
             {missingNow.length ? `Falta ${missingNow.join(", ")}.` : "El equipo lo revisa antes de publicarlo."}

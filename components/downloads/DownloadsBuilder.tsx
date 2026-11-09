@@ -1,13 +1,14 @@
 "use client";
 
 import { categoriesText } from "@/lib/categories";
-import { Check, Clapperboard, Copy, Download, FileSpreadsheet, FileText, Landmark, Presentation, X } from "lucide-react";
+import { Check, Clapperboard, Copy, Download, FileSpreadsheet, FileText, Landmark, Presentation, UserRound, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { MultiSelect } from "@/components/ui/MultiSelect";
 import { YearRange } from "@/components/ui/YearRange";
 import {
   EMPTY_FILM_FILTER,
   EMPTY_ORG_FILTER,
+  EMPTY_PERSON_FILTER,
   ORG_CATEGORIES,
   describeFilmFilter,
   describeOrgFilter,
@@ -15,9 +16,13 @@ import {
   filmFilterToParams,
   filterFilms,
   filterOrgs,
+  filterPeople,
   locationsMatching,
   orgFilterActive,
   orgFilterToParams,
+  parsePersonFilter,
+  personFilterActive,
+  personFilterToParams,
   parseFilmFilter,
   kindLayer,
   parseExportRequest,
@@ -27,15 +32,18 @@ import {
   type ExportRows,
   type FilmFilter,
   type OrgFilter,
+  type PersonFilter,
 } from "@/lib/filters";
-import { languageOptions } from "@/lib/crew";
+import { CREW_ROLES, languageOptions, OTHER_ROLE } from "@/lib/crew";
+import { personRoleLabels } from "@/lib/people";
 import { customGenres, filmTypeLabel, FORMATS, genreOptions, NATURES } from "@/lib/film-types";
-import { INITIATIVE_TYPES, NATIONALITIES, type Film, type Org } from "@/lib/types";
+import { INITIATIVE_TYPES, NATIONALITIES, type Film, type Org, type Person } from "@/lib/types";
 import { cn, fmtInt } from "@/lib/utils";
 
 interface Props {
   films: Film[];
   orgs: Org[];
+  people?: Person[];
   deptos: { code: number; name: string }[];
   names: Record<string, string>;
   initialQuery: string;
@@ -45,18 +53,20 @@ const KINDS: { id: ExportKind; title: string; blurb: string; icon: typeof Clappe
   { id: "producciones", title: "Producciones", blurb: "Una fila por producción, con sus datos y totales de rodaje; o una fila por locación.", icon: Clapperboard },
   { id: "circulacion", title: "Circulación", blurb: "Festivales, salas de cine, cineclubs y espacios de exhibición.", icon: Presentation },
   { id: "entidades", title: "Entidades", blurb: "Productoras, escuelas, servicios y demás empresas e instituciones de la industria.", icon: Landmark },
+  { id: "personas", title: "Directorio de personas", blurb: "Técnicas y técnicos publicados. Solo datos públicos: nunca el correo de verificación.", icon: UserRound },
 ];
 
 const digits = (s: string) => s.replace(/[^\d]/g, "");
 const group = (s: string) => (s ? Number(s).toLocaleString("es-GT") : "");
 
-export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: Props) {
+export function DownloadsBuilder({ films, orgs, people = [], deptos, names, initialQuery }: Props) {
   const init = useMemo(() => new URLSearchParams(initialQuery), [initialQuery]);
   const [tipo, setTipoRaw] = useState<ExportKind>(() => parseExportRequest(init).tipo);
   const [filas, setFilas] = useState<ExportRows>(() => parseExportRequest(init).filas);
   const [formato, setFormato] = useState<ExportFormat>(() => (init.get("formato") === "xlsx" ? "xlsx" : "csv"));
   const [ff, setFf] = useState<FilmFilter>(() => parseFilmFilter(init));
   const [of, setOf] = useState<OrgFilter>(() => parseOrgFilter(init));
+  const [pf, setPf] = useState<PersonFilter>(() => parsePersonFilter(init));
   const [copied, setCopied] = useState(false);
 
   const extraGenres = useMemo(() => customGenres(films), [films]);
@@ -65,7 +75,8 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
   const muniName = (c: number) => names[`muni:${c}`] ?? String(c);
 
   const layer = kindLayer(tipo);
-  const isOrgs = tipo !== "producciones";
+  const isPeople = tipo === "personas";
+  const isOrgs = tipo === "circulacion" || tipo === "entidades";
   const byLocation = !isOrgs && filas === "locaciones";
   const byFestival = !isOrgs && filas === "festivales";
   // las categorías de circulación y de industria no se comparten: al cambiar de una a otra se limpia la categoría
@@ -83,21 +94,23 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
   );
 
   const festCount = useMemo(() => filmsHit.reduce((n, f) => n + (f.festivals?.length ?? 0), 0), [filmsHit]);
-  const count = isOrgs ? orgsHit.length : byLocation ? locCount : byFestival ? festCount : filmsHit.length;
-  const total = isOrgs ? orgs.filter((o) => o.layer === layer).length : films.length;
-  const noun = isOrgs ? ["entidad", "entidades"] : byLocation ? ["locación", "locaciones"] : byFestival ? ["participación en festivales", "participaciones en festivales"] : ["producción", "producciones"];
+  const peopleHit = useMemo(() => filterPeople(people, pf), [people, pf]);
+  const count = isPeople ? peopleHit.length : isOrgs ? orgsHit.length : byLocation ? locCount : byFestival ? festCount : filmsHit.length;
+  const total = isPeople ? people.length : isOrgs ? orgs.filter((o) => o.layer === layer).length : films.length;
+  const noun = isPeople ? ["persona", "personas"] : isOrgs ? ["entidad", "entidades"] : byLocation ? ["locación", "locaciones"] : byFestival ? ["participación en festivales", "participaciones en festivales"] : ["producción", "producciones"];
 
   const query = useMemo(() => {
     const p = new URLSearchParams();
     p.set("tipo", tipo);
     if (formato !== "csv") p.set("formato", formato);
-    if (isOrgs) orgFilterToParams({ ...of, capa: null }, p);
+    if (isPeople) personFilterToParams(pf, p);
+    else if (isOrgs) orgFilterToParams({ ...of, capa: null }, p);
     else {
       if (byLocation || byFestival) p.set("filas", filas);
       filmFilterToParams(ff, p);
     }
     return p.toString();
-  }, [tipo, isOrgs, byLocation, byFestival, filas, formato, ff, of]);
+  }, [tipo, isPeople, isOrgs, byLocation, byFestival, filas, formato, ff, of, pf]);
 
   // La dirección de la página refleja los filtros: se puede copiar y compartir.
   useEffect(() => {
@@ -116,13 +129,23 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
   const patchFilm = (p: Partial<FilmFilter>) => setFf((f) => ({ ...f, ...p }));
   const patchOrg = (p: Partial<OrgFilter>) => setOf((f) => ({ ...f, ...p }));
 
-  const chips = isOrgs ? describeOrgFilter({ ...of, capa: null }, deptoName) : describeFilmFilter(ff, deptoName, muniName);
-  const active = isOrgs ? orgFilterActive({ ...of, capa: null }) : filmFilterActive(ff);
-  const clear = () => (isOrgs ? setOf(EMPTY_ORG_FILTER) : setFf(EMPTY_FILM_FILTER));
+  const chips = isPeople
+    ? [...(pf.depto.length ? [`Departamento: ${pf.depto.map(deptoName).join(", ")}`] : []), ...(pf.oficio.length ? [`Oficio: ${pf.oficio.join(", ")}`] : []), ...(pf.q ? [`Búsqueda: ${pf.q}`] : [])]
+    : isOrgs
+      ? describeOrgFilter({ ...of, capa: null }, deptoName)
+      : describeFilmFilter(ff, deptoName, muniName);
+  const active = isPeople ? personFilterActive(pf) : isOrgs ? orgFilterActive({ ...of, capa: null }) : filmFilterActive(ff);
+  const clear = () => (isPeople ? setPf(EMPTY_PERSON_FILTER) : isOrgs ? setOf(EMPTY_ORG_FILTER) : setFf(EMPTY_FILM_FILTER));
   const deptoOptions = deptos.map((d) => ({ value: d.code, label: d.name }));
 
   const presets: { label: string; apply(): void }[] =
-    tipo === "circulacion"
+    tipo === "personas"
+      ? [
+          { label: "Dirección", apply: () => setPf({ ...EMPTY_PERSON_FILTER, oficio: ["direccion"] }) },
+          { label: "Producción", apply: () => setPf({ ...EMPTY_PERSON_FILTER, oficio: ["produccion"] }) },
+          { label: "Fotografía", apply: () => setPf({ ...EMPTY_PERSON_FILTER, oficio: ["fotografia"] }) },
+        ]
+      : tipo === "circulacion"
       ? [
           { label: "Festivales", apply: () => setOf({ ...EMPTY_ORG_FILTER, categoria: ["Festivales"] }) },
           { label: "Salas y cine clubs", apply: () => setOf({ ...EMPTY_ORG_FILTER, categoria: ["Salas de cine comerciales y cadenas", "Cine clubs", "Espacios de exhibición"] }) },
@@ -141,8 +164,8 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
             { label: "Con presupuesto declarado", apply: () => setFf({ ...EMPTY_FILM_FILTER, presupuestoMin: 1 }) },
           ];
 
-  const sample = isOrgs ? orgsHit.slice(0, 6) : filmsHit.slice(0, 6);
-  const empty = films.length + orgs.length === 0;
+  const sample = isPeople ? peopleHit.slice(0, 6) : isOrgs ? orgsHit.slice(0, 6) : filmsHit.slice(0, 6);
+  const empty = films.length + orgs.length + people.length === 0;
   const canDownload = count > 0;
 
   return (
@@ -153,7 +176,7 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
           <h2 id="paso-1" className="mb-3 flex items-center gap-2.5 text-sm font-semibold">
             <Step n={1} /> ¿Qué quieres descargar?
           </h2>
-          <div role="radiogroup" aria-labelledby="paso-1" className="grid gap-3 sm:grid-cols-3">
+          <div role="radiogroup" aria-labelledby="paso-1" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {KINDS.map((k) => {
               const on = tipo === k.id;
               return (
@@ -199,7 +222,22 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
           </div>
 
           <div className="rounded-lg border border-line bg-surface p-5">
-            {isOrgs ? (
+            {isPeople ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <MultiSelect
+                  label="Oficio"
+                  placeholder="Todos"
+                  value={pf.oficio}
+                  onChange={(oficio) => setPf((f) => ({ ...f, oficio }))}
+                  options={CREW_ROLES.map((r) => ({ value: r.id, label: r.id === OTHER_ROLE ? "Otro oficio" : r.label }))}
+                />
+                <MultiSelect label="Departamento" placeholder="Todo el país" value={pf.depto} onChange={(depto) => setPf((f) => ({ ...f, depto }))} options={deptoOptions} searchable />
+                <div className="sm:col-span-2">
+                  <label className="label" htmlFor="f-q-person">Buscar por nombre</label>
+                  <input id="f-q-person" className="field" placeholder="Nombre u oficio" value={pf.q} onChange={(e) => setPf((f) => ({ ...f, q: e.target.value }))} />
+                </div>
+              </div>
+            ) : isOrgs ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 <MultiSelect
                   label="Categoría"
@@ -303,7 +341,14 @@ export function DownloadsBuilder({ films, orgs, deptos, names, initialQuery }: P
               <p className="px-4 py-8 text-center text-sm text-muted">{total === 0 ? "Todavía no hay datos publicados." : "Ningún registro coincide con estos filtros."}</p>
             ) : (
               <ul className="divide-y divide-line">
-                {isOrgs
+                {isPeople
+                  ? (sample as Person[]).map((p) => (
+                      <li key={p.id} className="flex items-baseline justify-between gap-4 px-4 py-2.5 text-sm">
+                        <span className="min-w-0 truncate font-medium">{p.name}</span>
+                        <span className="shrink-0 text-xs text-muted">{personRoleLabels(p).join(", ")}</span>
+                      </li>
+                    ))
+                  : isOrgs
                   ? (sample as Org[]).map((o) => (
                       <li key={o.id} className="flex items-baseline justify-between gap-4 px-4 py-2.5 text-sm">
                         <span className="min-w-0 truncate font-medium">{o.name}</span>

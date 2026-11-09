@@ -1,4 +1,4 @@
-import type { Film, FilmLocation, Org } from "@/lib/types";
+import type { Film, FilmLocation, Org, Person } from "@/lib/types";
 
 export interface Completeness {
   completeness: number;
@@ -95,6 +95,30 @@ export function orgCompleteness(
   const publishable =
     !!o.name?.trim() && !!o.category && (o.depto_ine != null || o.muni_ine != null || (o.lat != null && o.lng != null));
   return { completeness: Math.round((points / total) * 100), missing, publishable };
+}
+
+/** Una persona se puede publicar con nombre y al menos un oficio. El lugar no es obligatorio: no va al mapa. */
+export function personCompleteness(
+  p: Pick<Person, "name" | "roles" | "other_role" | "depto_ine" | "muni_ine" | "languages" | "bio" | "web" | "instagram" | "public_email" | "public_phone" | "credits">,
+): Completeness {
+  const missing: string[] = [];
+  let points = 0;
+  let total = 0;
+  const check = (ok: boolean, label: string, weight = 1) => {
+    total += weight;
+    if (ok) points += weight;
+    else missing.push(label);
+  };
+  const hasRole = (p.roles?.length ?? 0) > 0 || !!p.other_role?.trim();
+  check(!!p.name?.trim(), "Nombre", 2);
+  check(hasRole, "Oficio", 2);
+  check(p.depto_ine != null || p.muni_ine != null, "Lugar");
+  check((p.languages?.length ?? 0) > 0, "Idiomas");
+  check(!!p.bio?.trim(), "Presentación");
+  check(!!p.web || !!p.instagram, "Web o Instagram");
+  check(!!p.public_email || !!p.public_phone, "Contacto público");
+  check((p.credits?.length ?? 0) > 0, "Créditos");
+  return { completeness: Math.round((points / total) * 100), missing, publishable: !!p.name?.trim() && hasRole };
 }
 
 export function completenessTone(pct: number): "ok" | "warn" | "danger" {

@@ -134,6 +134,44 @@ export type Nationality = "guatemalteca" | "coproduccion" | "extranjera";
 
 export type InitiativeType = "publica" | "privada" | "comunitaria" | "transnacional";
 
+/** Un crédito destacado que la persona declara (producción, año y oficio). */
+export interface PersonCredit {
+  title: string;
+  year: number | null;
+  role: string | null;
+}
+
+/**
+ * Técnica, técnico o productor/a independiente del directorio.
+ * No es una entidad: lo que la distingue son sus oficios. No se pone en el mapa.
+ */
+export interface Person {
+  id: string;
+  slug: string;
+  name: string;
+  /** Ids de oficio (los de `CREW_ROLES`), hasta 5. */
+  roles: string[];
+  /** Oficio escrito a mano, cuando marca «Otro» o quiere precisar. */
+  other_role: string | null;
+  depto_ine: number | null;
+  muni_ine: number | null;
+  languages: string[];
+  bio: string | null;
+  web: string | null;
+  instagram: string | null;
+  imdb: string | null;
+  portfolio: string | null;
+  /** Correo que la persona aceptó mostrar. El de verificación vive solo en el aporte. */
+  public_email: string | null;
+  public_phone: string | null;
+  photo_url: string | null;
+  credits: PersonCredit[];
+  status: RecordStatus;
+  completeness: number;
+  missing_fields: string[];
+  source: string | null;
+}
+
 export interface Org {
   id: string;
   slug: string;
@@ -333,10 +371,31 @@ export interface OrgInput {
   source?: string | null;
 }
 
+export interface PersonInput {
+  id?: string;
+  name: string;
+  roles?: string[];
+  other_role?: string | null;
+  depto_ine?: number | null;
+  muni_ine?: number | null;
+  languages?: string[];
+  bio?: string | null;
+  web?: string | null;
+  instagram?: string | null;
+  imdb?: string | null;
+  portfolio?: string | null;
+  public_email?: string | null;
+  public_phone?: string | null;
+  photo_url?: string | null;
+  credits?: PersonCredit[];
+  status?: RecordStatus;
+  source?: string | null;
+}
+
 // ───────────────────────── aportes del público ─────────────────────────
 
 export type SubmissionStatus = "pending" | "approved" | "rejected";
-export type SubmissionKind = "film" | "org";
+export type SubmissionKind = "film" | "org" | "person";
 
 /**
  * Propuesta enviada desde el mapa público. Nunca toca los registros publicados:
@@ -370,8 +429,8 @@ export interface Submission {
   target_id: string | null;
   /** Nombre del registro al enviar el aporte (para mostrarlo en la lista). */
   label: string;
-  /** Datos propuestos (producción u organización, sin estado ni póster). */
-  payload: FilmInput | OrgInput;
+  /** Datos propuestos (producción, entidad o persona). */
+  payload: FilmInput | OrgInput | PersonInput;
   /** Comentario o fuente que acompaña el aporte. */
   note: string | null;
   /** Correo opcional para avisar o pedir aclaraciones. */

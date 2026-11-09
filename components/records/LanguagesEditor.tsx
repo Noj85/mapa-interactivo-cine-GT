@@ -9,7 +9,7 @@ import { cn, normalize } from "@/lib/utils";
  * Idiomas de la producción: los estándar (incluidos idiomas mayas, garífuna y xinka) para marcar con un toque
  * y un campo para escribir otros. Hasta 8 en total. Mismo diseño que los géneros.
  */
-export function LanguagesEditor({ languages, onChange }: { languages: string[]; onChange: (next: string[]) => void }) {
+export function LanguagesEditor({ languages, onChange, hint }: { languages: string[]; onChange: (next: string[]) => void; hint?: string }) {
   const [text, setText] = useState("");
   const chosen = new Set(languages.map(normalize));
   const standard = new Set(LANGUAGES.map(normalize));
@@ -32,7 +32,7 @@ export function LanguagesEditor({ languages, onChange }: { languages: string[]; 
       <div className="mb-2 flex items-center justify-between">
         <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Idiomas ({languages.length}/{MAX_LANGUAGES})</h2>
       </div>
-      <p className="mb-2 text-xs leading-relaxed text-muted">Los idiomas que se hablan en la producción. Marca los que apliquen; si falta alguno, escríbelo abajo.</p>
+      <p className="mb-2 text-xs leading-relaxed text-muted">{hint ?? "Los idiomas que se hablan en la producción. Marca los que apliquen; si falta alguno, escríbelo abajo."}</p>
       <div className="flex flex-wrap gap-1.5">
         {LANGUAGES.map((l) => {
           const on = chosen.has(normalize(l));

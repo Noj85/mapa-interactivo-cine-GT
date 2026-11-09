@@ -3,8 +3,9 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeCategories, orgCategories } from "@/lib/categories";
-import { buildFilm, buildOrg, newId, uniqueSlug } from "@/lib/data/records";
+import { buildFilm, buildOrg, buildPerson, newId, uniqueSlug } from "@/lib/data/records";
 import { cleanLanguages, coreFields, readCrew } from "@/lib/crew";
+import { cleanCredits, cleanPersonRoles } from "@/lib/people";
 import { cleanGenres, cleanMinutes, isFormat, isNature, legacyKind, upgradeFilmPayload } from "@/lib/film-types";
 import { festivalSearchKey } from "@/lib/festivals";
 import { normalize, upperTitle } from "@/lib/utils";
@@ -23,6 +24,8 @@ import type {
   OpenInfoResult,
   Org,
   OrgInput,
+  Person,
+  PersonInput,
   QuestionStatus,
   RecordStatus,
   ImportSubmissionInput,
@@ -92,6 +95,10 @@ export interface Store {
    */
   mergeFilmInto(fromId: string, intoId: string): Promise<void>;
   deleteOrg(id: string): Promise<void>;
+  listPeople(opts?: { drafts?: boolean }): Promise<Person[]>;
+  getPerson(id: string): Promise<Person | null>;
+  savePerson(input: PersonInput): Promise<Person>;
+  deletePerson(id: string): Promise<void>;
   saveImport(rec: ImportRecord): Promise<ImportRecord>;
   listImports(): Promise<ImportRecord[]>;
   saveQuestions(list: Omit<ImportQuestion, "id" | "created_at">[]): Promise<void>;
@@ -107,6 +114,8 @@ export interface Store {
     id: string,
     patch: { status: SubmissionStatus; reviewer_note?: string | null; result_id?: string | null },
   ): Promise<void>;
+  /** Reemplaza el payload de un aporte sin cambiar su estado. Lo usa la limpieza de tipos. */
+  replaceSubmissionPayload(id: string, payload: FilmInput | OrgInput | PersonInput): Promise<void>;
 
   /** Publica u oculta varios registros de una vez. */
   setRecordsStatus(kind: SubmissionKind, ids: string[], status: RecordStatus): Promise<void>;
@@ -163,6 +172,7 @@ interface LocalInfoRequest extends InfoRequest {
 interface LocalDb {
   films: Film[];
   orgs: Org[];
+  people: Person[];
   imports: ImportRecord[];
   questions: ImportQuestion[];
   submissions: Submission[];
@@ -194,6 +204,21 @@ function readFilm(f: any): Film {
   } as Film;
 }
 
+function readPerson(p: any): Person {
+  return {
+    ...p,
+    name: String(p.name ?? "").trim(),
+    roles: cleanPersonRoles(p.roles),
+    other_role: p.other_role ?? null,
+    languages: cleanLanguages(p.languages),
+    credits: cleanCredits(p.credits),
+    photo_url: p.photo_url ?? null,
+    public_email: p.public_email ?? null,
+    public_phone: p.public_phone ?? null,
+    missing_fields: p.missing_fields ?? [],
+  };
+}
+
 async function readDb(): Promise<LocalDb> {
   try {
     const raw = await fs.readFile(DB_PATH, "utf8");
@@ -201,6 +226,7 @@ async function readDb(): Promise<LocalDb> {
     return {
       films: (j.films ?? []).map(readFilm),
       orgs: (j.orgs ?? []).map((o) => ({ ...o, categories: orgCategories(o) })),
+      people: (j.people ?? []).map(readPerson),
       imports: j.imports ?? [],
       questions: j.questions ?? [],
       submissions: (j.submissions ?? []).map((s) => ({
@@ -215,7 +241,7 @@ async function readDb(): Promise<LocalDb> {
       settings: j.settings ?? {},
     };
   } catch {
-    return { films: [], orgs: [], imports: [], questions: [], submissions: [], festivals: [], info_requests: [], settings: {} };
+    return { films: [], orgs: [], people: [], imports: [], questions: [], submissions: [], festivals: [], info_requests: [], settings: {} };
   }
 }
 
@@ -307,6 +333,28 @@ export class LocalStore implements Store {
     await writeDb(db);
   }
 
+  async listPeople(opts?: { drafts?: boolean }) {
+    const { people } = await readDb();
+    return opts?.drafts ? people : people.filter((p) => p.status === "published");
+  }
+  async getPerson(id: string) {
+    return (await readDb()).people.find((p) => p.id === id) ?? null;
+  }
+  async savePerson(input: PersonInput) {
+    const db = await readDb();
+    const existing = input.id ? db.people.find((p) => p.id === input.id) : undefined;
+    const slug = existing?.slug ?? uniqueSlug(input.name, new Set(db.people.map((p) => p.slug)));
+    const person = buildPerson(input, { id: existing?.id, slug });
+    db.people = existing ? db.people.map((p) => (p.id === person.id ? person : p)) : [...db.people, person];
+    await writeDb(db);
+    return person;
+  }
+  async deletePerson(id: string) {
+    const db = await readDb();
+    db.people = db.people.filter((p) => p.id !== id);
+    await writeDb(db);
+  }
+
   async saveImport(rec: ImportRecord) {
     const db = await readDb();
     db.imports = [rec, ...db.imports.filter((i) => i.id !== rec.id)];
@@ -391,11 +439,17 @@ export class LocalStore implements Store {
     );
     await writeDb(db);
   }
+  async replaceSubmissionPayload(id: string, payload: FilmInput | OrgInput) {
+    const db = await readDb();
+    db.submissions = db.submissions.map((x) => (x.id === id ? { ...x, payload } : x));
+    await writeDb(db);
+  }
 
   async setRecordsStatus(kind: SubmissionKind, ids: string[], status: RecordStatus) {
     const db = await readDb();
     const set = new Set(ids);
     if (kind === "film") db.films = db.films.map((f) => (set.has(f.id) && f.title.trim() ? { ...f, status } : f));
+    else if (kind === "person") db.people = db.people.map((p) => (set.has(p.id) && p.name.trim() ? { ...p, status } : p));
     else db.orgs = db.orgs.map((o) => (set.has(o.id) && o.name.trim() ? { ...o, status } : o));
     await writeDb(db);
   }
@@ -719,6 +773,29 @@ const rowToFilmWith = (r: any, crew: FilmCrewMember[]): Film => ({
     .map(rowToFilmFestival),
   companies: Array.isArray(r.companies) ? r.companies.map((c: any) => ({ name: String(c.name ?? ""), country: c.country ?? null })) : [],
 });
+const rowToPerson = (r: any): Person => ({
+  id: r.id,
+  slug: r.slug,
+  name: r.name,
+  roles: cleanPersonRoles(r.roles),
+  other_role: r.other_role ?? null,
+  depto_ine: r.depto_ine,
+  muni_ine: r.muni_ine,
+  languages: cleanLanguages(r.languages),
+  bio: r.bio ?? null,
+  web: r.web ?? null,
+  instagram: r.instagram ?? null,
+  imdb: r.imdb ?? null,
+  portfolio: r.portfolio ?? null,
+  public_email: r.public_email ?? null,
+  public_phone: r.public_phone ?? null,
+  photo_url: r.photo_url ?? null,
+  credits: cleanCredits(r.credits),
+  status: r.status,
+  completeness: r.completeness ?? 0,
+  missing_fields: r.missing_fields ?? [],
+  source: r.source ?? null,
+});
 const rowToOrg = (r: any): Org => ({
   id: r.id,
   slug: r.slug,
@@ -946,6 +1023,52 @@ export class SupabaseStore implements Store {
     must(await this.db.from("organizations").delete().eq("id", id));
   }
 
+  async listPeople(opts?: { drafts?: boolean }) {
+    let q = this.db.from("people").select("*").order("name").order("id");
+    if (!opts?.drafts) q = q.eq("status", "published");
+    return (await pageAll(q)).map(rowToPerson);
+  }
+  async getPerson(id: string) {
+    const r = must(await this.db.from("people").select("*").eq("id", id).maybeSingle());
+    return r ? rowToPerson(r) : null;
+  }
+  async savePerson(input: PersonInput) {
+    const existing = input.id ? await this.getPerson(input.id) : null;
+    const slug =
+      existing?.slug ??
+      uniqueSlug(input.name, new Set((await pageAll(this.db.from("people").select("slug").order("slug"))).map((r: any) => r.slug)));
+    const person = buildPerson(input, { id: existing?.id, slug });
+    must(
+      await this.db.from("people").upsert({
+        id: person.id,
+        slug: person.slug,
+        name: person.name,
+        roles: person.roles,
+        other_role: person.other_role,
+        depto_ine: person.depto_ine,
+        muni_ine: person.muni_ine,
+        languages: person.languages,
+        bio: person.bio,
+        web: person.web,
+        instagram: person.instagram,
+        imdb: person.imdb,
+        portfolio: person.portfolio,
+        public_email: person.public_email,
+        public_phone: person.public_phone,
+        photo_url: person.photo_url,
+        credits: person.credits,
+        status: person.status,
+        completeness: person.completeness,
+        missing_fields: person.missing_fields,
+        source: person.source,
+      }),
+    );
+    return person;
+  }
+  async deletePerson(id: string) {
+    must(await this.db.from("people").delete().eq("id", id));
+  }
+
   async saveImport(rec: ImportRecord) {
     must(
       await this.db.from("imports").upsert({
@@ -1031,10 +1154,13 @@ export class SupabaseStore implements Store {
     if (patch.result_id) upd.result_id = patch.result_id;
     must(await this.db.from("submissions").update(upd).eq("id", id));
   }
+  async replaceSubmissionPayload(id: string, payload: FilmInput | OrgInput) {
+    must(await this.db.from("submissions").update({ payload }).eq("id", id));
+  }
 
   async setRecordsStatus(kind: SubmissionKind, ids: string[], status: RecordStatus) {
     if (!ids.length) return;
-    const table = kind === "film" ? "films" : "organizations";
+    const table = kind === "film" ? "films" : kind === "person" ? "people" : "organizations";
     // en bloques para no pasar el límite de la URL
     for (let i = 0; i < ids.length; i += 100) {
       must(await this.db.from(table).update({ status }).in("id", ids.slice(i, i + 100)));

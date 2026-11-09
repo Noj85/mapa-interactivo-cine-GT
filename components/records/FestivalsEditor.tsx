@@ -2,7 +2,7 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { FESTIVAL_RESULTS, type FestivalResult } from "@/lib/types";
-import { blankFest, isBlankFest, type FestDraft } from "./drafts";
+import { blankFest, isBlankFest, numericInput, type FestDraft } from "./drafts";
 import { FestivalPicker } from "./FestivalPicker";
 
 const MAX_FESTS = 40;
@@ -53,7 +53,7 @@ export function FestivalsEditor({ fests, onChange }: { fests: FestDraft[]; onCha
               </div>
               <div>
                 <label className="label" htmlFor={`fest-year-${i}`}>Año</label>
-                <input id={`fest-year-${i}`} className="field" inputMode="numeric" maxLength={4} placeholder="2024" value={f.year} onChange={(e) => set(i, { year: e.target.value })} />
+                <input id={`fest-year-${i}`} className="field" inputMode="numeric" maxLength={4} placeholder="2024" value={f.year} onChange={(e) => set(i, { year: numericInput(e.target.value) })} />
               </div>
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">

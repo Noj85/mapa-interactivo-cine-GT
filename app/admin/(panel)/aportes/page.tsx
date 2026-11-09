@@ -82,7 +82,7 @@ export default async function AportesPage({ searchParams }: { searchParams: Prom
                     {x.origin === "carga" && <span className="chip !py-0 text-[11px] text-accent">Carga de archivo</span>}
                   </span>
                   <span className="block truncate text-xs text-muted">
-                    {x.origin === "carga" ? (x.target_id ? "Diferencias con el registro" : "Coincidencia dudosa") : x.target_id ? "Corrección" : "Registro nuevo"} · {x.kind === "film" ? "Producción" : "Entidad"} ·{" "}
+                    {x.origin === "carga" ? (x.target_id ? "Diferencias con el registro" : "Coincidencia dudosa") : x.target_id ? "Corrección" : "Registro nuevo"} · {x.kind === "film" ? "Producción" : x.kind === "person" ? "Persona" : "Entidad"} ·{" "}
                     {new Date(x.created_at).toLocaleString("es-GT", { dateStyle: "medium", timeStyle: "short" })}
                     {x.submitter ? ` · ${x.submitter}` : x.contact ? ` · ${x.contact}` : ""}
                   </span>

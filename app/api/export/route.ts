@@ -1,9 +1,9 @@
-import { adminStore, getSession } from "@/lib/auth";
+import { adminStore, getSession, publicStore } from "@/lib/auth";
 import { loadDatasetCached } from "@/lib/data/load";
-import { buildTable, filterSlug, toCsv, toXlsx } from "@/lib/export";
-import { describeFilmFilter, describeOrgFilter, filterFilms, filterOrgs, kindLayer, parseExportRequest, parseFilmFilter, parseOrgFilter } from "@/lib/filters";
+import { buildPeopleTable, buildTable, filterSlug, toCsv, toXlsx } from "@/lib/export";
+import { describeFilmFilter, describeOrgFilter, filterFilms, filterOrgs, filterPeople, kindLayer, parseExportRequest, parseFilmFilter, parseOrgFilter, parsePersonFilter } from "@/lib/filters";
 import { serverGazetteer } from "@/lib/geo/server";
-import type { Film, Org } from "@/lib/types";
+import type { Film, Org, Person } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 /**
  * Descarga de datos, abierta a cualquier persona (solo lo publicado).
  *
- *  tipo       producciones (por defecto) | circulacion | entidades (la capa de industria)
+ *  tipo       producciones (por defecto) | circulacion | entidades (la capa de industria) | personas
  *  filas      solo en producciones: producciones (por defecto) | locaciones (una fila por lugar de rodaje) | festivales (una fila por participación)
  *             Los enlaces anteriores siguen funcionando: tipo=peliculas, tipo=locaciones y tipo=entidades&capa=circulacion.
  *  formato    csv (por defecto) | xlsx
@@ -60,15 +60,29 @@ export async function GET(req: Request) {
   const ff = parseFilmFilter(p);
   // la capa de las entidades la define la categoría de descarga, no un filtro
   const of = { ...parseOrgFilter(p), capa: kindLayer(tipo) };
-  const isOrgs = tipo !== "producciones";
-  const table = buildTable(tipo, filas, isOrgs ? [] : filterFilms(films, ff), isOrgs ? filterOrgs(orgs, of) : [], gaz, { film: ff, org: of });
+  const pf = parsePersonFilter(p);
+  const isPeople = tipo === "personas";
+  const isOrgs = tipo === "circulacion" || tipo === "entidades";
+  let people: Person[] = [];
+  if (isPeople) {
+    people = session && p.get("borradores") === "1"
+      ? await (await adminStore()).listPeople({ drafts: true }).catch(() => [])
+      : await publicStore().listPeople().catch(() => []);
+  }
+  const table = isPeople
+    ? buildPeopleTable(filterPeople(people, pf), gaz)
+    : buildTable(tipo, filas, isOrgs ? [] : filterFilms(films, ff), isOrgs ? filterOrgs(orgs, of) : [], gaz, { film: ff, org: of });
 
   const deptoName = (c: number) => gaz.depto(c)?.name ?? String(c);
   const muniName = (c: number) => gaz.muni(c)?.name ?? String(c);
-  const notes = isOrgs ? describeOrgFilter({ ...of, capa: null }, deptoName) : describeFilmFilter(ff, deptoName, muniName);
+  const notes = isPeople
+    ? [...(pf.depto.length ? [`Departamento: ${pf.depto.map(deptoName).join(", ")}`] : []), ...(pf.oficio.length ? [`Oficio: ${pf.oficio.join(", ")}`] : []), ...(pf.q ? [`Búsqueda: ${pf.q}`] : [])]
+    : isOrgs
+      ? describeOrgFilter({ ...of, capa: null }, deptoName)
+      : describeFilmFilter(ff, deptoName, muniName);
 
   const today = new Date().toISOString().slice(0, 10);
-  const slug = filterSlug(tipo, ff, of, gaz);
+  const slug = filterSlug(tipo, ff, of, gaz, pf);
   const filename = `mapa-cine-gt-${table.name}${slug ? `-${slug}` : ""}-${today}.${formato}`;
   const headers = {
     "Content-Disposition": `attachment; filename="${filename}"`,

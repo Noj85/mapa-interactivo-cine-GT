@@ -7,7 +7,7 @@ import { CrewEditor } from "./CrewEditor";
 import { GenresEditor } from "./GenresEditor";
 import { LanguagesEditor } from "./LanguagesEditor";
 import { VideoLinkField } from "./VideoLinkField";
-import type { FilmDraft } from "./drafts";
+import { numericInput, type FilmDraft } from "./drafts";
 
 /** Campos de una producción. Los usa el editor del equipo y el formulario público. */
 export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange: (patch: Partial<FilmDraft>) => void }) {
@@ -20,11 +20,11 @@ export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange:
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div>
           <label className="label" htmlFor="f-year">Año</label>
-          <input id="f-year" className="field" inputMode="numeric" value={d.year} onChange={(e) => onChange({ year: e.target.value })} />
+          <input id="f-year" className="field" inputMode="numeric" value={d.year} onChange={(e) => onChange({ year: numericInput(e.target.value) })} />
         </div>
         <div>
           <label className="label" htmlFor="f-dur">Duración (min)</label>
-          <input id="f-dur" className="field" inputMode="numeric" maxLength={4} placeholder="Ej.: 95" value={d.duration} onChange={(e) => onChange({ duration: e.target.value })} />
+          <input id="f-dur" className="field" inputMode="numeric" maxLength={4} placeholder="Ej.: 95" value={d.duration} onChange={(e) => onChange({ duration: numericInput(e.target.value) })} />
         </div>
         <div>
           <label className="label" htmlFor="f-format">Formato</label>
@@ -84,7 +84,7 @@ export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange:
       <div className="grid gap-4 sm:grid-cols-[1fr_120px]">
         <div>
           <label className="label" htmlFor="f-budget">Presupuesto</label>
-          <input id="f-budget" className="field" inputMode="decimal" value={d.budget} onChange={(e) => onChange({ budget: e.target.value })} />
+          <input id="f-budget" className="field" inputMode="decimal" value={d.budget} onChange={(e) => onChange({ budget: numericInput(e.target.value, true) })} />
         </div>
         <div>
           <label className="label" htmlFor="f-cur">Moneda</label>

@@ -49,7 +49,7 @@ export function SubmissionReview({
       const partial = list.length > 0 && !all;
       const res = await approveSubmissionAction(id, { publish, note: note || null, ...(partial ? { accepted: [...on] } : {}) });
       if (!res.ok) return setError(res.error);
-      if (edit) router.push(res.kind === "film" ? `/admin/peliculas/${res.recordId}` : `/admin/entidades/${res.recordId}`);
+      if (edit) router.push(res.kind === "film" ? `/admin/peliculas/${res.recordId}` : res.kind === "person" ? `/admin/personas/${res.recordId}` : `/admin/entidades/${res.recordId}`);
       else router.replace("/admin/aportes");
       router.refresh();
     });

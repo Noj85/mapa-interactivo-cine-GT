@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-/** Pestañas Producciones | Entidades que encabezan los dos listados de registros. */
-export function RecordsTabs({ current, films, orgs }: { current: "films" | "orgs"; films: number; orgs: number }) {
+/** Pestañas Producciones | Entidades | Personas que encabezan los listados de registros. */
+export function RecordsTabs({ current, films, orgs, people = 0 }: { current: "films" | "orgs" | "people"; films: number; orgs: number; people?: number }) {
   const tabs = [
     { id: "films" as const, href: "/admin/peliculas", label: "Producciones", count: films },
     { id: "orgs" as const, href: "/admin/entidades", label: "Entidades", count: orgs },
+    { id: "people" as const, href: "/admin/personas", label: "Personas", count: people },
   ];
   return (
     <div role="tablist" aria-label="Tipo de registro" className="mb-6 inline-flex rounded-2xl border border-line bg-surface p-1">

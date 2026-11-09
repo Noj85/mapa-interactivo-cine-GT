@@ -1,4 +1,4 @@
-import { Download, HandHeart, Map as MapIcon } from "lucide-react";
+import { BookUser, Download, HandHeart, Map as MapIcon } from "lucide-react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
@@ -6,12 +6,13 @@ import { MapLogo, ProcineLogo } from "./Brand";
 
 const links = [
   { href: "/", label: "Mapa", icon: MapIcon },
+  { href: "/directorio", label: "Directorio", icon: BookUser },
   { href: "/descargas", label: "Descargas", icon: Download },
   { href: "/aportar", label: "Aportar", icon: HandHeart },
 ];
 
 /** Encabezado de las páginas de contenido (descargas, etc.). El mapa tiene su propia barra flotante. */
-export function SiteHeader({ current }: { current?: "/" | "/descargas" | "/aportar" | "/creditos" }) {
+export function SiteHeader({ current }: { current?: "/" | "/directorio" | "/descargas" | "/aportar" | "/creditos" }) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">

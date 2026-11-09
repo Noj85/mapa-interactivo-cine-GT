@@ -20,7 +20,9 @@ export default async function AportarPage({ searchParams }: { searchParams: Prom
   // la capa que se estaba viendo en el mapa: Producción abre «Producción»; Circulación o Industria abren «Entidad» con esa capa
   const capa = one("capa");
   const layer = capa === "circulacion" || capa === "industria" ? capa : null;
-  const initialKind = one("tipo") === "entidad" || layer ? "org" : "film";
+  const tipo = one("tipo");
+  const initialKind = tipo === "persona" ? "person" : tipo === "entidad" || layer ? "org" : "film";
+  const defaultCategories = initialKind === "org" && layer === "industria" && tipo === "entidad" ? ["Productoras"] : undefined;
 
   return (
     <div className="min-h-dvh bg-bg">
@@ -28,10 +30,12 @@ export default async function AportarPage({ searchParams }: { searchParams: Prom
       <main className="mx-auto max-w-6xl px-4 pb-20 pt-10">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Mapa colaborativo</p>
         <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight sm:text-[44px]">
-          {film || org ? "Sugerir una corrección" : "Aportar al mapa"}
+          {film || org ? "Sugerir una corrección" : initialKind === "person" ? "Registrarme en el directorio" : "Aportar al mapa"}
         </h1>
         <p className="mt-3 max-w-3xl text-[15px] leading-relaxed text-muted">
-          ¿Falta una producción o una entidad, o hay un dato equivocado? Cuéntanos lo que sabes. Nada se publica de inmediato: el equipo de la Academia verifica cada aporte antes de sumarlo al mapa.
+          {initialKind === "person"
+            ? "Registra tus datos para el Directorio de Técnicas y Técnicos. El equipo de la Academia los verifica antes de publicarlos. Las empresas productoras se registran como entidad."
+            : "¿Falta una producción, una entidad o una persona del sector, o hay un dato equivocado? Cuéntanos lo que sabes. Nada se publica de inmediato: el equipo de la Academia verifica cada aporte."}
         </p>
         <div className="mt-6 grid gap-3 md:grid-cols-2">
           <aside className="flex items-start gap-3 rounded-2xl border border-accent/40 bg-accent/5 px-4 py-3 text-sm leading-relaxed">
@@ -55,7 +59,7 @@ export default async function AportarPage({ searchParams }: { searchParams: Prom
           </aside>
         </div>
         <div className="mt-8">
-          <ContributeForm key={film?.id ?? org?.id ?? `nuevo-${layer ?? initialKind}`} film={film} org={org} initialKind={initialKind} defaultLayer={layer ?? undefined} />
+          <ContributeForm key={film?.id ?? org?.id ?? `nuevo-${layer ?? initialKind}`} film={film} org={org} initialKind={initialKind} defaultLayer={layer ?? undefined} defaultCategories={defaultCategories} />
         </div>
       </main>
       <BrandFooter />

@@ -1,4 +1,4 @@
-import { ArrowRight, Clapperboard, FileUp, Landmark } from "lucide-react";
+import { ArrowRight, Clapperboard, FileUp, Landmark, UserRound } from "lucide-react";
 import Link from "next/link";
 import { adminStore } from "@/lib/auth";
 
@@ -22,6 +22,12 @@ const options = [
     title: "Entidad a mano",
     text: "Registra un festival, sala, productora, servicio o espacio de formación.",
   },
+  {
+    href: "/admin/personas/nueva",
+    icon: UserRound,
+    title: "Persona a mano",
+    text: "Registra a una técnica, un técnico o un productor independiente del directorio.",
+  },
 ];
 
 export default async function AddDataPage() {
@@ -31,7 +37,7 @@ export default async function AddDataPage() {
       <h1 className="font-display text-4xl tracking-tight">Agregar datos</h1>
       <p className="mt-1 text-sm text-muted">Sube un archivo o registra una producción o entidad a mano.</p>
 
-      <div className="mt-8 grid gap-3 md:grid-cols-3">
+      <div className="mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {options.map((o) => (
           <Link
             key={o.href}

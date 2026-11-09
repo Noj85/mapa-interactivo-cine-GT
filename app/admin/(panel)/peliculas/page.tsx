@@ -8,29 +8,41 @@ import { adminStore } from "@/lib/auth";
 import { serverGazetteer } from "@/lib/geo/server";
 import { FORMATS } from "@/lib/film-types";
 import { locationsNeedWork } from "@/lib/locations";
+import { typeCards } from "@/lib/type-cleanup";
 import { likelyDuplicates } from "@/lib/merge-films";
 
 export default async function FilmsPage() {
   const store = await adminStore();
-  const [films, orgs, gaz, requests] = await Promise.all([
+  const [films, orgs, people, gaz, requests, submissions] = await Promise.all([
     store.listFilms({ drafts: true }),
     store.listOrgs({ drafts: true }),
+    store.listPeople({ drafts: true }).catch(() => []),
     serverGazetteer(),
     // si todavía no se aplicó la migración de solicitudes, el listado sigue funcionando
     store.listInfoRequests({ kind: "film" }).catch(() => []),
+    store.listSubmissions().catch(() => []),
   ]);
   films.sort((a, b) => a.title.localeCompare(b.title));
   const dupes = likelyDuplicates(films);
   const unifyCount = films.filter((f) => locationsNeedWork(f.locations)).length;
+  const typeCount = typeCards(films, submissions).length;
   const byId = new Map(films.map((f) => [f.id, f]));
   return (
     <div>
       <h1 className="font-display text-4xl tracking-tight">Registros</h1>
       <p className="mb-5 mt-1 text-sm text-muted">Decide qué se ve en el mapa, revisa lo que falta y pide la información pendiente.</p>
-      <RecordsTabs current="films" films={films.length} orgs={orgs.length} />
+      <RecordsTabs current="films" films={films.length} orgs={orgs.length} people={people.length} />
       {films.length > 0 && (
         <div className="mb-4">
           <BulkPosterUploader films={films.map((f) => ({ id: f.id, title: f.title, slug: f.slug }))} />
+        </div>
+      )}
+      {typeCount > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-warn/30 bg-warn/5 px-4 py-3 text-sm">
+          <span className="font-medium">
+            {typeCount === 1 ? "1 registro con un número que no es entero" : `${typeCount} registros con un número que no es entero`}
+          </span>
+          <Link className="text-accent underline underline-offset-2" href="/admin/ajustes/tipos">Revisar y limpiar</Link>
         </div>
       )}
       {unifyCount > 0 && (

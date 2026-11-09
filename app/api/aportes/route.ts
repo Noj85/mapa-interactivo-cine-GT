@@ -4,7 +4,7 @@ import { sanitizeFestivalIds } from "@/lib/festivals-server";
 import { rateLimit } from "@/lib/rate-limit";
 import { submissionMetaSchema, submissionSchema } from "@/lib/schemas";
 import { upperTitle } from "@/lib/utils";
-import type { FilmInput, OrgInput } from "@/lib/types";
+import type { FilmInput, OrgInput, PersonInput } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -49,15 +49,20 @@ export async function POST(req: Request) {
     const store = publicStore();
     const d = parsed.data;
     if (target) {
-      const exists = d.kind === "film" ? await store.getFilm(target) : await store.getOrg(target);
+      const exists = d.kind === "film" ? await store.getFilm(target) : d.kind === "person" ? await store.getPerson(target) : await store.getOrg(target);
       if (!exists) return fail("No encontramos el registro que quieres corregir.", 404);
     }
     if (d.kind === "film") d.data.festivals = await sanitizeFestivalIds(store, d.data.festivals);
+    let payload = d.data as unknown as FilmInput | OrgInput | PersonInput;
+    if (d.kind === "person") {
+      const { consent: _consent, ...rest } = d.data;
+      payload = rest;
+    }
     await store.createSubmission({
       kind: d.kind,
       target_id: target,
       label: d.kind === "film" ? upperTitle(d.data.title) : d.data.name,
-      payload: d.data as unknown as FilmInput | OrgInput,
+      payload,
       note: m.note,
       contact: m.contact,
     });

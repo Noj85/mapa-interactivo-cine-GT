@@ -5,7 +5,9 @@ import { extraCrewText } from "@/lib/crew";
 import { describeFestival, sortFestivals } from "@/lib/festivals";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { durationLabel, formatLabel, natureLabel } from "@/lib/film-types";
-import { INITIATIVE_TYPES, LAYERS, NATIONALITIES, type Film, type FilmInput, type Org, type OrgInput, type Submission } from "@/lib/types";
+import { personRoleLabels } from "@/lib/people";
+import { INITIATIVE_TYPES, LAYERS, NATIONALITIES, type Film, type FilmInput, type Org, type OrgInput, type Person, type PersonInput, type Submission } from "@/lib/types";
+import { parseWholeNumber } from "@/lib/numbers";
 import { fmtInt, fmtMoney, upperTitle } from "@/lib/utils";
 
 export interface DiffRow {
@@ -35,6 +37,37 @@ export function locText(l: Loc, gaz: Gazetteer) {
 
 const locsText = (list: Loc[], gaz: Gazetteer) => (list.length ? list.map((l) => locText(l, gaz)).join("\n") : null);
 
+/** Avisos de un aporte que trae días o empleos con decimales o con texto: al aprobar se corrige el tipo. */
+export function decimalRoundNotes(locations: { days?: unknown; jobs?: unknown }[] | null | undefined): string[] {
+  const out: string[] = [];
+  for (const l of locations ?? []) {
+    const days = wholeNote("días", l.days);
+    const jobs = wholeNote("empleos", l.jobs);
+    if (days) out.push(days);
+    if (jobs) out.push(jobs);
+  }
+  return [...new Set(out)];
+}
+
+function shownRaw(v: unknown): string {
+  return typeof v === "string" ? `«${v.trim()}»` : String(v);
+}
+
+function wholeNote(kind: "días" | "empleos", value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0) return null;
+  const next = parseWholeNumber(value);
+  const shown = shownRaw(value);
+  if (kind === "días") {
+    if (next == null) return `${shown} no es un número: los días de rodaje no se guardarán.`;
+    if (typeof value === "number") return `Los días de rodaje se registran en jornadas completas: ${shown} se redondeará a ${next} al aprobar.`;
+    return `Los días de rodaje se registran en jornadas completas: ${shown} se guardará como ${next}.`;
+  }
+  if (next == null) return `${shown} no es un número: los empleos no se guardarán.`;
+  if (typeof value === "number") return `Los empleos se registran como número entero: ${shown} se redondeará a ${next} al aprobar.`;
+  return `Los empleos se registran como número entero: ${shown} se guardará como ${next}.`;
+}
+
 const festsText = (list: Parameters<typeof describeFestival>[0][]) =>
   list.length ? sortFestivals(list).map(describeFestival).join("\n") : null;
 
@@ -46,7 +79,7 @@ const row = (label: string, before: string | null, after: string | null, isNew: 
 });
 
 /** Campos del aporte, comparados con el registro actual cuando es una corrección. */
-export function diffSubmission(sub: Submission, current: Film | Org | null, gaz: Gazetteer): DiffRow[] {
+export function diffSubmission(sub: Submission, current: Film | Org | Person | null, gaz: Gazetteer): DiffRow[] {
   const isNew = !current;
   if (sub.kind === "film") {
     const p = sub.payload as FilmInput;
@@ -91,6 +124,36 @@ export function diffSubmission(sub: Submission, current: Film | Org | null, gaz:
       rows.push(row("Festivales y premios", c ? festsText(c.festivals) : null, festsText(mine), isNew));
     }
     return rows;
+  }
+  if (sub.kind === "person") {
+    const p = sub.payload as PersonInput;
+    const c = (current as Person | null) ?? null;
+    const place = (o: { muni_ine?: number | null; depto_ine?: number | null } | null) => {
+      if (!o) return null;
+      const m = gaz.muni(o.muni_ine ?? null);
+      const d = gaz.depto(o.depto_ine ?? m?.depto_ine ?? null);
+      return m ? `${m.name}, ${m.depto}` : d ? `${d.name} (municipio por confirmar)` : null;
+    };
+    const roles = (o: { roles?: string[] | null; other_role?: string | null } | null | undefined) => {
+      const labels = personRoleLabels({ roles: o?.roles, other_role: o?.other_role });
+      return labels.length ? labels.join(", ") : null;
+    };
+    const credits = (list: { title?: string | null; year?: number | null; role?: string | null }[] | null | undefined) =>
+      list?.length ? list.map((x) => [x.title, x.year, x.role].filter(Boolean).join(", ")).join("\n") : null;
+    return [
+      row("Nombre", c?.name ?? null, p.name, isNew),
+      row("Oficios", roles(c), roles(p), isNew),
+      row("Lugar", place(c), place(p), isNew),
+      row("Idiomas", c?.languages?.length ? c.languages.join(", ") : null, p.languages?.length ? p.languages.join(", ") : null, isNew),
+      row("Presentación", c?.bio ?? null, p.bio ?? null, isNew),
+      row("Sitio web", c?.web ?? null, p.web ?? null, isNew),
+      row("Instagram", c?.instagram ?? null, p.instagram ?? null, isNew),
+      row("IMDb", c?.imdb ?? null, p.imdb ?? null, isNew),
+      row("Portafolio", c?.portfolio ?? null, p.portfolio ?? null, isNew),
+      row("Correo público", c?.public_email ?? null, p.public_email ?? null, isNew),
+      row("Teléfono público", c?.public_phone ?? null, p.public_phone ?? null, isNew),
+      row("Créditos", credits(c?.credits), credits(p.credits), isNew),
+    ];
   }
   const p = sub.payload as OrgInput;
   const c = (current as Org | null) ?? null;

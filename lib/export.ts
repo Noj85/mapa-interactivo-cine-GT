@@ -3,9 +3,10 @@ import { isAbroad } from "@/lib/completeness";
 import { companiesText } from "@/lib/companies";
 import { CAST_ROLE, castText, EXTRA_ROLES, namesOf, OTHER_ROLE } from "@/lib/crew";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
-import { filmFilterActive, locDepto, locationsMatching, orgFilterActive, type ExportKind, type ExportRows, type FilmFilter, type OrgFilter } from "@/lib/filters";
+import { filmFilterActive, locDepto, locationsMatching, orgFilterActive, type ExportKind, type ExportRows, type FilmFilter, type OrgFilter, type PersonFilter } from "@/lib/filters";
 import { formatLabel, natureLabel } from "@/lib/film-types";
-import { FESTIVAL_RESULTS, INITIATIVE_TYPES, NATIONALITIES, type Film, type Org } from "@/lib/types";
+import { personRoleLabels } from "@/lib/people";
+import { FESTIVAL_RESULTS, INITIATIVE_TYPES, NATIONALITIES, type Film, type Org, type Person } from "@/lib/types";
 
 export interface Table {
   /** Nombre corto para el archivo. */
@@ -159,6 +160,34 @@ export function buildTable(
   };
 }
 
+/** Directorio de personas: solo datos públicos. Nunca el correo con el que se verificó el registro. */
+export function buildPeopleTable(people: Person[], gaz: Gazetteer): Table {
+  const depto = (c: number | null) => gaz.depto(c)?.name ?? "";
+  const muni = (c: number | null) => gaz.muni(c)?.name ?? "";
+  return {
+    name: "directorio-personas",
+    title: "Directorio de técnicas y técnicos",
+    header: ["Nombre", "Oficios", "Departamento", "Municipio", "Idiomas", "Presentación", "Web", "Instagram", "IMDb", "Portafolio", "Correo público", "Teléfono público", "Créditos", "Estado"],
+    widths: [28, 32, 16, 18, 24, 40, 24, 18, 24, 24, 28, 16, 40, 11],
+    rows: people.map((p) => [
+      p.name,
+      personRoleLabels(p).join("; "),
+      depto(p.depto_ine),
+      muni(p.muni_ine),
+      p.languages.join("; "),
+      p.bio,
+      p.web,
+      p.instagram,
+      p.imdb,
+      p.portfolio,
+      p.public_email,
+      p.public_phone,
+      p.credits.map((c) => [c.title, c.year, c.role].filter(Boolean).join(", ")).join("; "),
+      estado(p.status),
+    ]),
+  };
+}
+
 // ───────────────────────── formatos ─────────────────────────
 
 const esc = (v: unknown) => {
@@ -205,7 +234,7 @@ export async function toXlsx(t: Table, notes: string[]): Promise<Buffer> {
 }
 
 /** Parte del nombre de archivo que resume los filtros (p. ej. «peten-ficcion»). */
-export const filterSlug = (tipo: ExportKind, f: FilmFilter, o: OrgFilter, gaz: Gazetteer) => {
+export const filterSlug = (tipo: ExportKind, f: FilmFilter, o: OrgFilter, gaz: Gazetteer, person?: PersonFilter) => {
   const slug = (s: string) =>
     s
       .normalize("NFD")
@@ -214,6 +243,11 @@ export const filterSlug = (tipo: ExportKind, f: FilmFilter, o: OrgFilter, gaz: G
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
   const parts: string[] = [];
+  if (tipo === "personas") {
+    if (person?.depto.length === 1) parts.push(slug(gaz.depto(person.depto[0])?.name ?? ""));
+    if (person?.oficio.length === 1) parts.push(person.oficio[0].replace(/_/g, "-"));
+    return parts.filter(Boolean).join("-");
+  }
   if (tipo !== "producciones") {
     if (o.categoria.length === 1) parts.push(slug(o.categoria[0]));
     if (o.depto.length === 1) parts.push(slug(gaz.depto(o.depto[0])?.name ?? ""));

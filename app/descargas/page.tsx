@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { DownloadsBuilder } from "@/components/downloads/DownloadsBuilder";
 import { BrandFooter } from "@/components/site/Brand";
 import { SiteHeader } from "@/components/site/SiteHeader";
+import { publicStore } from "@/lib/auth";
 import { loadDatasetCached } from "@/lib/data/load";
 import { serverGazetteer } from "@/lib/geo/server";
 
@@ -11,7 +12,12 @@ export const metadata: Metadata = {
 };
 
 export default async function DescargasPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const [data, gaz, sp] = await Promise.all([loadDatasetCached(), serverGazetteer(), searchParams]);
+  const [data, gaz, sp, people] = await Promise.all([
+    loadDatasetCached(),
+    serverGazetteer(),
+    searchParams,
+    publicStore().listPeople().catch(() => []),
+  ]);
   const initial = new URLSearchParams();
   for (const [k, v] of Object.entries(sp)) if (typeof v === "string") initial.set(k, v);
 
@@ -28,11 +34,12 @@ export default async function DescargasPage({ searchParams }: { searchParams: Pr
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Datos abiertos</p>
         <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight sm:text-[44px]">Descargas</h1>
         <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted">
-          Elige entre producciones, circulación o entidades y filtra por lugar, tipo de obra, año o presupuesto. Te llevas un archivo CSV o Excel con lo que coincide, listo para tu informe, tesis o proyecto.
+          Elige entre producciones, circulación, entidades o el directorio de personas y filtra por lugar, tipo de obra, año o presupuesto. Te llevas un archivo CSV o Excel con lo que coincide, listo para tu informe, tesis o proyecto.
         </p>
         <DownloadsBuilder
           films={data.films}
           orgs={data.orgs}
+          people={people}
           deptos={deptos}
           names={names}
           initialQuery={initial.toString()}

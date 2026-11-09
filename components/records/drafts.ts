@@ -3,7 +3,8 @@ import { contactFromFields, contactParts } from "@/lib/contact";
 import { extraCrew } from "@/lib/crew";
 import { orgCategories } from "@/lib/categories";
 import type { FilmFormat, FilmNature } from "@/lib/film-types";
-import type { FestivalResult, Film, InitiativeType, Nationality, Org } from "@/lib/types";
+import { parseLooseNumber, parseWholeNumber } from "@/lib/numbers";
+import type { FestivalResult, Film, InitiativeType, Nationality, Org, Person } from "@/lib/types";
 
 /**
  * Borradores de formulario: todo como texto, igual que lo escribe la persona.
@@ -39,6 +40,38 @@ export const toNum = (v: string) => {
   const x = Number(t.replace(/[^0-9.\-]/g, ""));
   return Number.isFinite(x) ? x : null;
 };
+
+/**
+ * Entero redondeado para días de rodaje y empleos. La coma cuenta como decimal
+ * («2,5» → 3), igual que al guardar. Vacío, negativo o texto que no es número → null.
+ */
+export function toWhole(v: string): number | null {
+  return parseWholeNumber(v);
+}
+
+/** Si el texto trae una fracción, el entero al que se redondeará. Si ya es entero, vacío o no es número, null. */
+export function wholeHint(v: string): { shown: string; to: number } | null {
+  const t = v.trim();
+  if (t === "") return null;
+  const n = parseLooseNumber(t);
+  if (n == null || n < 0 || Number.isInteger(n)) return null;
+  return { shown: t, to: Math.round(n) };
+}
+
+/** Deja solo dígitos. Con `decimal`, también un único punto o coma. «3 d» queda en «3». */
+export function numericInput(v: string, decimal = false): string {
+  if (!decimal) return v.replace(/\D/g, "");
+  let out = "";
+  let sep = false;
+  for (const ch of v) {
+    if (ch >= "0" && ch <= "9") out += ch;
+    else if (!sep && (ch === "." || ch === ",")) {
+      out += ch;
+      sep = true;
+    }
+  }
+  return out;
+}
 
 /** Una participación en un festival, como se escribe en el formulario. */
 export interface FestDraft {
@@ -198,9 +231,9 @@ export function filmPayload(d: FilmDraft) {
         site: l.site || null,
         lat: l.lat,
         lng: l.lng,
-        days: toNum(l.days),
+        days: toWhole(l.days),
         local_spend: toNum(l.local_spend),
-        jobs: toNum(l.jobs),
+        jobs: toWhole(l.jobs),
       })),
     // en una producción guatemalteca el país de todas las casas es Guatemala
     companies: d.companies
@@ -292,3 +325,80 @@ export const orgContactErrors = (d: Pick<OrgDraft, "phone" | "email">) => {
   const c = contactFromFields(d.phone, d.email);
   return { phone: c.phoneError, email: c.emailError, ok: !c.phoneError && !c.emailError };
 };
+
+export interface CreditDraft {
+  title: string;
+  year: string;
+  role: string;
+}
+
+/** Borrador de una persona del directorio. El correo de verificación no vive aquí: es el del aporte. */
+export interface PersonDraft {
+  name: string;
+  roles: string[];
+  otherRole: string;
+  depto_ine: number | null;
+  muni_ine: number | null;
+  languages: string[];
+  bio: string;
+  web: string;
+  instagram: string;
+  imdb: string;
+  portfolio: string;
+  publicEmail: string;
+  showEmail: boolean;
+  publicPhone: string;
+  showPhone: boolean;
+  photo: string | null;
+  credits: CreditDraft[];
+}
+
+export function personDraft(p?: Person): PersonDraft {
+  return {
+    name: p?.name ?? "",
+    roles: p?.roles ?? [],
+    otherRole: p?.other_role ?? "",
+    depto_ine: p?.depto_ine ?? null,
+    muni_ine: p?.muni_ine ?? null,
+    languages: p?.languages ?? [],
+    bio: p?.bio ?? "",
+    web: p?.web ?? "",
+    instagram: p?.instagram ?? "",
+    imdb: p?.imdb ?? "",
+    portfolio: p?.portfolio ?? "",
+    publicEmail: p?.public_email ?? "",
+    showEmail: !!p?.public_email,
+    publicPhone: p?.public_phone ?? "",
+    showPhone: !!p?.public_phone,
+    photo: p?.photo_url ?? null,
+    credits: (p?.credits ?? []).map((c) => ({ title: c.title, year: c.year != null ? String(c.year) : "", role: c.role ?? "" })),
+  };
+}
+
+const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+
+export function personPayload(d: PersonDraft) {
+  return {
+    name: d.name,
+    roles: d.roles,
+    other_role: d.otherRole.trim() || null,
+    depto_ine: d.depto_ine,
+    muni_ine: d.muni_ine,
+    languages: d.languages,
+    bio: d.bio.trim() || null,
+    web: d.web.trim() || null,
+    instagram: d.instagram.trim() || null,
+    imdb: d.imdb.trim() || null,
+    portfolio: d.portfolio.trim() || null,
+    public_email: d.showEmail && emailOk(d.publicEmail) ? d.publicEmail.trim().toLowerCase() : null,
+    public_phone: d.showPhone ? d.publicPhone.trim() || null : null,
+    photo_url: d.photo,
+    credits: d.credits
+      .filter((c) => c.title.trim())
+      .map((c) => ({ title: c.title.trim(), year: toWhole(c.year), role: c.role.trim() || null })),
+  };
+}
+
+/** El correo público, si se va a mostrar, tiene que ser un correo. */
+export const personEmailError = (d: Pick<PersonDraft, "publicEmail" | "showEmail">) =>
+  d.showEmail && d.publicEmail.trim() && !emailOk(d.publicEmail) ? "El correo público no parece válido." : null;

@@ -3,7 +3,8 @@ import { companyNames } from "@/lib/companies";
 import { cleanLanguages, crewSearchText } from "@/lib/crew";
 import { cleanGenres, FORMATS, formatLabel, legacyKind, NATURES, natureLabel, type FilmFormat, type FilmNature } from "@/lib/film-types";
 import { isUnlocated } from "@/lib/completeness";
-import { CIRC_CATEGORIES, IND_CATEGORIES, INITIATIVE_TYPES, NATIONALITIES, type Film, type InitiativeType, type Nationality, type Org } from "@/lib/types";
+import { personRoleLabels } from "@/lib/people";
+import { CIRC_CATEGORIES, IND_CATEGORIES, INITIATIVE_TYPES, NATIONALITIES, type Film, type InitiativeType, type Nationality, type Org, type Person } from "@/lib/types";
 import { normalize } from "@/lib/utils";
 
 /**
@@ -17,7 +18,7 @@ import { normalize } from "@/lib/utils";
 export const USD_TO_GTQ = 7.7;
 
 /** Las tres categorías de descarga: producciones, entidades de circulación y entidades de industria. */
-export type ExportKind = "producciones" | "circulacion" | "entidades";
+export type ExportKind = "producciones" | "circulacion" | "entidades" | "personas";
 /** Qué es una fila en las producciones: una por producción o una por locación de rodaje. */
 export type ExportRows = "producciones" | "locaciones" | "festivales";
 export type ExportFormat = "csv" | "xlsx";
@@ -113,8 +114,46 @@ export const kindLayer = (k: ExportKind): "circulacion" | "industria" | null => 
  * Qué se pide: `tipo` (producciones | circulacion | entidades) y, en producciones, `filas` (producciones | locaciones | festivales).
  * Entiende también los enlaces anteriores: tipo=peliculas, tipo=locaciones y tipo=entidades&capa=circulacion.
  */
+export interface PersonFilter {
+  depto: number[];
+  /** Ids de oficio. */
+  oficio: string[];
+  q: string;
+}
+
+export const EMPTY_PERSON_FILTER: PersonFilter = { depto: [], oficio: [], q: "" };
+
+export function parsePersonFilter(p: URLSearchParams): PersonFilter {
+  return {
+    depto: nums(p, "depto"),
+    oficio: list(p, "oficio"),
+    q: (p.get("q") ?? "").trim().slice(0, 120),
+  };
+}
+
+export function personFilterToParams(f: PersonFilter, into = new URLSearchParams()) {
+  if (f.depto.length) into.set("depto", f.depto.join(","));
+  if (f.oficio.length) into.set("oficio", f.oficio.join(","));
+  if (f.q) into.set("q", f.q);
+  return into;
+}
+
+export const personFilterActive = (f: PersonFilter) => f.depto.length > 0 || f.oficio.length > 0 || !!f.q;
+
+/** Personas publicadas que coinciden con el filtro. No incluye el correo de verificación. */
+export function filterPeople(people: Person[], f: PersonFilter): Person[] {
+  const nq = normalize(f.q);
+  return people.filter((p) => {
+    if (f.depto.length && (p.depto_ine == null || !f.depto.includes(p.depto_ine))) return false;
+    if (f.oficio.length && !p.roles.some((r) => f.oficio.includes(r))) return false;
+    if (!nq) return true;
+    return normalize([p.name, ...personRoleLabels(p), p.bio ?? "", ...(p.languages ?? [])].join(" ")).includes(nq);
+  });
+}
+
 export function parseExportRequest(p: URLSearchParams): { tipo: ExportKind; filas: ExportRows } {
   const t = p.get("tipo");
+  if (t === "personas") return { tipo: "personas", filas: "producciones" };
   if (t === "circulacion") return { tipo: "circulacion", filas: "producciones" };
   if (t === "entidades") return { tipo: p.get("capa") === "circulacion" ? "circulacion" : "entidades", filas: "producciones" };
   if (t === "locaciones") return { tipo: "producciones", filas: "locaciones" };

@@ -8,7 +8,7 @@ import { setRecordsStatusAction } from "@/app/admin/actions";
 import { RequestInfoDialog, type RequestTarget } from "@/components/admin/RequestInfoDialog";
 import { CompletenessBadge } from "@/components/ui/Badges";
 import { cn, normalize } from "@/lib/utils";
-import type { RecordStatus, SubmissionKind } from "@/lib/types";
+import type { RecordStatus } from "@/lib/types";
 import { PosterImage } from "@/components/ui/PosterImage";
 
 /** Una fila del listado, ya preparada en el servidor (solo datos simples). */
@@ -75,7 +75,7 @@ export function RecordsTable({
   typeLabel,
   typeOptions,
 }: {
-  kind: SubmissionKind;
+  kind: "film" | "org";
   rows: RecordRow[];
   typeLabel: string;
   typeOptions: { value: string; label: string }[];

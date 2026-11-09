@@ -1,16 +1,16 @@
-import { filmCompleteness, isAbroad, orgCompleteness } from "@/lib/completeness";
+import { filmCompleteness, isAbroad, orgCompleteness, personCompleteness } from "@/lib/completeness";
 import { normalizeCategories } from "@/lib/categories";
 import { cleanGenres, cleanMinutes } from "@/lib/film-types";
 import { cleanLanguages, composeCrew, coreFields } from "@/lib/crew";
 import { unifyLocations } from "@/lib/locations";
-import { FESTIVAL_RESULTS, type Film, type FilmCompany, type FilmCrewMember, type FilmFestival, type FilmInput, type FilmLocation, type Org, type OrgInput } from "@/lib/types";
+import { parseLooseNumber, parseWholeNumber } from "@/lib/numbers";
+import { cleanCredits, cleanPersonRoles } from "@/lib/people";
+import { FESTIVAL_RESULTS, type Film, type FilmCompany, type FilmCrewMember, type FilmFestival, type FilmInput, type FilmLocation, type Org, type OrgInput, type Person, type PersonInput } from "@/lib/types";
 import { slugify, upperTitle } from "@/lib/utils";
 
-const num = (v: unknown): number | null => {
-  if (v === null || v === undefined || v === "") return null;
-  const n = typeof v === "number" ? v : Number(String(v).replace(/[^0-9.\-]/g, ""));
-  return Number.isFinite(n) ? n : null;
-};
+const num = (v: unknown): number | null => parseLooseNumber(v);
+/** Número entero (redondeado) o null; negativos y texto sin dígitos no valen. */
+const whole = (v: unknown): number | null => parseWholeNumber(v);
 const str = (v: unknown): string | null => {
   if (v === null || v === undefined) return null;
   const s = String(v).trim();
@@ -82,9 +82,10 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string; e
       site: str(l.site),
       lat: num(l.lat),
       lng: num(l.lng),
-      days: num(l.days),
+      // días y empleos son enteros en la base: «2.5 días» se guarda como 3 en vez de romper el guardado
+      days: whole(l.days),
       local_spend: num(l.local_spend),
-      jobs: num(l.jobs),
+      jobs: whole(l.jobs),
       confidence: l.confidence ?? null,
     };
   });
@@ -152,6 +153,38 @@ export function buildOrg(input: OrgInput, opts: { id?: string; slug: string; sou
     categories,
     city: str(input.city),
     logo_url: str(input.logo_url),
+    source: str(input.source) ?? opts.source ?? null,
+    ...base,
+    status: c.publishable && input.status === "published" ? "published" : "draft",
+    completeness: c.completeness,
+    missing_fields: c.missing,
+  };
+}
+
+export function buildPerson(input: PersonInput, opts: { id?: string; slug: string; source?: string | null }): Person {
+  const muni = num(input.muni_ine);
+  const depto = num(input.depto_ine) ?? (muni != null ? Math.floor(muni / 100) : null);
+  const base = {
+    name: input.name.trim(),
+    roles: cleanPersonRoles(input.roles),
+    other_role: str(input.other_role),
+    depto_ine: depto,
+    muni_ine: muni,
+    languages: cleanLanguages(input.languages),
+    bio: str(input.bio)?.slice(0, 600) ?? null,
+    web: str(input.web),
+    instagram: str(input.instagram),
+    imdb: str(input.imdb),
+    portfolio: str(input.portfolio),
+    public_email: str(input.public_email)?.toLowerCase() ?? null,
+    public_phone: str(input.public_phone),
+    credits: cleanCredits(input.credits),
+  };
+  const c = personCompleteness(base);
+  return {
+    id: input.id ?? opts.id ?? newId(),
+    slug: opts.slug,
+    photo_url: str(input.photo_url),
     source: str(input.source) ?? opts.source ?? null,
     ...base,
     status: c.publishable && input.status === "published" ? "published" : "draft",

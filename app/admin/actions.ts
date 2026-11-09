@@ -7,20 +7,23 @@ import { linkFestivals, syncOrgFestivalSafe } from "@/lib/festivals-server";
 import { serverGazetteer } from "@/lib/geo/server";
 import { deletePublicImages } from "@/lib/posters";
 import { droppedVideoThumbs, ensureVideoThumbs } from "@/lib/video";
-import { filmSchema, orgSchema } from "@/lib/schemas";
+import { filmSchema, orgSchema, personSchema } from "@/lib/schemas";
 import { isAbroad } from "@/lib/completeness";
 import { applyFilmFields, applyOrgFields, createFilmFromImport, createOrgFromImport, planFilmUpdate, planOrgUpdate } from "@/lib/import/apply-server";
 import { applyCorrection, planCorrection } from "@/lib/submissions-plan";
 import { applyMerge, type MergeChoice } from "@/lib/merge-films";
 import { unifyLocations } from "@/lib/locations";
+import { filmTypeFixes, submissionTypeFixes } from "@/lib/type-cleanup";
 import { z } from "zod";
-import type { Film, FilmInput, Org, OrgInput, QuestionStatus, RecordStatus } from "@/lib/types";
+import type { Film, FilmInput, Org, OrgInput, Person, PersonInput, QuestionStatus, RecordStatus } from "@/lib/types";
 
 type Result = { ok: true; id: string } | { ok: false; error: string };
 
 const refresh = () => {
   revalidatePath("/");
   revalidatePath("/admin");
+  revalidatePath("/directorio");
+  revalidatePath("/descargas");
 };
 
 export async function saveFilmAction(raw: unknown): Promise<Result> {
@@ -37,6 +40,32 @@ export async function saveFilmAction(raw: unknown): Promise<Result> {
     if (gone.length) await deletePublicImages(gone);
     refresh();
     return { ok: true, id: film.id };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+export async function savePersonAction(raw: unknown): Promise<Result> {
+  await requireSession();
+  const parsed = personSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    const store = await adminStore();
+    const person = await store.savePerson(parsed.data as unknown as PersonInput);
+    refresh();
+    return { ok: true, id: person.id };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+export async function deletePersonAction(id: string): Promise<Result> {
+  await requireSession();
+  try {
+    const store = await adminStore();
+    await store.deletePerson(id);
+    refresh();
+    return { ok: true, id };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
@@ -195,6 +224,44 @@ export async function unifyLocationsAction(ids: string[]): Promise<{ ok: true; f
   }
 }
 
+/**
+ * Corrige números ya guardados con el tipo mal (texto o decimal donde va un entero).
+ * Recalcula sobre lo que hay hoy y reescribe solo esos campos.
+ */
+export async function cleanNumberTypesAction(): Promise<
+  { ok: true; films: number; submissions: number; fields: number } | { ok: false; error: string }
+> {
+  await requireSession();
+  try {
+    const store = await adminStore();
+    const [films, submissions] = await Promise.all([store.listFilms({ drafts: true }), store.listSubmissions().catch(() => [])]);
+    let filmCount = 0;
+    let submissionCount = 0;
+    let fields = 0;
+    for (const film of films) {
+      const hit = filmTypeFixes(film);
+      if (!hit) continue;
+      await store.saveFilm({ ...hit.input, id: film.id, status: film.status });
+      filmCount++;
+      fields += hit.fixes.length;
+    }
+    for (const sub of submissions) {
+      const hit = submissionTypeFixes(sub);
+      if (!hit) continue;
+      await store.replaceSubmissionPayload(sub.id, hit.payload);
+      submissionCount++;
+      fields += hit.fixes.length;
+    }
+    refresh();
+    revalidatePath("/admin/peliculas");
+    revalidatePath("/admin/aportes");
+    revalidatePath("/admin/ajustes/tipos");
+    return { ok: true, films: filmCount, submissions: submissionCount, fields };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
 export async function deleteOrgAction(id: string): Promise<Result> {
   await requireSession();
   try {
@@ -279,7 +346,7 @@ const SOURCE_PUBLIC = "Aporte del público";
 export async function approveSubmissionAction(
   id: string,
   opts: { publish: boolean; note?: string | null; accepted?: string[] },
-): Promise<{ ok: true; kind: "film" | "org"; recordId: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; kind: "film" | "org" | "person"; recordId: string } | { ok: false; error: string }> {
   await requireSession();
   try {
     const store = await adminStore();
@@ -287,6 +354,7 @@ export async function approveSubmissionAction(
     if (!sub) return { ok: false, error: "Aporte no encontrado" };
     if (sub.status !== "pending") return { ok: false, error: "Este aporte ya fue revisado" };
     if (sub.origin === "carga") return { ok: false, error: "Este aporte viene de una carga de archivo: se revisa campo por campo." };
+    if (sub.kind === "person" && opts.accepted) return { ok: false, error: "El registro de una persona se aprueba completo." };
     const newStatus: RecordStatus = opts.publish ? "published" : "draft";
     let recordId: string;
     let reviewNote = opts.note ?? null;
@@ -368,6 +436,20 @@ export async function approveSubmissionAction(
         if (gone.length) await deletePublicImages(gone);
       }
       recordId = film.id;
+    } else if (sub.kind === "person") {
+      const parsed = personSchema.safeParse(sub.payload);
+      if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+      const input = parsed.data as unknown as PersonInput;
+      const current = sub.target_id ? await store.getPerson(sub.target_id) : null;
+      if (sub.target_id && !current) return { ok: false, error: "El registro a corregir ya no existe" };
+      const photo = input.photo_url || current?.photo_url || null;
+      const person = await store.savePerson(
+        current
+          ? { ...input, id: current.id, photo_url: photo, status: opts.publish ? "published" : current.status, source: current.source }
+          : { ...input, photo_url: photo, status: newStatus, source: SOURCE_PUBLIC },
+      );
+      if (current?.photo_url && photo !== current.photo_url) await deletePublicImages([current.photo_url]);
+      recordId = person.id;
     } else {
       const parsed = orgSchema.safeParse(sub.payload);
       if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -410,6 +492,7 @@ export async function approveImportSubmissionAction(
     if (!sub) return { ok: false, error: "Aporte no encontrado" };
     if (sub.origin !== "carga") return { ok: false, error: "Este aporte no viene de una carga de archivo." };
     if (sub.status !== "pending") return { ok: false, error: "Este aporte ya fue revisado" };
+    if (sub.kind === "person") return { ok: false, error: "Las personas no se cargan desde un archivo." };
     let recordId: string;
 
     if (opts.mode === "create") {

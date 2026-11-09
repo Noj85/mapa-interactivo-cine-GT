@@ -8,13 +8,15 @@ import { serverGazetteer } from "@/lib/geo/server";
 import { posterThumb } from "@/lib/poster-url";
 import { planFilmUpdate, planOrgUpdate } from "@/lib/import/diff";
 import { filmSchema, orgSchema } from "@/lib/schemas";
-import { diffSubmission } from "@/lib/submissions";
+import { decimalRoundNotes, diffSubmission } from "@/lib/submissions";
 import { planCorrection } from "@/lib/submissions-plan";
-import type { Film, FilmInput, Org, OrgInput, SubmissionKind } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import type { Film, FilmInput, Org, OrgInput, Person, SubmissionKind } from "@/lib/types";
+import { cn, normalize } from "@/lib/utils";
+
+const kindLabel = (k: SubmissionKind) => (k === "film" ? "Producción" : k === "person" ? "Persona" : "Entidad");
 
 function ImageBox({ url, kind, alt }: { url: string; kind: SubmissionKind; alt: string }) {
-  if (kind === "film") return <PosterImage src={url} alt={alt} heightClass="h-48" maxWidthClass="max-w-[20rem]" className="rounded-lg border border-line bg-surface-2" />;
+  if (kind === "film" || kind === "person") return <PosterImage src={url} alt={alt} heightClass="h-48" maxWidthClass="max-w-[20rem]" className="rounded-lg border border-line bg-surface-2" />;
   return (
     <div className="h-32 w-32 overflow-hidden rounded-lg border border-line bg-white">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -28,16 +30,27 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
   const store = await adminStore();
   const sub = await store.getSubmission(id);
   if (!sub) notFound();
-  const [gaz, current] = await Promise.all([
+  const [gaz, current, people] = await Promise.all([
     serverGazetteer(),
-    sub.target_id ? (sub.kind === "film" ? store.getFilm(sub.target_id) : store.getOrg(sub.target_id)) : Promise.resolve(null),
+    sub.target_id
+      ? sub.kind === "film"
+        ? store.getFilm(sub.target_id)
+        : sub.kind === "person"
+          ? store.getPerson(sub.target_id)
+          : store.getOrg(sub.target_id)
+      : Promise.resolve(null),
+    sub.kind === "person" ? store.listPeople({ drafts: true }).catch(() => []) : Promise.resolve([]),
   ]);
   const rows = diffSubmission(sub, current, gaz);
+  const sameName =
+    sub.kind === "person"
+      ? people.filter((x) => normalize(x.name) === normalize(sub.label) && x.id !== sub.target_id)
+      : [];
 
   // Carga de archivo: qué traería el archivo para cada registro posible, comparado con lo que tiene HOY
   const isCarga = sub.origin === "carga";
   const cargaOptions: CargaOption[] = [];
-  if (isCarga) {
+  if (isCarga && sub.kind !== "person") {
     const names = { muni: (c: number | null | undefined) => gaz.muni(c ?? null)?.name ?? "", depto: (c: number | null | undefined) => gaz.depto(c ?? null)?.name ?? "" };
     const parsed = sub.kind === "film" ? filmSchema.safeParse(sub.payload) : orgSchema.safeParse(sub.payload);
     const incoming = parsed.success ? parsed.data : sub.payload;
@@ -51,24 +64,49 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
   }
   const isCorrection = !!sub.target_id;
   // corrección pendiente a un registro que existe: sus cambios se pueden marcar uno por uno
-  const correctionItems = sub.status === "pending" && !isCarga && isCorrection && current ? planCorrection(sub, current, gaz).items : [];
+  const correctionItems = sub.status === "pending" && !isCarga && isCorrection && current && sub.kind !== "person" ? planCorrection(sub, current as Film | Org, gaz).items : [];
   const splitReview = correctionItems.length > 0;
   const visible = isCorrection ? rows : rows.filter((r) => r.after);
   const changes = rows.filter((r) => r.changed).length;
-  const payload = sub.payload as { poster_url?: string | null; logo_url?: string | null };
-  const proposedImage = (sub.kind === "film" ? payload.poster_url : payload.logo_url) || null;
-  const currentImage = current ? (sub.kind === "film" ? (current as Film).poster_url : (current as Org).logo_url) ?? null : null;
+  const payload = sub.payload as { poster_url?: string | null; logo_url?: string | null; photo_url?: string | null };
+  const proposedImage = (sub.kind === "film" ? payload.poster_url : sub.kind === "person" ? payload.photo_url : payload.logo_url) || null;
+  const currentImage = current
+    ? sub.kind === "film"
+      ? (current as Film).poster_url
+      : sub.kind === "person"
+        ? (current as Person).photo_url
+        : (current as Org).logo_url
+    : null;
   const imageChanges = !!proposedImage && !!current && proposedImage !== currentImage;
-  const imageLabel = sub.kind === "film" ? "Póster" : "Logo";
-  const resultHref = sub.result_id ? (sub.kind === "film" ? `/admin/peliculas/${sub.result_id}` : `/admin/entidades/${sub.result_id}`) : null;
+  const imageLabel = sub.kind === "film" ? "Póster" : sub.kind === "person" ? "Foto" : "Logo";
+  const resultHref = sub.result_id
+    ? sub.kind === "film"
+      ? `/admin/peliculas/${sub.result_id}`
+      : sub.kind === "person"
+        ? `/admin/personas/${sub.result_id}`
+        : `/admin/entidades/${sub.result_id}`
+    : null;
+  const roundNotes = sub.kind === "film" && sub.status === "pending" ? decimalRoundNotes((sub.payload as FilmInput).locations) : [];
 
   return (
     <div className="max-w-3xl">
       <Link href="/admin/aportes" className="text-sm text-muted hover:text-ink">← Aportes</Link>
       <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-accent">
-        {sub.origin === "recopilacion" && "Recopilación · "}{isCarga && "Carga de archivo · "}{isCarga ? (isCorrection ? "Diferencias con el registro" : "Coincidencia dudosa") : isCorrection ? "Corrección" : "Registro nuevo"} · {sub.kind === "film" ? "Producción" : "Entidad"}
+        {sub.origin === "recopilacion" && "Recopilación · "}{isCarga && "Carga de archivo · "}{isCarga ? (isCorrection ? "Diferencias con el registro" : "Coincidencia dudosa") : isCorrection ? "Corrección" : "Registro nuevo"} · {kindLabel(sub.kind)}
       </p>
       <h1 className="mt-1 font-display text-4xl tracking-tight">{sub.label}</h1>
+      {sameName.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-warn/30 bg-warn/5 px-4 py-3 text-sm">
+          Ya hay {sameName.length === 1 ? "una persona" : `${sameName.length} personas`} con este nombre:{" "}
+          {sameName.map((p, i) => (
+            <span key={p.id}>
+              {i > 0 && ", "}
+              <Link className="text-accent hover:underline" href={`/admin/personas/${p.id}`}>{p.name}</Link>
+            </span>
+          ))}
+          . Revisa que no sea la misma antes de aprobar.
+        </div>
+      )}
       <p className="mt-1 text-sm text-muted">
         Enviado el {new Date(sub.created_at).toLocaleString("es-GT", { dateStyle: "long", timeStyle: "short" })}
         {sub.contact && <> · Correo: <a className="underline decoration-line underline-offset-2 hover:text-ink" href={`mailto:${sub.contact}`}>{sub.contact}</a></>}
@@ -155,6 +193,12 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
           </div>
         ))}
       </dl>
+
+      {roundNotes.length > 0 && (
+        <div className="mt-4 space-y-1 rounded-2xl border border-warn/30 bg-warn/5 px-4 py-3 text-sm leading-relaxed text-warn">
+          {roundNotes.map((n) => <p key={n}>{n}</p>)}
+        </div>
+      )}
 
       {sub.status === "pending" && isCarga && (
         <div className="mt-6">

@@ -61,6 +61,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     enabled: false,
   },
   {
+    id: "tipos",
+    group: "Datos",
+    title: "Tipos de número",
+    description: "Revisar días, empleos y otros números ya guardados que traen texto o decimales, y dejarlos como enteros.",
+    enabled: true,
+  },
+  {
     id: "respaldo",
     group: "Datos",
     title: "Respaldo y exportación",

@@ -33,6 +33,19 @@ export function parseNumber(v: unknown): number | null {
   return Number.isFinite(n) && t !== "" ? n * mult : null;
 }
 
+/**
+ * Días de rodaje y empleos se guardan enteros. Si el valor trae decimales,
+ * `from` es el texto original para avisar a qué entero se redondea.
+ */
+export function parseWhole(v: unknown): { value: number | null; from: string | null } {
+  const raw = cleanText(v);
+  const n = parseNumber(v);
+  if (n == null) return { value: null, from: null };
+  if (n < 0) return { value: n, from: null };
+  const rounded = Math.round(n);
+  return { value: rounded, from: rounded === n ? null : raw };
+}
+
 export function parseYear(v: unknown): number | null {
   const s = cleanText(v);
   if (!s) return null;

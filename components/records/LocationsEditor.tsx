@@ -7,9 +7,22 @@ import { PlaceSelect } from "./PlaceSelect";
 import { COUNTRIES } from "@/lib/countries";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
 import { unifyLocations } from "@/lib/locations";
-import { blankLoc, isBlankLoc, type LocDraft } from "./drafts";
+import { blankLoc, isBlankLoc, numericInput, wholeHint, type LocDraft } from "./drafts";
 
 const MAX_LOCS = 20;
+
+/** Aviso solo cuando el valor trae decimales: dice a qué entero se redondea. */
+function RoundNotes({ days, jobs }: { days: string; jobs: string }) {
+  const d = wholeHint(days);
+  const j = wholeHint(jobs);
+  if (!d && !j) return null;
+  return (
+    <div className="mt-2 space-y-1">
+      {d && <p className="text-xs leading-snug text-warn">Los días de rodaje se registran en jornadas completas: {d.shown} se guardará como {d.to}.</p>}
+      {j && <p className="text-xs leading-snug text-warn">Los empleos se registran como número entero: {j.shown} se guardará como {j.to}.</p>}
+    </div>
+  );
+}
 
 /** Dónde se rodó una producción: una locación por lugar, con su punto en el mapa, días, inversión y empleos. */
 export function LocationsEditor({ locs, onChange }: { locs: LocDraft[]; onChange: (next: LocDraft[]) => void }) {
@@ -158,17 +171,19 @@ export function LocationsEditor({ locs, onChange }: { locs: LocDraft[]; onChange
             <div className="mt-3 grid grid-cols-3 gap-3">
               <div>
                 <label className="label">Días</label>
-                <input className="field" inputMode="numeric" value={l.days} onChange={(e) => setLoc(i, { days: e.target.value })} />
+                <input className="field" inputMode="decimal" value={l.days} onChange={(e) => setLoc(i, { days: numericInput(e.target.value, true) })} />
+                <p className="mt-1 text-xs leading-snug text-muted">Jornadas completas; la fracción se redondea.</p>
               </div>
               <div>
                 <label className="label">Inversión local (Q)</label>
-                <input className="field" inputMode="decimal" value={l.local_spend} onChange={(e) => setLoc(i, { local_spend: e.target.value })} />
+                <input className="field" inputMode="decimal" value={l.local_spend} onChange={(e) => setLoc(i, { local_spend: numericInput(e.target.value, true) })} />
               </div>
               <div>
                 <label className="label">Empleos</label>
-                <input className="field" inputMode="numeric" value={l.jobs} onChange={(e) => setLoc(i, { jobs: e.target.value })} />
+                <input className="field" inputMode="decimal" value={l.jobs} onChange={(e) => setLoc(i, { jobs: numericInput(e.target.value, true) })} />
               </div>
             </div>
+            <RoundNotes days={l.days} jobs={l.jobs} />
           </div>
         ))}
         <datalist id="loc-countries">
