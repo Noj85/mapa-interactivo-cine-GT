@@ -2,6 +2,7 @@ import { filmCompleteness, isAbroad, orgCompleteness } from "@/lib/completeness"
 import { normalizeCategories } from "@/lib/categories";
 import { cleanGenres, cleanMinutes } from "@/lib/film-types";
 import { cleanLanguages, composeCrew, coreFields } from "@/lib/crew";
+import { unifyLocations } from "@/lib/locations";
 import { FESTIVAL_RESULTS, type Film, type FilmCompany, type FilmCrewMember, type FilmFestival, type FilmInput, type FilmLocation, type Org, type OrgInput } from "@/lib/types";
 import { slugify, upperTitle } from "@/lib/utils";
 
@@ -65,7 +66,7 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string; e
     },
     input.crew ?? opts.existing?.crew ?? [],
   );
-  const locations: FilmLocation[] = (input.locations ?? []).map((l, i) => {
+  const rawLocations: FilmLocation[] = (input.locations ?? []).map((l, i) => {
     // fuera de Guatemala no hay departamento ni municipio; «Guatemala» como país es lo normal y no se guarda
     const country = str(l.country);
     const abroad = isAbroad({ country });
@@ -87,6 +88,8 @@ export function buildFilm(input: FilmInput, opts: { id?: string; slug: string; e
       confidence: l.confidence ?? null,
     };
   });
+  // en un departamento solo cuenta como locación aparte la que tiene un municipio distinto (ver lib/locations.ts)
+  const locations = unifyLocations(rawLocations).locations;
   const base = {
     title: upperTitle(input.title),
     year: num(input.year),

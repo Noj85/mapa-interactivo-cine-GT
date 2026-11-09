@@ -6,6 +6,7 @@ import { LocationPicker, type PickedPoint } from "@/components/admin/LocationPic
 import { PlaceSelect } from "./PlaceSelect";
 import { COUNTRIES } from "@/lib/countries";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
+import { unifyLocations } from "@/lib/locations";
 import { blankLoc, isBlankLoc, type LocDraft } from "./drafts";
 
 const MAX_LOCS = 20;
@@ -20,6 +21,15 @@ export function LocationsEditor({ locs, onChange }: { locs: LocDraft[]; onChange
   useEffect(() => {
     loadGeo().then(setGeo).catch(() => {});
   }, []);
+
+  // dentro de un departamento solo cuenta como otra locación la de un municipio distinto: se avisa antes de guardar
+  const unifyNote = (() => {
+    const res = unifyLocations(locs.filter((l) => !isBlankLoc(l)).map((l) => ({ muni_ine: l.muni_ine, depto_ine: l.depto_ine, country: l.abroad ? l.country || "fuera" : null })));
+    const parts: string[] = [];
+    if (res.merged.length) parts.push(`Al guardar, ${res.merged.length === 1 ? "una locación repetida se unirá" : `${res.merged.length} locaciones repetidas se unirán`} con otra del mismo departamento: dentro de un departamento solo cuenta como locación aparte la de un municipio distinto, y se conserva la cifra mayor de días, inversión y empleos.`);
+    if (res.manual.length) parts.push("Hay un departamento con varios municipios y una locación sin municipio: elige a qué municipio corresponde o quítala.");
+    return parts.join(" ");
+  })();
 
   const setLoc = (i: number, patch: Partial<LocDraft>) => onChange(locs.map((l, j) => (j === i ? { ...l, ...patch } : l)));
 
@@ -172,6 +182,8 @@ export function LocationsEditor({ locs, onChange }: { locs: LocDraft[]; onChange
           </div>
         )}
       </div>
+
+      {unifyNote && <p className="mt-3 rounded-xl border border-line bg-surface-2/50 px-3 py-2 text-xs leading-relaxed text-muted">{unifyNote}</p>}
 
       {picker != null && locs[picker] && (
         <LocationPicker

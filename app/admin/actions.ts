@@ -12,6 +12,7 @@ import { isAbroad } from "@/lib/completeness";
 import { applyFilmFields, applyOrgFields, createFilmFromImport, createOrgFromImport, planFilmUpdate, planOrgUpdate } from "@/lib/import/apply-server";
 import { applyCorrection, planCorrection } from "@/lib/submissions-plan";
 import { applyMerge, type MergeChoice } from "@/lib/merge-films";
+import { unifyLocations } from "@/lib/locations";
 import { z } from "zod";
 import type { Film, FilmInput, Org, OrgInput, QuestionStatus, RecordStatus } from "@/lib/types";
 
@@ -159,6 +160,36 @@ export async function mergeFilmsAction(aId: string, bId: string, raw: unknown): 
     revalidatePath("/admin/peliculas");
     revalidatePath("/admin/aportes");
     return { ok: true, id: saved.id };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/**
+ * Unifica las locaciones repetidas por departamento (regla en lib/locations.ts) de las producciones indicadas.
+ * Recalcula sobre los registros de hoy; lo que queda en revisión manual no se toca.
+ */
+export async function unifyLocationsAction(ids: string[]): Promise<{ ok: true; films: number; merged: number } | { ok: false; error: string }> {
+  await requireSession();
+  const list = [...new Set(ids)].filter((x) => typeof x === "string" && x.length > 0 && x.length <= 80).slice(0, 2000);
+  if (!list.length) return { ok: false, error: "No hay producciones seleccionadas" };
+  try {
+    const store = await adminStore();
+    let films = 0;
+    let merged = 0;
+    for (const id of list) {
+      const film = await store.getFilm(id);
+      if (!film) continue;
+      const res = unifyLocations(film.locations);
+      if (!res.merged.length) continue;
+      await store.saveFilm({ ...film, locations: res.locations, status: film.status });
+      films++;
+      merged += res.merged.length;
+    }
+    refresh();
+    revalidatePath("/admin/peliculas");
+    revalidatePath("/admin/resumen");
+    return { ok: true, films, merged };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }

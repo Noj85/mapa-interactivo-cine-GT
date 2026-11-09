@@ -93,23 +93,13 @@ export default function CreditosPage() {
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <section className="rounded-2xl border border-line bg-surface p-5">
             <h2 className="font-display text-xl font-semibold">Autoría</h2>
-            <dl className="mt-3 space-y-3 text-sm leading-relaxed">
+            <dl className="mt-3 text-sm leading-relaxed">
               <div>
-                <dt className="font-medium text-ink">Arquitectura, diseño del sistema y desarrollo</dt>
-                <dd className="text-muted">Javier Oswaldo Borrayo Mazariegos</dd>
-              </div>
-              <div>
-                <dt className="font-medium text-ink">Diseño gráfico y UI/UX</dt>
-                <dd className="text-muted">Por definir.</dd>
+                <dt className="font-medium text-ink">Arquitectura, diseño del sistema, desarrollo, diseño gráfico y UI/UX</dt>
+                <dd className="text-muted">Javier Borrayo </dd>
               </div>
             </dl>
-            <p className="mt-4 text-xs leading-relaxed text-muted">
-              El software es © {new Date().getFullYear()} Javier Oswaldo Borrayo Mazariegos, todos los derechos reservados. La información del mapa no se reclama como propiedad de nadie y se puede descargar con filtros desde{" "}
-              <Link href="/descargas" className={A}>
-                descargas
-              </Link>
-              . Los logotipos son marcas de sus titulares.
-            </p>
+            <p className="mt-4 text-xs leading-relaxed text-muted">Los logotipos son marcas de sus titulares.</p>
           </section>
 
           <section className="rounded-2xl border border-line bg-surface p-5">

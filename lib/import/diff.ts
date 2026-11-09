@@ -216,15 +216,18 @@ function filmItems(existing: Film, incoming: FilmInput, names?: PlaceNames): Ite
     const siteIs = (s: string | null | undefined) => sameSite(s, nl.site);
     const deptoOf = nl.depto_ine ?? (nl.muni_ine != null ? Math.floor(nl.muni_ine / 100) : null);
     const lDepto = (l: { depto_ine: number | null; muni_ine: number | null }) => l.depto_ine ?? (l.muni_ine != null ? Math.floor(l.muni_ine / 100) : null);
-    // 1. la misma locación: se completan solo sus cifras vacías
+    // 1. la misma locación: se completan solo sus cifras vacías.
+    //    En Guatemala, dentro de un departamento solo cuenta como otra locación la de un municipio distinto (lib/locations.ts):
+    //    el sitio no distingue, y una fila sin municipio es la misma locación que cualquiera del departamento.
     let match = abroad
       ? existing.locations.find((l) => isAbroad(l) && normalize(l.country ?? "") === normalize(nl.country ?? "") && normalize(l.city ?? "") === normalize(nl.city ?? ""))
-      : existing.locations.find((l) => !isAbroad(l) && (nl.muni_ine != null ? l.muni_ine === nl.muni_ine : l.muni_ine == null && lDepto(l) === deptoOf) && siteIs(l.site));
+      : existing.locations.find((l) => !isAbroad(l) && (nl.muni_ine != null ? l.muni_ine === nl.muni_ine : deptoOf != null ? lDepto(l) === deptoOf : l.muni_ine == null && lDepto(l) == null && siteIs(l.site)));
     let completesPlace = false;
-    // 2. una locación existente sin municipio que este archivo sí ubica
+    // 2. una locación existente sin municipio que este archivo sí ubica (si el departamento no tiene ya otros municipios)
     if (!match && !abroad && nl.muni_ine != null) {
+      const munisInDepto = existing.locations.filter((l) => !isAbroad(l) && l.muni_ine != null && lDepto(l) === deptoOf).length;
       match = existing.locations.find(
-        (l) => !isAbroad(l) && l.muni_ine == null && !claimed.has(l.id) && siteIs(l.site) && (lDepto(l) == null || lDepto(l) === deptoOf),
+        (l) => !isAbroad(l) && l.muni_ine == null && !claimed.has(l.id) && (lDepto(l) == null ? siteIs(l.site) : lDepto(l) === deptoOf && munisInDepto === 0),
       );
       completesPlace = !!match;
     }

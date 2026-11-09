@@ -7,6 +7,7 @@ import { openRequestCounts, filmRows } from "@/lib/admin-rows";
 import { adminStore } from "@/lib/auth";
 import { serverGazetteer } from "@/lib/geo/server";
 import { FORMATS } from "@/lib/film-types";
+import { locationsNeedWork } from "@/lib/locations";
 import { likelyDuplicates } from "@/lib/merge-films";
 
 export default async function FilmsPage() {
@@ -20,6 +21,7 @@ export default async function FilmsPage() {
   ]);
   films.sort((a, b) => a.title.localeCompare(b.title));
   const dupes = likelyDuplicates(films);
+  const unifyCount = films.filter((f) => locationsNeedWork(f.locations)).length;
   const byId = new Map(films.map((f) => [f.id, f]));
   return (
     <div>
@@ -29,6 +31,14 @@ export default async function FilmsPage() {
       {films.length > 0 && (
         <div className="mb-4">
           <BulkPosterUploader films={films.map((f) => ({ id: f.id, title: f.title, slug: f.slug }))} />
+        </div>
+      )}
+      {unifyCount > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-warn/30 bg-warn/5 px-4 py-3 text-sm">
+          <span className="font-medium">
+            {unifyCount === 1 ? "1 producción con locaciones repetidas por departamento" : `${unifyCount} producciones con locaciones repetidas por departamento`}
+          </span>
+          <Link className="text-accent underline underline-offset-2" href="/admin/peliculas/locaciones">Revisar y unificar</Link>
         </div>
       )}
       {dupes.length > 0 && (

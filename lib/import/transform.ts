@@ -6,6 +6,7 @@ import type { PolyCollection } from "@/lib/geo/load";
 import { municipalityAt } from "@/lib/geo/pip";
 import type { FilmCrewMember, FilmInput, OrgInput } from "@/lib/types";
 import { cleanCrew, cleanLanguages, crewFromCell, EXTRA_ROLES, OTHER_ROLE, parseLanguageCell } from "@/lib/crew";
+import { unifiedIndexMap, unifyLocations } from "@/lib/locations";
 import { crewFieldId } from "./types";
 import { normalizeCategories } from "@/lib/categories";
 import { normalize, upperTitle } from "@/lib/utils";
@@ -545,5 +546,30 @@ export function buildCandidates(
     if (!sheet) continue;
     out.push(...(sp.entity === "film" ? filmCandidates(sheet, sp, places, geo) : orgCandidates(sheet, sp, places, geo)));
   }
-  return mergeInFile(out);
+  return mergeInFile(out).map(unifyCandidateLocations);
+}
+
+/**
+ * Aplica la regla de locaciones (un municipio distinto por locación dentro de un departamento) a una producción
+ * del archivo y lleva sus avisos a la nueva posición; los avisos de una fila que se unió a otra se descartan.
+ */
+function unifyCandidateLocations(c: Candidate): Candidate {
+  if (c.type !== "film" || !c.film?.locations?.length) return c;
+  const orig = c.film.locations;
+  const res = unifyLocations(orig);
+  if (!res.merged.length) return c;
+  const map = unifiedIndexMap(orig, res);
+  const issues: Issue[] = [];
+  for (const is of c.issues) {
+    const m = is.field.match(/^location:(\d+)$/);
+    if (!m) {
+      issues.push(is);
+      continue;
+    }
+    const i = Number(m[1]);
+    // la fila se queda (sola o como base de su grupo); una que se unió a otra ya no existe y su aviso tampoco
+    const stays = res.locations.includes(orig[i]) || res.merged.some((g) => g.from[0] === orig[i]);
+    if (stays && map[i] >= 0) issues.push({ ...is, field: `location:${map[i]}` });
+  }
+  return { ...c, film: { ...c.film, locations: res.locations }, issues };
 }
