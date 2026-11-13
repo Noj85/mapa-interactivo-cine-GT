@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, MapPinned } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { LocationPicker } from "@/components/admin/LocationPicker";
 import { PlaceSelect } from "./PlaceSelect";
 import { MAX_CATEGORIES } from "@/lib/categories";
@@ -11,7 +11,7 @@ import { normalizeEmail, normalizePhone } from "@/lib/contact";
 import { orgContactErrors, type OrgDraft, type OrgLayerId } from "./drafts";
 
 /** Campos de una entidad. Los usa el editor del equipo y el formulario público. */
-export function OrgFields({ draft: d, onChange }: { draft: OrgDraft; onChange: (patch: Partial<OrgDraft>) => void }) {
+export function OrgFields({ draft: d, onChange, belowMain }: { draft: OrgDraft; onChange: (patch: Partial<OrgDraft>) => void; belowMain?: ReactNode }) {
   const [picker, setPicker] = useState(false);
   const base: readonly string[] = d.layer === "circulacion" ? CIRC_CATEGORIES : IND_CATEGORIES;
   // categorías antiguas que no están en la lista (p. ej. de una importación) se conservan y se pueden quitar
@@ -26,6 +26,7 @@ export function OrgFields({ draft: d, onChange }: { draft: OrgDraft; onChange: (
       <div>
         <label className="label" htmlFor="o-name">Nombre *</label>
         <input id="o-name" className="field text-base" maxLength={300} value={d.name} onChange={(e) => onChange({ name: e.target.value })} />
+        {belowMain}
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>

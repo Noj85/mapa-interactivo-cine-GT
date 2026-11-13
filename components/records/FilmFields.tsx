@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { FORMATS, NATURES, type FilmFormat, type FilmNature } from "@/lib/film-types";
 import { NATIONALITIES, type Nationality } from "@/lib/types";
 import { CompaniesEditor } from "./CompaniesEditor";
@@ -10,12 +11,13 @@ import { VideoLinkField } from "./VideoLinkField";
 import { numericInput, type FilmDraft } from "./drafts";
 
 /** Campos de una producción. Los usa el editor del equipo y el formulario público. */
-export function FilmFields({ draft: d, onChange }: { draft: FilmDraft; onChange: (patch: Partial<FilmDraft>) => void }) {
+export function FilmFields({ draft: d, onChange, belowMain }: { draft: FilmDraft; onChange: (patch: Partial<FilmDraft>) => void; belowMain?: ReactNode }) {
   return (
     <section className="space-y-4">
       <div>
         <label className="label" htmlFor="f-title">Título *</label>
         <input id="f-title" className="field text-base uppercase" maxLength={300} value={d.title} onChange={(e) => onChange({ title: e.target.value })} />
+        {belowMain}
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div>

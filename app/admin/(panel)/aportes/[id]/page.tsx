@@ -11,9 +11,15 @@ import { filmSchema, orgSchema } from "@/lib/schemas";
 import { decimalRoundNotes, diffSubmission } from "@/lib/submissions";
 import { planCorrection } from "@/lib/submissions-plan";
 import type { Film, FilmInput, Org, OrgInput, Person, SubmissionKind } from "@/lib/types";
-import { cn, normalize } from "@/lib/utils";
+import { rankSimilar } from "@/lib/similar";
+import { cn } from "@/lib/utils";
 
 const kindLabel = (k: SubmissionKind) => (k === "film" ? "Producción" : k === "person" ? "Persona" : "Entidad");
+const SAME_ONE: Record<SubmissionKind, string> = { film: "una producción", org: "una entidad", person: "una persona" };
+const SAME_MANY: Record<SubmissionKind, string> = { film: "producciones", org: "entidades", person: "personas" };
+
+/** Una ficha que podría ser la misma que el aporte (para el aviso de repetido). */
+type SameNameRef = { id: string; name: string; href: string; hidden: boolean };
 
 function ImageBox({ url, kind, alt }: { url: string; kind: SubmissionKind; alt: string }) {
   if (kind === "film" || kind === "person") return <PosterImage src={url} alt={alt} heightClass="h-48" maxWidthClass="max-w-[20rem]" className="rounded-lg border border-line bg-surface-2" />;
@@ -30,7 +36,10 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
   const store = await adminStore();
   const sub = await store.getSubmission(id);
   if (!sub) notFound();
-  const [gaz, current, people] = await Promise.all([
+  // ¿ya hay fichas (publicadas u ocultas) con este nombre? La sugerencia del formulario público solo ve lo publicado
+  // y la persona puede haberla ignorado, así que aquí se atrapa lo que se cuele. No aplica a cargas de archivo (traen sus candidatos).
+  const checkSameName = sub.status === "pending" && sub.origin !== "carga";
+  const [gaz, current, siblings] = await Promise.all([
     serverGazetteer(),
     sub.target_id
       ? sub.kind === "film"
@@ -39,13 +48,16 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
           ? store.getPerson(sub.target_id)
           : store.getOrg(sub.target_id)
       : Promise.resolve(null),
-    sub.kind === "person" ? store.listPeople({ drafts: true }).catch(() => []) : Promise.resolve([]),
+    !checkSameName
+      ? Promise.resolve([] as SameNameRef[])
+      : sub.kind === "film"
+        ? store.listFilms({ drafts: true }).then((l) => l.map((x): SameNameRef => ({ id: x.id, name: x.title, href: `/admin/peliculas/${x.id}`, hidden: x.status === "draft" })))
+        : sub.kind === "person"
+          ? store.listPeople({ drafts: true }).then((l) => l.map((x): SameNameRef => ({ id: x.id, name: x.name, href: `/admin/personas/${x.id}`, hidden: x.status === "draft" }))).catch(() => [] as SameNameRef[])
+          : store.listOrgs({ drafts: true }).then((l) => l.map((x): SameNameRef => ({ id: x.id, name: x.name, href: `/admin/entidades/${x.id}`, hidden: x.status === "draft" }))),
   ]);
   const rows = diffSubmission(sub, current, gaz);
-  const sameName =
-    sub.kind === "person"
-      ? people.filter((x) => normalize(x.name) === normalize(sub.label) && x.id !== sub.target_id)
-      : [];
+  const sameName = rankSimilar(sub.label, siblings.filter((x) => x.id !== sub.target_id), (x) => x.name, sub.kind).map((m) => m.item);
 
   // Carga de archivo: qué traería el archivo para cada registro posible, comparado con lo que tiene HOY
   const isCarga = sub.origin === "carga";
@@ -97,14 +109,15 @@ export default async function AporteDetail({ params }: { params: Promise<{ id: s
       <h1 className="mt-1 font-display text-4xl tracking-tight">{sub.label}</h1>
       {sameName.length > 0 && (
         <div className="mt-4 rounded-2xl border border-warn/30 bg-warn/5 px-4 py-3 text-sm">
-          Ya hay {sameName.length === 1 ? "una persona" : `${sameName.length} personas`} con este nombre:{" "}
-          {sameName.map((p, i) => (
-            <span key={p.id}>
+          Ya hay {sameName.length === 1 ? SAME_ONE[sub.kind] : `${sameName.length} ${SAME_MANY[sub.kind]}`} con este nombre o uno muy parecido:{" "}
+          {sameName.map((x, i) => (
+            <span key={x.id}>
               {i > 0 && ", "}
-              <Link className="text-accent hover:underline" href={`/admin/personas/${p.id}`}>{p.name}</Link>
+              <Link className="text-accent hover:underline" href={x.href}>{x.name}</Link>
+              {x.hidden && <span className="text-muted"> (oculta)</span>}
             </span>
           ))}
-          . Revisa que no sea la misma antes de aprobar.
+          . Revisa que no sea la misma antes de aprobar: si lo es, rechaza este aporte y aplica los cambios en esa ficha.
         </div>
       )}
       <p className="mt-1 text-sm text-muted">

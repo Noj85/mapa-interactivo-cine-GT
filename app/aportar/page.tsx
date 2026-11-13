@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { ContributeForm } from "@/components/aportar/ContributeForm";
 import { BrandFooter } from "@/components/site/Brand";
 import { SiteHeader } from "@/components/site/SiteHeader";
+import { publicStore } from "@/lib/auth";
 import { loadDatasetCached } from "@/lib/data/load";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +18,18 @@ export default async function AportarPage({ searchParams }: { searchParams: Prom
   const data = await loadDatasetCached();
   const film = one("pelicula") ? data.films.find((f) => f.slug === one("pelicula")) : undefined;
   const org = !film && one("entidad") ? data.orgs.find((o) => o.slug === one("entidad")) : undefined;
+  // las personas no van en el conjunto de datos del mapa: se buscan aparte, solo entre las publicadas
+  const person =
+    !film && !org && one("persona")
+      ? (await publicStore().listPeople().catch(() => [])).find((x) => x.slug === one("persona"))
+      : undefined;
+  // se llegó desde la sugerencia «ya existe»: el aviso ofrece volver a un aporte nuevo
+  const fromSuggestion = one("desde") === "sugerencia" && !!(film || org || person);
   // la capa que se estaba viendo en el mapa: Producción abre «Producción»; Circulación o Industria abren «Entidad» con esa capa
   const capa = one("capa");
   const layer = capa === "circulacion" || capa === "industria" ? capa : null;
   const tipo = one("tipo");
-  const initialKind = tipo === "persona" ? "person" : tipo === "entidad" || layer ? "org" : "film";
+  const initialKind = person || tipo === "persona" ? "person" : tipo === "entidad" || layer ? "org" : "film";
   const defaultCategories = initialKind === "org" && layer === "industria" && tipo === "entidad" ? ["Productoras"] : undefined;
 
   return (
@@ -30,10 +38,10 @@ export default async function AportarPage({ searchParams }: { searchParams: Prom
       <main className="mx-auto max-w-6xl px-4 pb-20 pt-10">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Mapa colaborativo</p>
         <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight sm:text-[44px]">
-          {film || org ? "Sugerir una corrección" : initialKind === "person" ? "Registrarme en el directorio" : "Aportar al mapa"}
+          {film || org || person ? "Sugerir una corrección" : initialKind === "person" ? "Registrarme en el directorio" : "Aportar al mapa"}
         </h1>
         <p className="mt-3 max-w-3xl text-[15px] leading-relaxed text-muted">
-          {initialKind === "person"
+          {initialKind === "person" && !person
             ? "Registra tus datos para el Directorio de Técnicas y Técnicos. El equipo de la Academia los verifica antes de publicarlos. Las empresas productoras se registran como entidad."
             : "¿Falta una producción, una entidad o una persona del sector, o hay un dato equivocado? Cuéntanos lo que sabes. Nada se publica de inmediato: el equipo de la Academia verifica cada aporte."}
         </p>
@@ -59,7 +67,7 @@ export default async function AportarPage({ searchParams }: { searchParams: Prom
           </aside>
         </div>
         <div className="mt-8">
-          <ContributeForm key={film?.id ?? org?.id ?? `nuevo-${layer ?? initialKind}`} film={film} org={org} initialKind={initialKind} defaultLayer={layer ?? undefined} defaultCategories={defaultCategories} />
+          <ContributeForm key={film?.id ?? org?.id ?? person?.id ?? `nuevo-${layer ?? initialKind}`} film={film} org={org} person={person} fromSuggestion={fromSuggestion} initialKind={initialKind} defaultLayer={layer ?? undefined} defaultCategories={defaultCategories} />
         </div>
       </main>
       <BrandFooter />

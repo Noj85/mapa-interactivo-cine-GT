@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
+import type { ReactNode } from "react";
 import { LanguagesEditor } from "@/components/records/LanguagesEditor";
 import { PlaceSelect } from "@/components/records/PlaceSelect";
 import { numericInput, type PersonDraft } from "@/components/records/drafts";
@@ -9,7 +10,7 @@ import { MAX_BIO, MAX_CREDITS, MAX_PERSON_ROLES } from "@/lib/people";
 import { cn } from "@/lib/utils";
 
 /** Oficios, lugar, presentación y contacto de una persona del directorio. Lo usan el público y el equipo. */
-export function PersonFields({ draft, onChange }: { draft: PersonDraft; onChange: (patch: Partial<PersonDraft>) => void }) {
+export function PersonFields({ draft, onChange, belowMain }: { draft: PersonDraft; onChange: (patch: Partial<PersonDraft>) => void; belowMain?: ReactNode }) {
   const toggleRole = (id: string) => {
     const on = draft.roles.includes(id);
     if (on) onChange({ roles: draft.roles.filter((r) => r !== id) });
@@ -22,6 +23,7 @@ export function PersonFields({ draft, onChange }: { draft: PersonDraft; onChange
       <div>
         <label className="label" htmlFor="person-name">Nombre *</label>
         <input id="person-name" className="field" maxLength={300} value={draft.name} onChange={(e) => onChange({ name: e.target.value })} />
+        {belowMain}
       </div>
 
       <section aria-label="Oficios">

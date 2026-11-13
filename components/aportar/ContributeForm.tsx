@@ -11,9 +11,10 @@ import { ImageField } from "@/components/records/ImageField";
 import { LocationsEditor } from "@/components/records/LocationsEditor";
 import { OrgFields } from "@/components/records/OrgFields";
 import { PersonFields } from "@/components/records/PersonFields";
+import { SimilarRecords } from "@/components/aportar/SimilarRecords";
 import { CompletenessMeter } from "@/components/ui/Badges";
 import { filmCompleteness, orgCompleteness, personCompleteness } from "@/lib/completeness";
-import type { Film, Org } from "@/lib/types";
+import type { Film, Org, Person } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Kind = "film" | "org" | "person";
@@ -28,6 +29,8 @@ const PERSON_NOTE = "Registro directo en el directorio de la Academia.";
 export function ContributeForm({
   film,
   org,
+  person,
+  fromSuggestion,
   initialKind,
   defaultLayer,
   defaultCategories,
@@ -38,6 +41,10 @@ export function ContributeForm({
 }: {
   film?: Film;
   org?: Org;
+  /** Persona del directorio que se corrige (solo sus datos públicos). */
+  person?: Person;
+  /** Se llegó desde la sugerencia «ya existe»: el aviso ofrece volver a un aporte nuevo. */
+  fromSuggestion?: boolean;
   initialKind?: Kind;
   /** Capa de entidades con la que arranca el formulario (la que se veía en el mapa). */
   defaultLayer?: OrgLayerId;
@@ -52,8 +59,8 @@ export function ContributeForm({
   /** Nombre, rol y correo ya escritos en otra producción del mismo enlace. */
   identity?: { submitter: string; email: string };
 }) {
-  const correcting = !!(film || org);
-  const [kind, setKind] = useState<Kind>(film ? "film" : org ? "org" : (initialKind ?? "film"));
+  const correcting = !!(film || org || person);
+  const [kind, setKind] = useState<Kind>(film ? "film" : org ? "org" : person ? "person" : (initialKind ?? "film"));
   const opened = useRef(Date.now());
   const [status, setStatus] = useState<"idle" | "sending" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -64,8 +71,18 @@ export function ContributeForm({
     if (!org && defaultCategories?.length) d.categories = defaultCategories;
     return d;
   });
-  const [p, setP] = useState<PersonDraft>(() => personDraft());
+  const [p, setP] = useState<PersonDraft>(() => personDraft(person));
   const [consent, setConsent] = useState(false);
+  // Sugerir la ficha que ya existe: solo en un aporte nuevo del público (no al corregir ni con enlace de recopilación).
+  const suggest = !correcting && !collect;
+  // ¿escribió algo más que el título o el nombre? Si sí, cambiar de ficha le haría perder datos.
+  const initialDrafts = useRef({ f, o, p });
+  const dirty =
+    kind === "film"
+      ? JSON.stringify({ ...f, title: "" }) !== JSON.stringify({ ...initialDrafts.current.f, title: "" })
+      : kind === "person"
+        ? JSON.stringify({ ...p, name: "" }) !== JSON.stringify({ ...initialDrafts.current.p, name: "" })
+        : JSON.stringify({ ...o, name: "" }) !== JSON.stringify({ ...initialDrafts.current.o, name: "" });
   const setFilm = (patch: Partial<FilmDraft>) => setF((x) => ({ ...x, ...patch }));
   const setOrg = (patch: Partial<OrgDraft>) => setO((x) => ({ ...x, ...patch }));
   const setPerson = (patch: Partial<PersonDraft>) => setP((x) => ({ ...x, ...patch }));
@@ -199,7 +216,7 @@ export function ContributeForm({
         body: JSON.stringify({
           kind,
           data,
-          target_id: film?.id ?? org?.id ?? null,
+          target_id: film?.id ?? org?.id ?? person?.id ?? null,
           note: kind === "person" && note.trim().length < 8 ? (note.trim() ? `${PERSON_NOTE} ${note.trim()}` : PERSON_NOTE) : note.trim(),
           contact: email.trim(),
           website_url_hp: trap,
@@ -269,7 +286,19 @@ export function ContributeForm({
 
       {correcting && !collect && (
         <div className="rounded-2xl border border-accent/30 bg-accent/5 px-4 py-3 text-sm">
-          Estás sugiriendo una corrección para <b>{film?.title ?? org?.name}</b>. Cambia lo que esté mal o complétalo; no se modifica nada hasta que el equipo lo revise.
+          {fromSuggestion ? <>Esta ficha ya existe en el mapa y cargamos sus datos. </> : null}
+          Estás sugiriendo una corrección para <b>{film?.title ?? org?.name ?? person?.name}</b>. Cambia lo que esté mal o complétalo; no se modifica nada hasta que el equipo lo revise.
+          {fromSuggestion && (
+            <>
+              {" "}
+              <Link
+                className="whitespace-nowrap text-ink underline decoration-line underline-offset-2 hover:decoration-accent"
+                href={film ? "/aportar" : org ? "/aportar?tipo=entidad" : "/aportar?tipo=persona"}
+              >
+                ¿No es esta ficha? Empezar un aporte nuevo
+              </Link>
+            </>
+          )}
         </div>
       )}
       {collect && (
@@ -288,14 +317,14 @@ export function ContributeForm({
         <div className="space-y-8">
           {kind === "film" ? (
             <>
-              <FilmFields draft={f} onChange={setFilm} />
+              <FilmFields draft={f} onChange={setFilm} belowMain={suggest ? <SimilarRecords kind="film" text={f.title} hasOtherData={dirty} /> : undefined} />
               <LocationsEditor locs={f.locs} onChange={(locs) => setFilm({ locs })} />
               <FestivalsEditor fests={f.fests} onChange={(fests) => setFilm({ fests })} />
             </>
           ) : kind === "person" ? (
-            <PersonFields draft={p} onChange={setPerson} />
+            <PersonFields draft={p} onChange={setPerson} belowMain={suggest ? <SimilarRecords kind="person" text={p.name} hasOtherData={dirty} /> : undefined} />
           ) : (
-            <OrgFields draft={o} onChange={setOrg} />
+            <OrgFields draft={o} onChange={setOrg} belowMain={suggest ? <SimilarRecords kind="org" text={o.name} hasOtherData={dirty} /> : undefined} />
           )}
         </div>
 
