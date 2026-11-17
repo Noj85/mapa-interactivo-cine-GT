@@ -3,7 +3,7 @@ import { companyNames } from "@/lib/companies";
 import { cleanLanguages, crewSearchText } from "@/lib/crew";
 import { cleanGenres, FORMATS, formatLabel, legacyKind, NATURES, natureLabel, type FilmFormat, type FilmNature } from "@/lib/film-types";
 import { isUnlocated } from "@/lib/completeness";
-import { personRoleLabels } from "@/lib/people";
+import { personDepto, personRoleLabels } from "@/lib/people";
 import { CIRC_CATEGORIES, IND_CATEGORIES, INITIATIVE_TYPES, NATIONALITIES, type Film, type InitiativeType, type Nationality, type Org, type Person } from "@/lib/types";
 import { normalize } from "@/lib/utils";
 
@@ -140,11 +140,15 @@ export function personFilterToParams(f: PersonFilter, into = new URLSearchParams
 
 export const personFilterActive = (f: PersonFilter) => f.depto.length > 0 || f.oficio.length > 0 || !!f.q;
 
+/** Lo mínimo que se necesita de una persona para filtrarla (sirve para la ficha completa y para la del mapa). */
+type PersonFilterable = Pick<Person, "name" | "roles" | "other_role" | "bio" | "languages" | "depto_ine" | "muni_ine">;
+
 /** Personas publicadas que coinciden con el filtro. No incluye el correo de verificación. */
-export function filterPeople(people: Person[], f: PersonFilter): Person[] {
+export function filterPeople<T extends PersonFilterable>(people: T[], f: PersonFilter): T[] {
   const nq = normalize(f.q);
   return people.filter((p) => {
-    if (f.depto.length && (p.depto_ine == null || !f.depto.includes(p.depto_ine))) return false;
+    const depto = personDepto(p);
+    if (f.depto.length && (depto == null || !f.depto.includes(depto))) return false;
     if (f.oficio.length && !p.roles.some((r) => f.oficio.includes(r))) return false;
     if (!nq) return true;
     return normalize([p.name, ...personRoleLabels(p), p.bio ?? "", ...(p.languages ?? [])].join(" ")).includes(nq);

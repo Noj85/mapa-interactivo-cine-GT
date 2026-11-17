@@ -2,7 +2,7 @@ import type { PublicStats } from "@/lib/site-settings";
 import type { FilmFormat, FilmNature } from "@/lib/film-types";
 export type LayerId = "produccion" | "circulacion" | "industria";
 
-export type MetricId = "films" | "days" | "spend" | "jobs" | "orgs";
+export type MetricId = "films" | "days" | "spend" | "jobs" | "orgs" | "people";
 
 export type RecordStatus = "draft" | "published";
 
@@ -143,7 +143,8 @@ export interface PersonCredit {
 
 /**
  * Técnica, técnico o productor/a independiente del directorio.
- * No es una entidad: lo que la distingue son sus oficios. No se pone en el mapa.
+ * No es una entidad: lo que la distingue son sus oficios. En el mapa solo aparece en Industria → Personas,
+ * en el centro de su municipio (ver `MapPerson`).
  */
 export interface Person {
   id: string;
@@ -199,9 +200,34 @@ export interface Org {
   source: string | null;
 }
 
+/**
+ * Lo que el mapa necesita de una persona del directorio. A propósito no lleva correo, teléfono, enlaces ni créditos:
+ * eso se queda en la ficha del directorio. Solo tiene lugar aproximado (municipio o departamento).
+ */
+export interface MapPerson {
+  id: string;
+  slug: string;
+  name: string;
+  roles: string[];
+  other_role: string | null;
+  depto_ine: number | null;
+  muni_ine: number | null;
+  languages: string[];
+  bio: string | null;
+  photo_url: string | null;
+  status: RecordStatus;
+  completeness: number;
+  missing_fields: string[];
+}
+
+/** Industria muestra entidades o personas; las otras capas no tienen esta división. */
+export type IndustrySub = "entidad" | "persona";
+
 export interface Dataset {
   films: Film[];
   orgs: Org[];
+  /** Personas del directorio (opcional: sin la migración del directorio o en cargas de prueba no hay). */
+  people?: MapPerson[];
   /** Festival del catálogo -> entidad de Circulación publicada con la que está vinculado. */
   festivalOrgs: Record<string, string>;
   /** "supabase" | "local" */
@@ -277,6 +303,7 @@ export const METRICS: Record<
   spend: { id: "spend", label: "Inversión local", unit: "GTQ", layer: "produccion", format: "money" },
   jobs: { id: "jobs", label: "Empleos", unit: "empleos", layer: "produccion", format: "int" },
   orgs: { id: "orgs", label: "Iniciativas", unit: "registros", layer: "circulacion", format: "int" },
+  people: { id: "people", label: "Personas", unit: "personas", layer: "industria", format: "int" },
 };
 
 export const LAYER_METRICS: Record<LayerId, MetricId[]> = {

@@ -1,5 +1,6 @@
 import { isAbroad } from "@/lib/completeness";
-import type { Dataset, Film, LayerId, MetricId, Org } from "@/lib/types";
+import { personDepto } from "@/lib/people";
+import type { Dataset, Film, IndustrySub, LayerId, MapPerson, MetricId, Org } from "@/lib/types";
 
 export interface Agg {
   films: number;
@@ -7,9 +8,11 @@ export interface Agg {
   spend: number;
   jobs: number;
   orgs: number;
+  /** Personas del directorio (solo se cuentan en Industria → Personas). */
+  people: number;
 }
 
-const empty = (): Agg => ({ films: 0, days: 0, spend: 0, jobs: 0, orgs: 0 });
+const empty = (): Agg => ({ films: 0, days: 0, spend: 0, jobs: 0, orgs: 0, people: 0 });
 
 export interface Aggregates {
   depto: Map<number, Agg>;
@@ -18,7 +21,7 @@ export interface Aggregates {
 }
 
 /** Suma por territorio para una capa. Una producción cuenta una vez por territorio. */
-export function aggregate(data: Dataset, layer: LayerId): Aggregates {
+export function aggregate(data: Dataset, layer: LayerId, sub: IndustrySub = "entidad"): Aggregates {
   const depto = new Map<number, Agg>();
   const muni = new Map<number, Agg>();
   const total = empty();
@@ -65,6 +68,15 @@ export function aggregate(data: Dataset, layer: LayerId): Aggregates {
       }
       if (counted) total.films++;
     }
+  } else if (layer === "industria" && sub === "persona") {
+    // las personas solo tienen lugar aproximado: municipio o departamento
+    for (const p of data.people ?? []) {
+      const dep = personDepto(p);
+      if (dep != null) get(depto, dep).people++;
+      if (p.muni_ine != null) get(muni, p.muni_ine).people++;
+      // en el total del país solo cuentan las que tienen lugar
+      if (dep != null) total.people++;
+    }
   } else {
     for (const o of data.orgs) {
       if (o.layer !== layer) continue;
@@ -97,6 +109,11 @@ export function orgsIn(data: Dataset, layer: LayerId, scope: { depto?: number; m
         ? o.muni_ine === scope.muni
         : (o.depto_ine ?? (o.muni_ine != null ? Math.floor(o.muni_ine / 100) : null)) === scope.depto),
   );
+}
+
+/** Personas del directorio en un departamento o municipio. */
+export function peopleIn(data: Dataset, scope: { depto?: number; muni?: number }): MapPerson[] {
+  return (data.people ?? []).filter((p) => (scope.muni != null ? p.muni_ine === scope.muni : personDepto(p) === scope.depto));
 }
 
 export interface Stop {

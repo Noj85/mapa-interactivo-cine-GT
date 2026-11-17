@@ -2,8 +2,18 @@
 
 import { customGenres } from "@/lib/film-types";
 import { languageOptions } from "@/lib/crew";
-import { CIRC_CATEGORIES, IND_CATEGORIES } from "@/lib/types";
-import { filmFilterActive, filterFilms, locationsMatching, orgFilterActive, orgMatches, type FilmFilter } from "@/lib/filters";
+import { CIRC_CATEGORIES, IND_CATEGORIES, type IndustrySub } from "@/lib/types";
+import {
+  filmFilterActive,
+  filterFilms,
+  filterPeople,
+  locationsMatching,
+  orgFilterActive,
+  orgMatches,
+  personFilterActive,
+  type FilmFilter,
+  type PersonFilter,
+} from "@/lib/filters";
 import { AnimatePresence, motion } from "framer-motion";
 import { Download, HandHeart, Moon, Search, Sun } from "lucide-react";
 import { DepartmentFilter } from "./DepartmentFilter";
@@ -16,16 +26,18 @@ import MapCanvas, { type MapHandle } from "@/components/map/MapCanvas";
 import { aggregate } from "@/lib/aggregate";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
 import { useTheme } from "@/lib/use-theme";
-import { LAYER_METRICS, type Dataset, type LayerId } from "@/lib/types";
-import { DEFAULT_VIEW, downloadHref, parseView, selectedDeptos, serializeView, type Place, type ViewState } from "@/lib/view";
+import type { Dataset, LayerId } from "@/lib/types";
+import { DEFAULT_VIEW, defaultMetric, downloadHref, parseView, selectedDeptos, serializeView, type Place, type ViewState } from "@/lib/view";
 import FilmPanel from "./FilmPanel";
 import { FilterPanel } from "./FilterPanel";
+import { IndustrySubSwitcher } from "./IndustrySubSwitcher";
 import { LayerSwitcher } from "./LayerSwitcher";
 import { MapControls } from "./MapControls";
 import { MobilePeek } from "./MobilePeek";
 import { MobileTopBar } from "./MobileTopBar";
 import OrgPanel from "./OrgPanel";
 import OverviewPanel from "./OverviewPanel";
+import PersonPanel from "./PersonPanel";
 import { SearchPalette } from "./SearchPalette";
 import TerritoryPanel from "./TerritoryPanel";
 import type { PanelCtx } from "./parts";
@@ -81,27 +93,43 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
     // «Sin locación» solo se ve como lista aparte: al salir de ahí, o al elegir un lugar, se vuelve a lo normal («con locación»)
     const backToCon = (f: FilmFilter): FilmFilter => (f.locacion === "sin" ? { ...f, locacion: "con" } : f);
     return {
-      place: (p: Place | null) => commit({ ...view, place: p, deptos: [], film: null, org: null, noloc: false, abroad: false, filmFilter: backToCon(view.filmFilter) }),
-      film: (slug: string) => commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", film: slug, org: null, noloc: false, abroad: false }),
+      place: (p: Place | null) =>
+        commit({ ...view, place: p, deptos: [], film: null, org: null, person: null, noloc: false, abroad: false, filmFilter: backToCon(view.filmFilter) }),
+      film: (slug: string) =>
+        commit({ ...view, layer: "produccion", sub: "entidad", metric: defaultMetric("produccion"), film: slug, org: null, person: null, noloc: false, abroad: false }),
       org: (slug: string) => {
         const o = data.orgs.find((x) => x.slug === slug);
         const layer: LayerId = o?.layer ?? view.layer;
-        commit({ ...view, layer, metric: layer === view.layer ? view.metric : LAYER_METRICS[layer][0], org: slug, film: null, noloc: false, abroad: false });
+        commit({ ...view, layer, sub: "entidad", metric: defaultMetric(layer), org: slug, film: null, person: null, noloc: false, abroad: false });
       },
+      person: (slug: string) =>
+        commit({ ...view, layer: "industria", sub: "persona", metric: defaultMetric("industria", "persona"), person: slug, film: null, org: null, noloc: false, abroad: false }),
+      sub: (s: IndustrySub) =>
+        commit({
+          ...view,
+          layer: "industria",
+          sub: s,
+          metric: defaultMetric("industria", s),
+          film: null,
+          org: null,
+          person: null,
+          noloc: false,
+          abroad: false,
+        }),
       layer: (l: LayerId) =>
-        commit({ ...view, layer: l, metric: LAYER_METRICS[l][0], film: null, org: null, noloc: false, abroad: false }),
+        commit({ ...view, layer: l, sub: "entidad", metric: defaultMetric(l), film: null, org: null, person: null, noloc: false, abroad: false }),
       deptos: (codes: number[]) =>
         codes.length >= 2
-          ? commit({ ...view, place: null, deptos: [...codes].sort((a, b) => a - b), film: null, org: null, noloc: false, abroad: false, filmFilter: backToCon(view.filmFilter) })
+          ? commit({ ...view, place: null, deptos: [...codes].sort((a, b) => a - b), film: null, org: null, person: null, noloc: false, abroad: false, filmFilter: backToCon(view.filmFilter) })
           : codes.length === 1
-            ? commit({ ...view, place: { type: "depto", code: codes[0] }, deptos: [], film: null, org: null, noloc: false, abroad: false, filmFilter: backToCon(view.filmFilter) })
-            : commit({ ...view, place: null, deptos: [], film: null, org: null, noloc: false, abroad: false, filmFilter: view.noloc ? backToCon(view.filmFilter) : view.filmFilter }),
+            ? commit({ ...view, place: { type: "depto", code: codes[0] }, deptos: [], film: null, org: null, person: null, noloc: false, abroad: false, filmFilter: backToCon(view.filmFilter) })
+            : commit({ ...view, place: null, deptos: [], film: null, org: null, person: null, noloc: false, abroad: false, filmFilter: view.noloc ? backToCon(view.filmFilter) : view.filmFilter }),
       unlocated: () =>
-        commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", place: null, deptos: [], film: null, org: null, noloc: true, abroad: false, filmFilter: { ...view.filmFilter, locacion: "sin" } }),
+        commit({ ...view, layer: "produccion", sub: "entidad", metric: defaultMetric("produccion"), place: null, deptos: [], film: null, org: null, person: null, noloc: true, abroad: false, filmFilter: { ...view.filmFilter, locacion: "sin" } }),
       abroad: () =>
-        commit({ ...view, layer: "produccion", metric: LAYER_METRICS.produccion.includes(view.metric) ? view.metric : "films", place: null, deptos: [], film: null, org: null, noloc: false, abroad: true, filmFilter: backToCon(view.filmFilter) }),
+        commit({ ...view, layer: "produccion", sub: "entidad", metric: defaultMetric("produccion"), place: null, deptos: [], film: null, org: null, person: null, noloc: false, abroad: true, filmFilter: backToCon(view.filmFilter) }),
       up: () => {
-        if (view.film || view.org) return commit({ ...view, film: null, org: null });
+        if (view.film || view.org || view.person) return commit({ ...view, film: null, org: null, person: null });
         if (view.noloc || view.abroad) return commit({ ...view, noloc: false, abroad: false, filmFilter: view.noloc ? backToCon(view.filmFilter) : view.filmFilter });
         if (view.place?.type === "muni") {
           const e = geo?.gaz.muni(view.place.code);
@@ -109,10 +137,11 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
         }
         commit({ ...view, place: null, deptos: [] });
       },
-      clear: () => commit({ ...view, place: null, deptos: [], film: null, org: null, noloc: false, abroad: false, filmFilter: view.noloc ? backToCon(view.filmFilter) : view.filmFilter }),
+      clear: () =>
+        commit({ ...view, place: null, deptos: [], film: null, org: null, person: null, noloc: false, abroad: false, filmFilter: view.noloc ? backToCon(view.filmFilter) : view.filmFilter }),
       locacion: (locacion: "con" | "sin" | null) =>
         // en «Sin locación» no hay territorio que ver: se sale del lugar o de la producción abiertos
-        commit({ ...view, filmFilter: { ...view.filmFilter, locacion }, film: null, ...(locacion === "sin" ? { place: null, deptos: [] } : {}), noloc: false, abroad: false }),
+        commit({ ...view, filmFilter: { ...view.filmFilter, locacion }, film: null, person: null, ...(locacion === "sin" ? { place: null, deptos: [] } : {}), noloc: false, abroad: false }),
     };
   }, [view, commit, data.orgs, geo]);
 
@@ -138,7 +167,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       } else if (e.key === "/" && !searchOpen && !(e.target instanceof HTMLInputElement)) {
         e.preventDefault();
         setSearchOpen(true);
-      } else if (e.key === "Escape" && !searchOpen && (view.place || view.deptos.length || view.film || view.org || view.noloc || view.abroad)) {
+      } else if (e.key === "Escape" && !searchOpen && (view.place || view.deptos.length || view.film || view.org || view.person || view.noloc || view.abroad)) {
         go.up();
       }
     };
@@ -149,6 +178,8 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
 
   // Los filtros recortan solo la capa activa (las demás se ven completas). El lugar lo maneja `view.place`, no el filtro.
   // Con varios departamentos marcados, las producciones se recortan a lo rodado en ellos (así las cifras y el mapa cuadran).
+  const allPeople = data.people ?? [];
+  const peopleMode = view.layer === "industria" && view.sub === "persona";
   const filteredFilms = useMemo(() => {
     if (view.layer !== "produccion") return data.films;
     const multi = view.deptos.length >= 2;
@@ -157,29 +188,41 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
     return multi && !view.film ? out.map((f) => ({ ...f, locations: locationsMatching(f.locations, { depto: view.deptos, muni: [] }) })) : out;
   }, [data.films, view.layer, view.filmFilter, view.deptos, view.film]);
   const filteredOrgs = useMemo(() => {
-    if (view.layer === "produccion" || (!orgFilterActive(view.orgFilter) && view.deptos.length < 2)) return data.orgs;
+    if (peopleMode || view.layer === "produccion" || (!orgFilterActive(view.orgFilter) && view.deptos.length < 2)) return data.orgs;
     const f = { ...view.orgFilter, capa: null, depto: view.deptos };
     return data.orgs.filter((o) => o.layer !== view.layer || orgMatches(o, f));
-  }, [data.orgs, view.layer, view.orgFilter, view.deptos]);
+  }, [data.orgs, view.layer, view.orgFilter, view.deptos, peopleMode]);
+  const filteredPeople = useMemo(() => {
+    if (!peopleMode) return allPeople;
+    const multi = view.deptos.length >= 2;
+    if (!multi && !personFilterActive(view.personFilter)) return allPeople;
+    return filterPeople(allPeople, { ...view.personFilter, depto: view.deptos });
+  }, [allPeople, peopleMode, view.personFilter, view.deptos]);
   // lo que está seleccionado nunca desaparece del mapa, aunque no cumpla los filtros
   const shown = useMemo<Dataset>(() => {
     const films = filteredFilms === data.films || !view.film ? filteredFilms : filteredFilms.some((f) => f.slug === view.film) ? filteredFilms : [...filteredFilms, ...data.films.filter((f) => f.slug === view.film)];
     const orgs = filteredOrgs === data.orgs || !view.org ? filteredOrgs : filteredOrgs.some((o) => o.slug === view.org) ? filteredOrgs : [...filteredOrgs, ...data.orgs.filter((o) => o.slug === view.org)];
-    return films === data.films && orgs === data.orgs ? data : { ...data, films, orgs };
-  }, [data, filteredFilms, filteredOrgs, view.film, view.org]);
-  const layerCount = view.layer === "produccion" ? filteredFilms.length : filteredOrgs.filter((o) => o.layer === view.layer).length;
-  const layerTotal = view.layer === "produccion" ? data.films.length : data.orgs.filter((o) => o.layer === view.layer).length;
+    const people =
+      filteredPeople === allPeople || !view.person
+        ? filteredPeople
+        : filteredPeople.some((p) => p.slug === view.person)
+          ? filteredPeople
+          : [...filteredPeople, ...allPeople.filter((p) => p.slug === view.person)];
+    return films === data.films && orgs === data.orgs && people === allPeople ? data : { ...data, films, orgs, people };
+  }, [data, filteredFilms, filteredOrgs, filteredPeople, allPeople, view.film, view.org, view.person]);
+  const layerCount = view.layer === "produccion" ? filteredFilms.length : peopleMode ? filteredPeople.length : filteredOrgs.filter((o) => o.layer === view.layer).length;
+  const layerTotal = view.layer === "produccion" ? data.films.length : peopleMode ? allPeople.length : data.orgs.filter((o) => o.layer === view.layer).length;
   const extraCategories = useMemo(() => {
-    if (view.layer === "produccion") return [];
+    if (view.layer === "produccion" || peopleMode) return [];
     const known: readonly string[] = view.layer === "circulacion" ? CIRC_CATEGORIES : IND_CATEGORIES;
     const out = new Set<string>();
     for (const o of data.orgs) if (o.layer === view.layer) for (const c of o.categories ?? []) if (!known.includes(c)) out.add(c);
     return [...out];
-  }, [data.orgs, view.layer]);
+  }, [data.orgs, view.layer, peopleMode]);
   const extraGenres = useMemo(() => customGenres(data.films), [data.films]);
   const languages = useMemo(() => languageOptions(data.films), [data.films]);
-  const aggs = useMemo(() => aggregate(shown, view.layer), [shown, view.layer]);
-  const hasSelection = !!(view.place || view.deptos.length || view.film || view.org || view.noloc || view.abroad);
+  const aggs = useMemo(() => aggregate(shown, view.layer, view.sub), [shown, view.layer, view.sub]);
+  const hasSelection = !!(view.place || view.deptos.length || view.film || view.org || view.person || view.noloc || view.abroad);
   const desktop = vw.w >= 900;
   // teléfono del público: barra superior compacta; el equipo conserva la distribución de siempre
   const compactTop = !desktop && !canEdit;
@@ -197,15 +240,18 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       compact={compact}
       hiddenFields={hiddenFilters}
       layer={view.layer}
+      sub={view.sub}
       filmFilter={view.filmFilter}
       orgFilter={view.orgFilter}
+      personFilter={view.personFilter}
       count={layerCount}
       total={layerTotal}
       extraCategories={extraCategories}
       extraGenres={extraGenres}
       languages={languages}
-      onFilm={(filmFilter) => commit({ ...view, filmFilter, film: null, org: null, noloc: false, abroad: false })}
-      onOrg={(orgFilter) => commit({ ...view, orgFilter, film: null, org: null, noloc: false, abroad: false })}
+      onFilm={(filmFilter) => commit({ ...view, filmFilter, film: null, org: null, person: null, noloc: false, abroad: false })}
+      onOrg={(orgFilter) => commit({ ...view, orgFilter, film: null, org: null, person: null, noloc: false, abroad: false })}
+      onPerson={(personFilter: PersonFilter) => commit({ ...view, personFilter, film: null, org: null, person: null, noloc: false, abroad: false })}
       downloadHref={downloadHref(view)}
     />
   );
@@ -213,7 +259,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
   const ctx: PanelCtx | null = geo ? { data: shown, allFilms: data.films, gaz: geo.gaz, aggs, view, go, canEdit, mobile: !desktop, sheet } : null;
 
   // al elegir otra cosa, la hoja vuelve a su tamaño medio (o a la mínima si no hay nada elegido)
-  const selectionKey = `${view.deptos.join(",")}|${view.film ?? ""}|${view.org ?? ""}|${view.place?.type ?? ""}${view.place?.code ?? ""}|${view.noloc}|${view.abroad}`;
+  const selectionKey = `${view.deptos.join(",")}|${view.film ?? ""}|${view.org ?? ""}|${view.person ?? ""}|${view.place?.type ?? ""}${view.place?.code ?? ""}|${view.noloc}|${view.abroad}|${view.sub}`;
   useEffect(() => setSheet(hasSelection ? "half" : "peek"), [selectionKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const levels: ("peek" | "half" | "full")[] = hasSelection ? ["half", "full"] : ["peek", "half", "full"];
   const stepSheet = (dir: 1 | -1) => setSheet(levels[Math.max(0, Math.min(levels.length - 1, levels.indexOf(sheet) + dir))]);
@@ -222,17 +268,35 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
     ? `Producción: ${data.films.find((f) => f.slug === view.film)?.title ?? ""}`
     : view.org
       ? `Entidad: ${data.orgs.find((o) => o.slug === view.org)?.name ?? ""}`
-      : view.noloc
-        ? "Producciones sin locación"
-        : view.abroad
-          ? "Producciones rodadas fuera de Guatemala"
-      : view.deptos.length
-        ? `Departamentos: ${view.deptos.map((d) => geo?.gaz.depto(d)?.name ?? "").join(", ")}`
-        : view.place
-        ? `Territorio: ${(view.place.type === "depto" ? geo?.gaz.depto(view.place.code) : geo?.gaz.muni(view.place.code))?.name ?? ""}`
-        : `Capa ${view.layer}`;
+      : view.person
+        ? `Persona: ${allPeople.find((p) => p.slug === view.person)?.name ?? ""}`
+        : view.noloc
+          ? "Producciones sin locación"
+          : view.abroad
+            ? "Producciones rodadas fuera de Guatemala"
+            : view.deptos.length
+              ? `Departamentos: ${view.deptos.map((d) => geo?.gaz.depto(d)?.name ?? "").join(", ")}`
+              : view.place
+                ? `Territorio: ${(view.place.type === "depto" ? geo?.gaz.depto(view.place.code) : geo?.gaz.muni(view.place.code))?.name ?? ""}`
+                : peopleMode
+                  ? "Industria · Personas"
+                  : `Capa ${view.layer}`;
 
-  const panelKey = view.film ? `f-${view.film}` : view.org ? `o-${view.org}` : view.noloc ? "noloc" : view.abroad ? "abroad" : view.place ? `p-${view.place.type}${view.place.code}` : view.deptos.length ? `d-${view.deptos.join("-")}` : `home-${view.layer}`;
+  const panelKey = view.film
+    ? `f-${view.film}`
+    : view.org
+      ? `o-${view.org}`
+      : view.person
+        ? `pe-${view.person}`
+        : view.noloc
+          ? "noloc"
+          : view.abroad
+            ? "abroad"
+            : view.place
+              ? `p-${view.place.type}${view.place.code}`
+              : view.deptos.length
+                ? `d-${view.deptos.join("-")}`
+                : `home-${view.layer}-${view.sub}`;
 
   return (
     <main aria-label="Mapa del cine de Guatemala" className="relative h-full w-full overflow-hidden bg-bg">
@@ -252,6 +316,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
           onPlace={(p) => (p ? go.place(p) : go.clear())}
           onFilm={go.film}
           onOrg={go.org}
+          onPerson={go.person}
           onUnlocated={go.unlocated}
           onAbroad={go.abroad}
           onReady={() => setMapReady(true)}
@@ -287,12 +352,19 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
       <div className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex flex-col gap-2.5 sm:left-4 sm:right-auto sm:top-4 sm:w-[440px]">
         {compactTop ? (
           <>
-            <MobileTopBar homeHref={homeHref} onHome={goHome} aportarHref={`/aportar?capa=${view.layer}`} onSearch={() => setSearchOpen(true)} theme={theme} onTheme={toggleTheme} filters={filterPanel(true)} />
-            <div className="pointer-events-none flex items-center gap-2">
-              <div className="pointer-events-auto min-w-0 flex-1">
-                <LayerSwitcher layer={view.layer} onChange={go.layer} />
+            <MobileTopBar homeHref={homeHref} onHome={goHome} aportarHref={peopleMode ? "/aportar?capa=industria&tipo=persona" : `/aportar?capa=${view.layer}`} onSearch={() => setSearchOpen(true)} theme={theme} onTheme={toggleTheme} filters={filterPanel(true)} />
+            <div className="pointer-events-none flex flex-col gap-2">
+              <div className="pointer-events-none flex items-center gap-2">
+                <div className="pointer-events-auto min-w-0 flex-1">
+                  <LayerSwitcher layer={view.layer} onChange={go.layer} />
+                </div>
+                {geo && <DepartmentFilter compact gaz={geo.gaz} selected={selectedDeptos(view)} onChange={go.deptos} />}
               </div>
-              {geo && <DepartmentFilter compact gaz={geo.gaz} selected={selectedDeptos(view)} onChange={go.deptos} />}
+              {view.layer === "industria" && (
+                <div className="pointer-events-auto">
+                  <IndustrySubSwitcher sub={view.sub} onChange={go.sub} />
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -320,16 +392,17 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
             </div>
             {!canEdit && (
               <Link
-                href={`/aportar?capa=${view.layer}`}
+                href={peopleMode ? "/aportar?capa=industria&tipo=persona" : `/aportar?capa=${view.layer}`}
                 className="btn-primary pointer-events-auto h-11 w-full justify-center gap-2 rounded-2xl text-[15px] shadow-soft"
-                title="Aporta una producción o entidad que falta en el mapa"
+                title={peopleMode ? "Aporta una técnica, técnico o productor/a independiente" : "Aporta una producción o entidad que falta en el mapa"}
               >
                 <HandHeart className="h-5 w-5" aria-hidden />
-                Aportar al mapa
+                {peopleMode ? "Aportar una persona" : "Aportar al mapa"}
               </Link>
             )}
-            <div className="pointer-events-auto flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap">
+            <div className="pointer-events-auto flex flex-col items-start gap-2">
               <LayerSwitcher layer={view.layer} onChange={go.layer} />
+              {view.layer === "industria" && <IndustrySubSwitcher sub={view.sub} onChange={go.sub} />}
             </div>
             <div className="pointer-events-none relative flex flex-wrap items-start gap-2">
               {geo && <DepartmentFilter gaz={geo.gaz} selected={selectedDeptos(view)} onChange={go.deptos} />}
@@ -417,6 +490,8 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
                 <FilmPanel ctx={ctx} />
               ) : view.org ? (
                 <OrgPanel ctx={ctx} />
+              ) : view.person ? (
+                <PersonPanel ctx={ctx} />
               ) : view.noloc ? (
                 <UnlocatedPanel ctx={ctx} />
               ) : view.abroad ? (
@@ -442,6 +517,7 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
           onPlace={go.place}
           onFilm={go.film}
           onOrg={go.org}
+          onPerson={go.person}
         />
       )}
     </main>

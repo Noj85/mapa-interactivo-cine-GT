@@ -10,8 +10,23 @@ import { LocacionChip, locacionCounts, type PanelCtx } from "./parts";
 export function MobilePeek({ ctx, onOpen }: { ctx: PanelCtx; onOpen(): void }) {
   const { data, view, allFilms, go } = ctx;
   const film = view.layer === "produccion";
-  const n = film ? data.films.length : data.orgs.filter((o) => o.layer === view.layer).length;
-  const noun = film ? (n === 1 ? "producción" : "producciones") : view.layer === "circulacion" ? (n === 1 ? "espacio" : "espacios") : n === 1 ? "entidad" : "entidades";
+  const people = view.layer === "industria" && view.sub === "persona";
+  const n = film ? data.films.length : people ? (data.people ?? []).length : data.orgs.filter((o) => o.layer === view.layer).length;
+  const noun = film
+    ? n === 1
+      ? "producción"
+      : "producciones"
+    : people
+      ? n === 1
+        ? "persona"
+        : "personas"
+      : view.layer === "circulacion"
+        ? n === 1
+          ? "espacio"
+          : "espacios"
+        : n === 1
+          ? "entidad"
+          : "entidades";
   return (
     <div className="flex items-center gap-2 px-4 pb-2">
       {film && allFilms.length > 0 ? (

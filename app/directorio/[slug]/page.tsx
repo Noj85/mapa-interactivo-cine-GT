@@ -50,6 +50,16 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
             <h1 className="font-display text-4xl tracking-tight">{person.name}</h1>
             <p className="mt-1 text-sm text-muted">{personRoleLabels(person).join(" · ")}</p>
             {place && <p className="mt-1 text-sm text-muted">{place}</p>}
+            {(person.depto_ine != null || person.muni_ine != null) && (
+              <p className="mt-2">
+                <Link
+                  href={`/?capa=industria&tipo=personas&persona=${encodeURIComponent(person.slug)}`}
+                  className="text-sm text-accent underline-offset-2 hover:underline"
+                >
+                  Ver en el mapa
+                </Link>
+              </p>
+            )}
           </div>
         </div>
         {person.bio && <p className="mt-6 text-[15px] leading-relaxed">{person.bio}</p>}

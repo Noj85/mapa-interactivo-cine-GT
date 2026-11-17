@@ -9,11 +9,13 @@ import { BrandFooter } from "@/components/site/Brand";
 import { hasAnchor, isAbroad } from "@/lib/completeness";
 import type { StatKey } from "@/lib/site-settings";
 import type { Film } from "@/lib/types";
-import { DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid, LocacionChip, locacionCounts } from "./parts";
+import { personDepto } from "@/lib/people";
+import { DownloadLink, Empty, FilmCard, OrgCard, PanelShell, PersonCard, type PanelCtx, SectionTitle, Stat, StatsGrid, LocacionChip, locacionCounts } from "./parts";
 
 export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
   const { data, gaz, aggs, view, go } = ctx;
   const layer = LAYERS.find((l) => l.id === view.layer)!;
+  const peopleMode = view.layer === "industria" && view.sub === "persona";
   const [showAll, setShowAll] = useState(false);
 
   const films = useMemo(
@@ -24,11 +26,16 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
     () => data.orgs.filter((o) => o.layer === view.layer).sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)),
     [data.orgs, view.layer],
   );
-  const incomplete =
-    view.layer === "produccion"
+  const people = useMemo(
+    () => [...(data.people ?? [])].sort((a, b) => a.name.localeCompare(b.name, "es")),
+    [data.people],
+  );
+  const incomplete = peopleMode
+    ? people.filter((p) => p.completeness < 100).length
+    : view.layer === "produccion"
       ? data.films.filter((f) => f.completeness < 100).length
       : orgs.filter((o) => o.completeness < 100).length;
-  const totalRecords = view.layer === "produccion" ? films.length : orgs.length;
+  const totalRecords = peopleMode ? people.length : view.layer === "produccion" ? films.length : orgs.length;
 
   const t = aggs.total;
   // solo para el equipo: en cuántas producciones hay dato de cada cifra
@@ -36,11 +43,12 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
     const has = (f: Film) => f.locations.some((l) => !isAbroad(l) && (k === "films" ? hasAnchor(l) : k === "days" ? l.days != null : k === "spend" ? l.local_spend != null : l.jobs != null));
     return `dato en ${data.films.filter(has).length} de ${data.films.length}`;
   };
-  const list = view.layer === "produccion" ? films : orgs;
+  const list = peopleMode ? people : view.layer === "produccion" ? films : orgs;
   const mobile = !!ctx.mobile;
   const full = ctx.sheet === "full";
   const previewN = mobile ? 8 : 6;
   const shown = showAll ? list : list.slice(0, previewN);
+  const withoutPlace = peopleMode ? people.filter((p) => personDepto(p) == null).length : 0;
 
   const counts = useMemo(() => locacionCounts(ctx.allFilms), [ctx.allFilms]);
   const loc = view.filmFilter.locacion;
@@ -50,7 +58,8 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
       <h2 className={cn("font-display tracking-tight text-ink", mobile ? "text-[22px] leading-tight" : "text-[30px] leading-[1.05]")}>
         {view.layer === "produccion" && "Dónde se ha filmado en Guatemala"}
         {view.layer === "circulacion" && "Dónde se ve cine en Guatemala"}
-        {view.layer === "industria" && "Quién hace cine en Guatemala"}
+        {view.layer === "industria" && !peopleMode && "Quién hace cine en Guatemala"}
+        {peopleMode && "Técnicas, técnicos y productoras independientes"}
       </h2>
       {!mobile && (
         <p className="mt-2 text-sm leading-relaxed text-muted">
@@ -58,7 +67,7 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
           locación.
         </p>
       )}
-      {data.films.length + data.orgs.length === 0 && (
+      {data.films.length + data.orgs.length + (data.people?.length ?? 0) === 0 && (
         <div className="mt-4 rounded-xl border border-dashed border-line px-3.5 py-3 text-sm text-muted">
           <p className="font-medium text-ink">Todavía no hay información publicada.</p>
           {ctx.canEdit ? (
@@ -86,6 +95,11 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
           { key: "jobs", label: "Empleos generados", value: fmtInt(t.jobs), coverage: cover("jobs") },
         ]}
       />
+    ) : peopleMode ? (
+      <div className={cn("grid grid-cols-2 gap-2.5", mobile ? "mt-4" : "mt-5")}>
+        <Stat label="Personas con ubicación" value={fmtInt(t.people)} />
+        <Stat label="Departamentos presentes" value={fmtInt(aggs.depto.size)} sub="de 22" />
+      </div>
     ) : (
       <div className={cn("grid grid-cols-2 gap-2.5", mobile ? "mt-4" : "mt-5")}>
         <Stat label={view.layer === "circulacion" ? "Espacios de circulación" : "Empresas e instituciones"} value={fmtInt(t.orgs)} />
@@ -100,7 +114,7 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
     </p>
   );
 
-  const listTitle = view.layer === "produccion" ? "Producciones" : "Registros";
+  const listTitle = peopleMode ? "Personas" : view.layer === "produccion" ? "Producciones" : "Registros";
   const listBlock = (
     <>
       {view.layer === "produccion" && ctx.allFilms.length > 0 ? (
@@ -115,19 +129,28 @@ export default function OverviewPanel({ ctx }: { ctx: PanelCtx }) {
       ) : (
         <SectionTitle aside={`${list.length}`}>{listTitle}</SectionTitle>
       )}
+      {peopleMode && withoutPlace > 0 && (
+        <p className="mb-2 text-xs text-muted">
+          {withoutPlace === 1 ? "1 persona sin ubicación" : `${withoutPlace} personas sin ubicación`} no aparece{withoutPlace === 1 ? "" : "n"} en el mapa.
+        </p>
+      )}
       <div className="-mx-2 space-y-0.5">
-        {view.layer === "produccion"
-          ? (shown as typeof films).map((f) => <FilmCard key={f.id} film={f} gaz={gaz} hideBadge={!ctx.canEdit} onClick={() => go.film(f.slug)} />)
-          : (shown as typeof orgs).map((o) => <OrgCard key={o.id} org={o} gaz={gaz} hideBadge={!ctx.canEdit} onClick={() => go.org(o.slug)} />)}
+        {peopleMode
+          ? (shown as typeof people).map((p) => <PersonCard key={p.id} person={p} gaz={gaz} hideBadge={!ctx.canEdit} onClick={() => go.person(p.slug)} />)
+          : view.layer === "produccion"
+            ? (shown as typeof films).map((f) => <FilmCard key={f.id} film={f} gaz={gaz} hideBadge={!ctx.canEdit} onClick={() => go.film(f.slug)} />)
+            : (shown as typeof orgs).map((o) => <OrgCard key={o.id} org={o} gaz={gaz} hideBadge={!ctx.canEdit} onClick={() => go.org(o.slug)} />)}
         {list.length === 0 && (
           <Empty>
-            {view.layer !== "produccion"
-              ? "Sin registros todavía."
-              : loc === "con" && counts.sin > 0
-                ? "Ninguna producción tiene locación todavía."
-                : loc
-                  ? "Ninguna producción coincide con este filtro."
-                  : "Sin registros todavía."}
+            {peopleMode
+              ? "Sin personas publicadas todavía."
+              : view.layer !== "produccion"
+                ? "Sin registros todavía."
+                : loc === "con" && counts.sin > 0
+                  ? "Ninguna producción tiene locación todavía."
+                  : loc
+                    ? "Ninguna producción coincide con este filtro."
+                    : "Sin registros todavía."}
           </Empty>
         )}
       </div>

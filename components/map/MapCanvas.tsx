@@ -12,6 +12,7 @@ import { INCOMPLETE_COLOR, LAYER_COLORS, MAP_BG, ramp, readableOn, type Theme } 
 import { abroadFilms, ABROAD_BBOX, buildAbroad, buildFilmRoute, buildLabels, buildMask, buildNowhere, buildPins, hasAbroad, levels, locationPoint, NOWHERE_BBOX, isUnlocated, unlocatedFilms, withZones } from "@/lib/map/features";
 import { loadZoneIcons } from "@/lib/map/zone-icons";
 import { buildStyle, firstSymbolId } from "@/lib/map/style";
+import { personDepto } from "@/lib/people";
 import type { Dataset } from "@/lib/types";
 import { deptoOf, selectedDeptos, type Place, type ViewState } from "@/lib/view";
 
@@ -43,6 +44,7 @@ interface Props {
   onPlace(p: Place | null): void;
   onFilm(slug: string): void;
   onOrg(slug: string): void;
+  onPerson?(slug: string): void;
   onUnlocated?(): void;
   onAbroad?(): void;
   onScale?(s: ScaleInfo): void;
@@ -521,8 +523,8 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
     const map = mapRef.current;
     if (!map || !ready.current || !map.getSource("depto")) return;
     const { data, geo, view, theme } = propsRef.current;
-    const aggs = aggregate(data, view.layer);
-    const filmMode = !!view.film || !!view.org;
+    const aggs = aggregate(data, view.layer, view.sub);
+    const filmMode = !!view.film || !!view.org || !!view.person;
 
     // coropleta
     const deptoCodes = geo.gaz.entries.filter((e) => e.type === "depto").map((e) => e.code);
@@ -574,16 +576,16 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
     (map.getSource("lbl-muni") as MapLibre.GeoJSONSource).setData(labels.muni as any);
 
     // pines
-    (map.getSource("pins") as MapLibre.GeoJSONSource).setData(buildPins(data, view.layer, geo.gaz, deptoOf(view.place)) as any);
+    (map.getSource("pins") as MapLibre.GeoJSONSource).setData(buildPins(data, view.layer, geo.gaz, deptoOf(view.place), view.sub) as any);
     for (const id of PIN_LAYERS) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", filmMode ? "none" : "visible");
 
-    // zona «Sin locación»: solo en Producción, sin filtro de departamento y sin entidad abierta
+    // zona «Sin locación»: solo en Producción, sin filtro de departamento y sin entidad/persona abierta
     const selFilm = view.film ? data.films.find((f) => f.slug === view.film) : undefined;
-    const showZone = view.layer === "produccion" && !view.place && !view.deptos.length && !view.org && (!view.film || (!!selFilm && isUnlocated(selFilm)));
+    const showZone = view.layer === "produccion" && !view.place && !view.deptos.length && !view.org && !view.person && (!view.film || (!!selFilm && isUnlocated(selFilm)));
     const unlocatedCount = showZone ? (view.film ? 1 : unlocatedFilms(data.films).length) : 0;
     const zoneTotal = showZone ? unlocatedFilms(data.films).length : 0;
     // zona «Fuera de Guatemala»: las producciones con alguna locación en otro país
-    const showAbroad = view.layer === "produccion" && !view.place && !view.deptos.length && !view.org && (!view.film || (!!selFilm && hasAbroad(selFilm)));
+    const showAbroad = view.layer === "produccion" && !view.place && !view.deptos.length && !view.org && !view.person && (!view.film || (!!selFilm && hasAbroad(selFilm)));
     const abroadTotal = showAbroad ? abroadFilms(data.films).length : 0;
     const zones = [buildNowhere(zoneTotal, view.noloc || (!!view.film && unlocatedCount > 0)), buildAbroad(abroadTotal, view.abroad || (!!view.film && abroadTotal > 0))];
     (map.getSource("nowhere") as MapLibre.GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: zones.flatMap((z) => z.features) } as any);
@@ -651,6 +653,46 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       }
       if (org?.muni_ine != null) prevHot.current.push({ source: "muni", id: org.muni_ine });
       for (const h of prevHot.current) map.setFeatureState(h, { hot: true });
+    } else if (view.person) {
+      const person = (data.people ?? []).find((x) => x.slug === view.person);
+      const dep = person ? personDepto(person) : null;
+      const p = person && locationPoint({ lat: null, lng: null, muni_ine: person.muni_ine, depto_ine: dep }, geo.gaz);
+      filmSrc.setData(
+        p
+          ? ({
+              type: "FeatureCollection",
+              features: [
+                {
+                  type: "Feature",
+                  properties: { n: "", site: person!.name, approx: true },
+                  geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+                },
+              ],
+            } as any)
+          : empty,
+      );
+      lineSrc.setData(empty);
+      if (person?.photo_url && p) {
+        const el = document.createElement("div");
+        el.className = "person-photo-marker";
+        el.style.cssText = [
+          "width:44px;height:44px;border-radius:50%;background:#fff;overflow:hidden;pointer-events:none",
+          `border:2px solid ${accent};box-shadow:0 4px 14px rgba(0,0,0,.35)`,
+        ].join(";");
+        const img = document.createElement("img");
+        img.src = posterThumb(person.photo_url) ?? person.photo_url;
+        img.alt = "";
+        img.style.cssText = "width:100%;height:100%;object-fit:cover";
+        const full = person.photo_url;
+        img.onerror = () => {
+          if (img.src !== full) img.src = full;
+        };
+        el.appendChild(img);
+        logoMarker.current = new (getMaplibre().Marker)({ element: el, anchor: "bottom", offset: [0, -16] }).setLngLat([p.lng, p.lat]).addTo(map);
+      }
+      if (person?.muni_ine != null) prevHot.current.push({ source: "muni", id: person.muni_ine });
+      else if (dep != null) prevHot.current.push({ source: "depto", id: dep });
+      for (const h of prevHot.current) map.setFeatureState(h, { hot: true });
     } else {
       filmSrc.setData(empty);
       lineSrc.setData(empty);
@@ -687,7 +729,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       themeApplied.current = theme;
 
       let initial: { center: [number, number]; zoom: number } | null = null;
-      if (!view.place && !view.film && !view.org) {
+      if (!view.place && !view.film && !view.org && !view.person) {
         try {
           const s = JSON.parse(localStorage.getItem(STORE_KEY) ?? "null");
           if (s && Array.isArray(s.center) && typeof s.zoom === "number") initial = s;
@@ -737,7 +779,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       });
 
       map.once("load", () => {
-        if (!initial && !view.place && !view.film && !view.org) fitCountry(false);
+        if (!initial && !view.place && !view.film && !view.org && !view.person) fitCountry(false);
         propsRef.current.onReady?.();
         setMapTick((t) => t + 1);
       });
@@ -808,7 +850,8 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
             } else {
               title = p.title ?? p.site ?? "";
               sub = p.sub ?? "";
-              if (propsRef.current.showIncomplete && (p.incomplete === true || p.incomplete === "true")) note = "Información incompleta";
+              if (p.kind === "person" || p.approx === true || p.approx === "true") note = "Ubicación aproximada: municipio";
+              if (propsRef.current.showIncomplete && (p.incomplete === true || p.incomplete === "true")) note = note ? `${note} · Información incompleta` : "Información incompleta";
             }
             setHover(null);
           } else if (hit.kind === "nowhere") {
@@ -823,7 +866,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
             const entry = hit.kind === "muni" ? geo.gaz.muni(code) : geo.gaz.depto(code);
             title = entry?.name ?? "";
             sub = hit.kind === "muni" ? entry?.depto ?? "" : "Departamento";
-            const aggs = aggregate(data, view.layer);
+            const aggs = aggregate(data, view.layer, view.sub);
             const a = (hit.kind === "muni" ? aggs.muni : aggs.depto).get(code);
             note = metricText(a, view.metric, view.layer);
             setHover({ source: hit.kind, id: code });
@@ -859,6 +902,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
             map!.easeTo({ center: (hit.f.geometry as any).coordinates, zoom: Math.min(z + 0.2, 15), duration: 600 });
           } else if (p.kind === "film") cb.onFilm(p.slug);
           else if (p.kind === "org") cb.onOrg(p.slug);
+          else if (p.kind === "person") cb.onPerson?.(p.slug);
           return;
         }
         if (hit.kind === "nowhere") {
@@ -895,7 +939,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
   // datos y vista
   useEffect(() => {
     applyData();
-  }, [props.data, props.view.layer, props.view.metric, props.view.film, props.view.org, props.view.place, props.view.deptos, props.view.noloc, props.view.abroad, props.geo, applyData]);
+  }, [props.data, props.view.layer, props.view.sub, props.view.metric, props.view.film, props.view.org, props.view.person, props.view.place, props.view.deptos, props.view.noloc, props.view.abroad, props.geo, applyData]);
 
   useEffect(() => {
     applySelection();
@@ -912,7 +956,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
   const { view, padding, geo, data } = props;
   const zoneOn = view.layer === "produccion" && data.films.some(isUnlocated);
   const abroadOn = view.layer === "produccion" && data.films.some(hasAbroad);
-  const camKey = `${view.place?.type}${view.place?.code}|${view.deptos.join(",")}|${view.film}|${view.org}|${view.noloc}|${view.abroad}|${zoneOn}|${abroadOn}`;
+  const camKey = `${view.place?.type}${view.place?.code}|${view.deptos.join(",")}|${view.film}|${view.org}|${view.person}|${view.sub}|${view.noloc}|${view.abroad}|${zoneOn}|${abroadOn}`;
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -954,6 +998,11 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
         const org = data.orgs.find((o) => o.slug === view.org);
         const p = org && locationPoint(org, geo.gaz);
         if (p) map.flyTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), 12), padding: pad, duration: 1000 });
+      } else if (view.person) {
+        const person = (data.people ?? []).find((x) => x.slug === view.person);
+        const dep = person ? personDepto(person) : null;
+        const p = person && locationPoint({ lat: null, lng: null, muni_ine: person.muni_ine, depto_ine: dep }, geo.gaz);
+        if (p) map.flyTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), 11), padding: pad, duration: 1000 });
       } else if (!view.place && view.deptos.length) {
         // varios departamentos: se encuadran juntos
         const b = new (getMaplibre().LngLatBounds)();

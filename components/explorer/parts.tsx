@@ -2,8 +2,7 @@
 
 import { categoriesText } from "@/lib/categories";
 import { PosterImage } from "@/components/ui/PosterImage";
-import { posterThumb } from "@/lib/poster-url";
-import { ArrowLeft, Check, ChevronDown, Clapperboard, Download, Landmark, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Clapperboard, Download, Landmark, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -11,7 +10,9 @@ import { isAbroad, isUnlocated } from "@/lib/completeness";
 import type { Aggregates } from "@/lib/aggregate";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
 import { durationLabel, filmTypeLabel } from "@/lib/film-types";
-import type { Dataset, Film, LayerId, Org } from "@/lib/types";
+import { personDepto, personRoleLabels } from "@/lib/people";
+import { posterThumb } from "@/lib/poster-url";
+import type { Dataset, Film, IndustrySub, LayerId, MapPerson, Org } from "@/lib/types";
 import type { PublicStats, StatKey } from "@/lib/site-settings";
 import type { Place, ViewState } from "@/lib/view";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,9 @@ export interface PanelCtx {
     deptos(codes: number[]): void;
     film(slug: string): void;
     org(slug: string): void;
+    person(slug: string): void;
+    /** Solo en Industria: entidades o personas. */
+    sub(s: IndustrySub): void;
     unlocated(): void;
     abroad(): void;
     layer(l: LayerId): void;
@@ -419,6 +423,54 @@ export function OrgCard({ org, gaz, onClick, hideBadge }: { org: Org; gaz: Gazet
         </span>
         <span className="mt-1 flex flex-wrap items-center gap-1.5">
           {!hideBadge && <CompletenessBadge pct={org.completeness} missing={org.missing_fields} compact />}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+/** Foto de una persona del directorio; sin foto muestra un icono. */
+export function PersonPhoto({ person, className, full }: { person: Pick<MapPerson, "name" | "photo_url">; className?: string; full?: boolean }) {
+  if (!person.photo_url)
+    return (
+      <span className={cn("flex shrink-0 items-center justify-center bg-accent/12 text-accent", className)}>
+        <UserRound className="h-[45%] w-[45%]" />
+      </span>
+    );
+  return (
+    <span className={cn("flex shrink-0 items-center justify-center overflow-hidden bg-surface-2 ring-1 ring-line", className)}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={(full ? person.photo_url : posterThumb(person.photo_url)) ?? person.photo_url}
+        alt=""
+        loading="lazy"
+        className="h-full w-full object-cover"
+        onError={(e) => {
+          const img = e.currentTarget as HTMLImageElement;
+          if (person.photo_url && img.src !== person.photo_url) img.src = person.photo_url;
+        }}
+      />
+    </span>
+  );
+}
+
+export function PersonCard({ person, gaz, onClick, hideBadge }: { person: MapPerson; gaz: Gazetteer; onClick: () => void; hideBadge?: boolean }) {
+  const place = gaz.muni(person.muni_ine)?.name ?? gaz.depto(personDepto(person))?.name;
+  const roles = personRoleLabels(person).slice(0, 2).join(" · ");
+  return (
+    <button
+      onClick={onClick}
+      className="group flex min-h-[48px] w-full items-start gap-3 rounded-2xl border border-transparent px-3 py-2.5 text-left transition hover:border-line hover:bg-surface-2/70"
+    >
+      <PersonPhoto person={person} className="mt-0.5 h-9 w-9 rounded-full" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-display text-[15px] text-ink">{person.name}</span>
+        <span className="block truncate text-xs text-muted">
+          {roles || "Sin oficio"}
+          {place ? ` — ${place}` : ""}
+        </span>
+        <span className="mt-1 flex flex-wrap items-center gap-1.5">
+          {!hideBadge && <CompletenessBadge pct={person.completeness} missing={person.missing_fields} compact />}
         </span>
       </span>
     </button>

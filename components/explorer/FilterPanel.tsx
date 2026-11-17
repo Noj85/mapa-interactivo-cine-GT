@@ -5,16 +5,20 @@ import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { MultiSelect } from "@/components/ui/MultiSelect";
 import { YearRange } from "@/components/ui/YearRange";
-import { EMPTY_FILM_FILTER, EMPTY_ORG_FILTER, ORG_CATEGORIES, type FilmFilter, type OrgFilter } from "@/lib/filters";
+import { CREW_ROLES } from "@/lib/crew";
+import { EMPTY_FILM_FILTER, EMPTY_ORG_FILTER, EMPTY_PERSON_FILTER, ORG_CATEGORIES, type FilmFilter, type OrgFilter, type PersonFilter } from "@/lib/filters";
 import { FORMATS, genreOptions, NATURES } from "@/lib/film-types";
-import { INITIATIVE_TYPES, NATIONALITIES, type LayerId } from "@/lib/types";
+import { INITIATIVE_TYPES, NATIONALITIES, type IndustrySub, type LayerId } from "@/lib/types";
 import { cn, fmtInt } from "@/lib/utils";
 import { activeFilterCount } from "@/lib/view";
 
 interface Props {
   layer: LayerId;
+  /** Solo en Industria: entidades o personas. */
+  sub?: IndustrySub;
   filmFilter: FilmFilter;
   orgFilter: OrgFilter;
+  personFilter?: PersonFilter;
   /** Registros de la capa que cumplen los filtros, y cuántos hay en total. */
   count: number;
   total: number;
@@ -26,6 +30,7 @@ interface Props {
   languages: { value: string; label: string; group?: string }[];
   onFilm(f: FilmFilter): void;
   onOrg(f: OrgFilter): void;
+  onPerson?(f: PersonFilter): void;
   /** Enlace a /descargas con los mismos filtros. */
   downloadHref: string;
   /** Teléfono: el botón es solo el ícono (con la cuenta de filtros activos). */
@@ -96,7 +101,10 @@ function Range({
  */
 export function FilterPanel(p: Props) {
   const { layer, filmFilter: ff, orgFilter: of } = p;
+  const sub = p.sub ?? "entidad";
+  const pf0 = p.personFilter ?? EMPTY_PERSON_FILTER;
   const isFilm = layer === "produccion";
+  const isPeople = layer === "industria" && sub === "persona";
   const [open, setOpen] = useState(false);
   const [added, setAdded] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
@@ -108,7 +116,7 @@ export function FilterPanel(p: Props) {
   useEffect(() => {
     setAdded([]);
     setAdding(false);
-  }, [layer]);
+  }, [layer, sub]);
 
   useEffect(() => {
     if (!open) return;
@@ -134,8 +142,37 @@ export function FilterPanel(p: Props) {
 
   const pf = (patch: Partial<FilmFilter>) => p.onFilm({ ...ff, ...patch });
   const po = (patch: Partial<OrgFilter>) => p.onOrg({ ...of, ...patch });
+  const pp = (patch: Partial<PersonFilter>) => p.onPerson?.({ ...pf0, ...patch });
 
   const fields: Field[] = useMemo(() => {
+    if (isPeople) {
+      return [
+        {
+          id: "oficio",
+          label: "Oficio",
+          ownLabel: true,
+          active: pf0.oficio.length > 0,
+          clear: () => pp({ oficio: [] }),
+          node: (
+            <MultiSelect
+              label="Oficio"
+              placeholder="Todos"
+              value={pf0.oficio}
+              onChange={(oficio) => pp({ oficio })}
+              options={CREW_ROLES.map((r) => ({ value: r.id, label: r.label }))}
+              searchable
+            />
+          ),
+        },
+        {
+          id: "q",
+          label: "Buscar",
+          active: pf0.q !== "",
+          clear: () => pp({ q: "" }),
+          node: <input aria-label="Buscar" className="field" placeholder="Nombre, oficio o biografía" value={pf0.q} onChange={(e) => pp({ q: e.target.value })} />,
+        },
+      ];
+    }
     if (isFilm) {
       return [
         {
@@ -264,15 +301,16 @@ export function FilterPanel(p: Props) {
       },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFilm, layer, ff, of, p.extraCategories, p.extraGenres, p.languages]);
+  }, [isFilm, isPeople, layer, ff, of, pf0, p.extraCategories, p.extraGenres, p.languages]);
 
   const hidden = p.hiddenFields ?? [];
   const offered = fields.filter((f) => !hidden.includes(f.id));
   const shownFields = offered.filter((f) => f.active || added.includes(f.id));
   const available = offered.filter((f) => !shownFields.includes(f));
-  const n = activeFilterCount({ layer, filmFilter: ff, orgFilter: of });
+  const n = activeFilterCount({ layer, sub, filmFilter: ff, orgFilter: of, personFilter: pf0 });
   const clearAll = () => {
     if (isFilm) p.onFilm({ ...EMPTY_FILM_FILTER, locacion: ff.locacion });
+    else if (isPeople) p.onPerson?.({ ...EMPTY_PERSON_FILTER });
     else p.onOrg({ ...EMPTY_ORG_FILTER });
     setAdded([]);
   };
@@ -287,7 +325,17 @@ export function FilterPanel(p: Props) {
       setTimeout(() => setCopied(false), 2000);
     } catch {}
   };
-  const noun = isFilm ? (p.count === 1 ? "producción" : "producciones") : p.count === 1 ? "entidad" : "entidades";
+  const noun = isFilm
+    ? p.count === 1
+      ? "producción"
+      : "producciones"
+    : isPeople
+      ? p.count === 1
+        ? "persona"
+        : "personas"
+      : p.count === 1
+        ? "entidad"
+        : "entidades";
   const highlighted = n > 0;
 
   return (
