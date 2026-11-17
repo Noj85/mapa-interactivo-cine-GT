@@ -1,6 +1,6 @@
 import { isCrewRole, OTHER_ROLE, roleLabel } from "@/lib/crew";
 import { parseWholeNumber } from "@/lib/numbers";
-import type { Film, PersonCredit } from "@/lib/types";
+import type { Film, MapPerson, Person, PersonCredit } from "@/lib/types";
 import { normalize } from "@/lib/utils";
 
 /** Oficios que se pueden marcar en el directorio (los mismos roles del equipo de una producción). */
@@ -53,6 +53,26 @@ export function personRoleLabels(p: { roles?: string[] | null; other_role?: stri
   else if (roles.includes(OTHER_ROLE)) labels.push("Otro oficio");
   return labels;
 }
+
+/** Lo que el mapa recibe de una persona: sin correo, teléfono, enlaces ni créditos (eso queda en el directorio). */
+export const toMapPerson = (p: Person): MapPerson => ({
+  id: p.id,
+  slug: p.slug,
+  name: p.name,
+  roles: p.roles,
+  other_role: p.other_role,
+  depto_ine: p.depto_ine,
+  muni_ine: p.muni_ine,
+  languages: p.languages,
+  bio: p.bio,
+  photo_url: p.photo_url,
+  status: p.status,
+  completeness: p.completeness,
+  missing_fields: p.missing_fields,
+});
+
+/** Departamento de una persona: el guardado o el que sale del código del municipio. */
+export const personDepto = (p: { depto_ine: number | null; muni_ine: number | null }) => p.depto_ine ?? (p.muni_ine != null ? Math.floor(p.muni_ine / 100) : null);
 
 /** Producciones publicadas donde este nombre aparece en el equipo. */
 export function filmsCrediting(name: string, films: Film[]): { film: Film; roles: string[] }[] {

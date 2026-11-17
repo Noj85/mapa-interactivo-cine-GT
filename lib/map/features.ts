@@ -3,15 +3,16 @@ import type { Feature, FeatureCollection, GeometryCollection, LineString, Point,
 import type { Agg, Aggregates } from "@/lib/aggregate";
 import { buildStops, levelOf, metricValue } from "@/lib/aggregate";
 import { metricText } from "@/lib/format";
-import { hasPlace, isAbroad, isUnlocated } from "@/lib/completeness";
+import { isAbroad, isUnlocated } from "@/lib/completeness";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
-import type { Dataset, Film, LayerId, MetricId } from "@/lib/types";
+import { personDepto, personRoleLabels } from "@/lib/people";
+import type { Dataset, Film, IndustrySub, LayerId, MetricId } from "@/lib/types";
 
 type Pt = Feature<Point, Record<string, unknown>>;
 
 /** Posición de una locación: coordenadas exactas, o centro del municipio/depto (aproximada). */
 export function locationPoint(
-  l: { lat: number | null; lng: number | null; muni_ine: number | null; depto_ine: number | null },
+  l: { lat?: number | null; lng?: number | null; muni_ine: number | null; depto_ine: number | null },
   gaz: Gazetteer,
 ): { lng: number; lat: number; approx: boolean } | null {
   if (l.lat != null && l.lng != null) return { lng: l.lng, lat: l.lat, approx: false };
@@ -34,7 +35,13 @@ function spread(points: { lng: number; lat: number }[]) {
   });
 }
 
-export function buildPins(data: Dataset, layer: LayerId, gaz: Gazetteer, depto?: number | null): FeatureCollection<Point> {
+export function buildPins(
+  data: Dataset,
+  layer: LayerId,
+  gaz: Gazetteer,
+  depto?: number | null,
+  sub: IndustrySub = "entidad",
+): FeatureCollection<Point> {
   const raw: { p: { lng: number; lat: number; approx: boolean }; props: Record<string, unknown> }[] = [];
   if (layer === "produccion") {
     for (const f of data.films) {
@@ -55,6 +62,25 @@ export function buildPins(data: Dataset, layer: LayerId, gaz: Gazetteer, depto?:
             loc: i,
           },
         });
+      });
+    }
+  } else if (layer === "industria" && sub === "persona") {
+    // las personas no tienen coordenadas: van al centro del municipio (o del departamento)
+    for (const person of data.people ?? []) {
+      const dep = personDepto(person);
+      if (depto != null && dep !== depto) continue;
+      const p = locationPoint({ lat: null, lng: null, muni_ine: person.muni_ine, depto_ine: dep }, gaz);
+      if (!p) continue;
+      raw.push({
+        p,
+        props: {
+          kind: "person",
+          slug: person.slug,
+          title: person.name,
+          sub: personRoleLabels(person).slice(0, 2).join(" · ") || "Persona del directorio",
+          approx: true,
+          incomplete: person.completeness < 100,
+        },
       });
     }
   } else {

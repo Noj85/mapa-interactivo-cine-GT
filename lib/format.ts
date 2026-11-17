@@ -19,6 +19,8 @@ export function metricText(a: Agg | undefined, metric: MetricId, layer: LayerId 
       return plural(v, "empleo", "empleos");
     case "orgs":
       return layer === "circulacion" ? plural(v, "espacio", "espacios") : plural(v, "empresa", "empresas");
+    case "people":
+      return plural(v, "persona", "personas");
   }
 }
 
@@ -27,6 +29,7 @@ export function metricValueText(v: number, metric: MetricId) {
 }
 
 export function metricLabel(metric: MetricId, layer: LayerId) {
+  if (metric === "people") return "Personas del directorio";
   if (metric === "orgs") return layer === "circulacion" ? "Espacios de circulación" : "Empresas e instituciones";
   return METRICS[metric].label;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { isAbroad } from "@/lib/completeness";
-import { EMPTY_FILM_FILTER, EMPTY_ORG_FILTER } from "@/lib/filters";
+import { EMPTY_FILM_FILTER, EMPTY_ORG_FILTER, EMPTY_PERSON_FILTER } from "@/lib/filters";
 import { AlertTriangle, ArrowRight, Copy, Download, MapPin, Plus, Sparkles } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
@@ -125,7 +125,21 @@ export function StepReview({
     return out;
   }, [preview]);
   const activeLayer = layers.includes(layer) ? layer : (layers[0] ?? "produccion");
-  const view: ViewState = { layer: activeLayer, metric: activeLayer === "produccion" ? "films" : "orgs", place: null, deptos: [], film: null, org: null, filmFilter: EMPTY_FILM_FILTER, orgFilter: EMPTY_ORG_FILTER, noloc: false, abroad: false };
+  const view: ViewState = {
+    layer: activeLayer,
+    sub: "entidad",
+    metric: activeLayer === "produccion" ? "films" : "orgs",
+    place: null,
+    deptos: [],
+    film: null,
+    org: null,
+    person: null,
+    filmFilter: EMPTY_FILM_FILTER,
+    orgFilter: EMPTY_ORG_FILTER,
+    personFilter: EMPTY_PERSON_FILTER,
+    noloc: false,
+    abroad: false,
+  };
   const theme = typeof document !== "undefined" && document.documentElement.dataset.theme === "light" ? "light" : "dark";
 
   const placeLabel = (c: Candidate, idx: number) => {

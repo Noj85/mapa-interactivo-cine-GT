@@ -1,17 +1,18 @@
 "use client";
 
 import { useMemo } from "react";
-import { filmsIn, metricValue, orgsIn, type Agg } from "@/lib/aggregate";
+import { filmsIn, metricValue, orgsIn, peopleIn, type Agg } from "@/lib/aggregate";
 import { metricText } from "@/lib/format";
 import { LAYERS, type LayerId } from "@/lib/types";
 import { fmtInt, fmtMoney } from "@/lib/utils";
 import { downloadHref } from "@/lib/view";
-import { BarRow, DownloadLink, Empty, FilmCard, OrgCard, PanelShell, type PanelCtx, SectionTitle, Stat, StatsGrid } from "./parts";
+import { BarRow, DownloadLink, Empty, FilmCard, OrgCard, PanelShell, PersonCard, type PanelCtx, SectionTitle, Stat, StatsGrid } from "./parts";
 
-const ZERO: Agg = { films: 0, days: 0, spend: 0, jobs: 0, orgs: 0 };
+const ZERO: Agg = { films: 0, days: 0, spend: 0, jobs: 0, orgs: 0, people: 0 };
 
 export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
   const { data, gaz, aggs, view, go } = ctx;
+  const peopleMode = view.layer === "industria" && view.sub === "persona";
   const place = view.place!;
   const entry = place.type === "muni" ? gaz.muni(place.code) : gaz.depto(place.code);
   const scope = place.type === "muni" ? { muni: place.code } : { depto: place.code };
@@ -19,6 +20,7 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
 
   const films = useMemo(() => filmsIn(data, scope), [data, place.type, place.code]); // eslint-disable-line react-hooks/exhaustive-deps
   const orgs = useMemo(() => orgsIn(data, view.layer, scope), [data, view.layer, place.type, place.code]); // eslint-disable-line react-hooks/exhaustive-deps
+  const people = useMemo(() => peopleIn(data, scope), [data, place.type, place.code]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const munis = useMemo(() => {
     if (place.type !== "depto") return [];
@@ -67,6 +69,10 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
             { key: "jobs", label: "Empleos", value: fmtInt(agg.jobs) },
           ]}
         />
+      ) : peopleMode ? (
+        <div className="mt-4 grid grid-cols-2 gap-2.5">
+          <Stat label="Personas" value={fmtInt(agg.people)} sub="del directorio" />
+        </div>
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-2.5">
           <Stat label={LAYERS.find((l) => l.id === view.layer)!.label} value={fmtInt(agg.orgs)} sub="registros" />
@@ -101,11 +107,17 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
         </>
       )}
 
-      <SectionTitle aside={view.layer === "produccion" ? films.length : orgs.length}>
-        {view.layer === "produccion" ? "Producciones rodadas aquí" : "Registros aquí"}
+      <SectionTitle aside={peopleMode ? people.length : view.layer === "produccion" ? films.length : orgs.length}>
+        {peopleMode ? "Personas aquí" : view.layer === "produccion" ? "Producciones rodadas aquí" : "Registros aquí"}
       </SectionTitle>
       <div className="-mx-2 space-y-0.5">
-        {view.layer === "produccion" ? (
+        {peopleMode ? (
+          people.length ? (
+            people.map((p) => <PersonCard key={p.id} person={p} gaz={gaz} hideBadge={!ctx.canEdit} onClick={() => go.person(p.slug)} />)
+          ) : (
+            <Empty>Sin personas del directorio en {entry?.name}.</Empty>
+          )
+        ) : view.layer === "produccion" ? (
           films.length ? (
             films.map((f) => (
               <FilmCard
@@ -127,8 +139,11 @@ export default function TerritoryPanel({ ctx }: { ctx: PanelCtx }) {
           <Empty>Sin registros en esta capa para {entry?.name}.</Empty>
         )}
       </div>
-      {(view.layer === "produccion" ? films.length : orgs.length) > 0 && (
-        <DownloadLink href={downloadHref({ layer: view.layer, place, filmFilter: view.filmFilter, orgFilter: view.orgFilter })} label={`Descargar datos de ${entry?.name ?? "este lugar"}`} />
+      {(peopleMode ? people.length : view.layer === "produccion" ? films.length : orgs.length) > 0 && (
+        <DownloadLink
+          href={downloadHref({ layer: view.layer, place, filmFilter: view.filmFilter, orgFilter: view.orgFilter, sub: view.sub, personFilter: view.personFilter })}
+          label={`Descargar datos de ${entry?.name ?? "este lugar"}`}
+        />
       )}
     </PanelShell>
   );

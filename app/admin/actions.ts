@@ -552,11 +552,16 @@ export async function rejectSubmissionAction(id: string, note: string | null): P
     if (sub.status !== "pending") return { ok: false, error: "Este aporte ya fue revisado" };
     await store.reviewSubmission(id, { status: "rejected", reviewer_note: note?.trim() || null });
     // las imágenes que subió el público ya no hacen falta (salvo que algún registro las esté usando)
-    const p = sub.payload as { poster_url?: string | null; logo_url?: string | null; trailer_thumb?: string | null; film_thumb?: string | null };
-    const mine = [p.poster_url, p.logo_url, p.trailer_thumb, p.film_thumb].filter((u): u is string => !!u);
+    const p = sub.payload as { poster_url?: string | null; logo_url?: string | null; photo_url?: string | null; trailer_thumb?: string | null; film_thumb?: string | null };
+    const mine = [p.poster_url, p.logo_url, p.photo_url, p.trailer_thumb, p.film_thumb].filter((u): u is string => !!u);
     if (mine.length) {
-      const [films, orgs] = await Promise.all([store.listFilms({ drafts: true }), store.listOrgs({ drafts: true })]);
-      const inUse = new Set([...films.flatMap((f) => [f.poster_url, f.trailer_thumb, f.film_thumb]), ...orgs.map((o) => o.logo_url)]);
+      const [films, orgs, people] = await Promise.all([
+        store.listFilms({ drafts: true }),
+        store.listOrgs({ drafts: true }),
+        // sin la migración del directorio no hay personas
+        store.listPeople({ drafts: true }).catch(() => []),
+      ]);
+      const inUse = new Set([...films.flatMap((f) => [f.poster_url, f.trailer_thumb, f.film_thumb]), ...orgs.map((o) => o.logo_url), ...people.map((x) => x.photo_url)]);
       await deletePublicImages(mine.filter((u) => !inUse.has(u)));
     }
     revalidatePath("/admin");

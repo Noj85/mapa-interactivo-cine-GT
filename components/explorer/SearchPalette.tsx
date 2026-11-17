@@ -4,11 +4,12 @@ import { categoriesText } from "@/lib/categories";
 import { companyNames } from "@/lib/companies";
 import { crewMatch } from "@/lib/crew";
 import { AnimatePresence, motion } from "framer-motion";
-import { Clapperboard, Landmark, MapPin, Search } from "lucide-react";
+import { Clapperboard, Landmark, MapPin, Search, UserRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { filmTypeLabel } from "@/lib/film-types";
 import { PosterImage } from "@/components/ui/PosterImage";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
+import { personRoleLabels } from "@/lib/people";
 import type { Dataset } from "@/lib/types";
 import type { Place } from "@/lib/view";
 import { cn, normalize } from "@/lib/utils";
@@ -18,7 +19,8 @@ const SUGGESTIONS = ["Panajachel", "Antigua Guatemala", "Tikal", "Quetzaltenango
 type Result =
   | { kind: "place"; id: string; label: string; sub: string; place: Place }
   | { kind: "film"; id: string; label: string; sub: string; slug: string; poster: string | null }
-  | { kind: "org"; id: string; label: string; sub: string; slug: string };
+  | { kind: "org"; id: string; label: string; sub: string; slug: string }
+  | { kind: "person"; id: string; label: string; sub: string; slug: string };
 
 /** Icono del resultado; las producciones con póster muestran su miniatura (si no carga, vuelve el icono). */
 function ResultIcon({ result }: { result: Result }) {
@@ -28,7 +30,7 @@ function ResultIcon({ result }: { result: Result }) {
     return (
       <PosterImage src={poster} heightClass="h-12" maxWidthClass="max-w-[4.5rem]" className="rounded-md bg-surface-2 ring-1 ring-line" onBroken={() => setFailed(true)} />
     );
-  const Icon = result.kind === "place" ? MapPin : result.kind === "film" ? Clapperboard : Landmark;
+  const Icon = result.kind === "place" ? MapPin : result.kind === "film" ? Clapperboard : result.kind === "person" ? UserRound : Landmark;
   return (
     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/12 text-accent">
       <Icon className="h-4 w-4" />
@@ -44,6 +46,7 @@ export function SearchPalette({
   onPlace,
   onFilm,
   onOrg,
+  onPerson,
 }: {
   open: boolean;
   onClose(): void;
@@ -52,6 +55,7 @@ export function SearchPalette({
   onPlace(p: Place): void;
   onFilm(slug: string): void;
   onOrg(slug: string): void;
+  onPerson?(slug: string): void;
 }) {
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
@@ -97,6 +101,17 @@ export function SearchPalette({
       if (normalize(`${o.name} ${categoriesText(o, " ")}`).includes(nq))
         out.push({ kind: "org", id: `o${o.id}`, label: o.name, sub: categoriesText(o), slug: o.slug });
     }
+    for (const p of data.people ?? []) {
+      const roles = personRoleLabels(p).join(" ");
+      if (normalize(`${p.name} ${roles}`).includes(nq))
+        out.push({
+          kind: "person",
+          id: `pe${p.id}`,
+          label: p.name,
+          sub: ["Persona", personRoleLabels(p).slice(0, 2).join(" · ") || null].filter(Boolean).join(" · "),
+          slug: p.slug,
+        });
+    }
     return out.slice(0, 12);
   }, [q, gaz, data]);
 
@@ -104,6 +119,7 @@ export function SearchPalette({
     onClose();
     if (r.kind === "place") onPlace(r.place);
     else if (r.kind === "film") onFilm(r.slug);
+    else if (r.kind === "person") onPerson?.(r.slug);
     else onOrg(r.slug);
   };
 
@@ -148,7 +164,7 @@ export function SearchPalette({
                   setIdx(0);
                 }}
                 onKeyDown={onKey}
-                placeholder="Busca un lugar, producción o entidad…"
+                placeholder="Busca un lugar, producción, entidad o persona…"
                 enterKeyHint="search"
                 autoComplete="off"
                 autoCorrect="off"
@@ -162,7 +178,7 @@ export function SearchPalette({
             <div className="min-h-0 flex-1 overflow-y-auto p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:max-h-[50vh] sm:flex-none">
               {!q && (
                 <div className="px-3 py-5 text-center">
-                  <p className="text-sm text-muted">Busca un lugar, el título de una producción o una entidad.</p>
+                  <p className="text-sm text-muted">Busca un lugar, una producción, una entidad o una persona del directorio.</p>
                   <div className="mt-3 flex flex-wrap justify-center gap-2">
                     {SUGGESTIONS.map((x) => (
                       <button key={x} type="button" className="chip min-h-[36px] px-3 text-sm transition hover:border-accent hover:text-ink" onClick={() => setQ(x)}>
