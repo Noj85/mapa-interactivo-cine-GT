@@ -26,7 +26,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
-        // «display» es la misma Biennale; el peso y el espaciado de los títulos están en globals.css
+        // «display» es la misma Montserrat; el peso y el espaciado de los títulos están en globals.css
         display: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       borderRadius: {

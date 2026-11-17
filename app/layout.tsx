@@ -1,43 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
 import "maplibre-gl/dist/maplibre-gl.css";
+// Tipografía única: Montserrat (licencia SIL OFL 1.1, libre para uso y redistribución), servida desde el propio sitio
+// con el paquete @fontsource/montserrat. Regular 400 (texto) · Medium 500 (etiquetas, botones) · SemiBold 600 (títulos)
+// · Bold 700 (h1), y la cursiva Regular. Cada peso se descarga solo si una página lo usa; la variable --font-sans
+// (que usan Tailwind y globals.css) se define en globals.css.
+import "@fontsource/montserrat/400.css";
+import "@fontsource/montserrat/400-italic.css";
+import "@fontsource/montserrat/500.css";
+import "@fontsource/montserrat/600.css";
+import "@fontsource/montserrat/700.css";
 import { Providers } from "@/components/Providers";
 import "./globals.css";
-
-// Tipografía única: Biennale (carpeta /fonts/biennale), en todas sus variantes.
-//  Hair 100 · Thin 200 · Ultra Light 250 · Light 300 · Book 350 · Regular 400 (texto) · Medium 500 (etiquetas, botones)
-//  SemiBold 600 (títulos) · Bold 700 · Heavy 800 · Black 900, cada una con su cursiva.
-// Los archivos se descargan solo cuando una página usa ese peso (preload apagado para no cargar los 22 a la vez).
-const biennale = localFont({
-  src: [
-    { path: "../fonts/biennale/Biennale Hair.otf", weight: "100", style: "normal" },
-    { path: "../fonts/biennale/Biennale Hair It.otf", weight: "100", style: "italic" },
-    { path: "../fonts/biennale/Biennale Thin.otf", weight: "200", style: "normal" },
-    { path: "../fonts/biennale/Biennale Thin It.otf", weight: "200", style: "italic" },
-    { path: "../fonts/biennale/Biennale Ultra Light.otf", weight: "250", style: "normal" },
-    { path: "../fonts/biennale/Biennale UltraLight It.otf", weight: "250", style: "italic" },
-    { path: "../fonts/biennale/Biennale Light.otf", weight: "300", style: "normal" },
-    { path: "../fonts/biennale/Biennale Light It.otf", weight: "300", style: "italic" },
-    { path: "../fonts/biennale/Biennale Book.otf", weight: "350", style: "normal" },
-    { path: "../fonts/biennale/Biennale Book It.otf", weight: "350", style: "italic" },
-    { path: "../fonts/biennale/Biennale Regular.otf", weight: "400", style: "normal" },
-    { path: "../fonts/biennale/Biennale Regular It.otf", weight: "400", style: "italic" },
-    { path: "../fonts/biennale/Biennale Medium.otf", weight: "500", style: "normal" },
-    { path: "../fonts/biennale/Biennale Medium It.otf", weight: "500", style: "italic" },
-    { path: "../fonts/biennale/Biennale SemiBold.otf", weight: "600", style: "normal" },
-    { path: "../fonts/biennale/Biennale SemiBold It.otf", weight: "600", style: "italic" },
-    { path: "../fonts/biennale/Biennale Bold.otf", weight: "700", style: "normal" },
-    { path: "../fonts/biennale/Biennale Bold It.otf", weight: "700", style: "italic" },
-    { path: "../fonts/biennale/Biennale Heavy.otf", weight: "800", style: "normal" },
-    { path: "../fonts/biennale/Biennale Heavy It.otf", weight: "800", style: "italic" },
-    { path: "../fonts/biennale/Biennale Black.otf", weight: "900", style: "normal" },
-    { path: "../fonts/biennale/Biennale Black It.otf", weight: "900", style: "italic" },
-  ],
-  variable: "--font-sans",
-  display: "swap",
-  preload: false,
-  fallback: ["system-ui", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
-});
 
 const SITE_NAME = "Mapa del Cine de Guatemala";
 const DESCRIPTION = "Dónde se filma, dónde se ve y quién hace cine en Guatemala: departamentos, municipios y locaciones. Un proyecto de PROCINE y la Academia Guatemalteca de Artes y Ciencias Cinematográficas.";
@@ -78,7 +51,7 @@ const themeScript = `(function(){var d=document.documentElement,t=null;try{t=loc
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" data-theme="light" className={biennale.variable} suppressHydrationWarning>
+    <html lang="es" data-theme="light" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

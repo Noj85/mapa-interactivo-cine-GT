@@ -96,8 +96,8 @@ const SERVICES = [
     text: "Servicios de base de datos, autenticación, almacenamiento y alojamiento, sujetos a sus términos de servicio. https://supabase.com/terms — https://vercel.com/legal/terms",
   },
   {
-    name: "Tipografía Biennale",
-    text: "Propiedad de su fabricante. Uso temporal en esta plataforma; no se redistribuye ni se licencia a terceros. Será reemplazada por la tipografía institucional.",
+    name: "Tipografía Montserrat",
+    text: "Diseñada por Julieta Ulanovsky y colaboradores (The Montserrat Project Authors). Licencia SIL Open Font License 1.1, que permite usarla y redistribuirla libremente. Se sirve desde el propio sitio con el paquete @fontsource/montserrat. https://openfontlicense.org — https://github.com/JulietaUla/Montserrat",
   },
 ];
 

@@ -4,6 +4,8 @@
 
 :root,
 [data-theme="light"] {
+  /* Tipografía única: Montserrat (SIL OFL 1.1), cargada en app/layout.tsx */
+  --font-sans: "Montserrat", ui-sans-serif, system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   /* Claro: papel frío, tinta azul marino; el acento es el violeta del pin del logo y de PROCINE */
   --bg: 245 247 250;
   --surface: 255 255 255;
@@ -44,7 +46,7 @@
   color-scheme: dark;
 }
 
-/* Títulos: Biennale SemiBold (Bold en h1), con el espaciado algo cerrado */
+/* Títulos: Montserrat SemiBold (Bold en h1), con el espaciado algo cerrado */
 h1,
 h2,
 h3,

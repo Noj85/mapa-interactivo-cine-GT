@@ -16,7 +16,8 @@ const dataUri = (buf: Buffer, mime: string) => `data:${mime};base64,${buf.toStri
 
 export default async function OpenGraphImage() {
   const [book, logo, academia, procine] = await Promise.all([
-    file("fonts", "biennale", "Biennale Book.otf"),
+    // Montserrat Regular (SIL OFL 1.1); ImageResponse lee TTF, OTF y WOFF (no WOFF2)
+    file("node_modules", "@fontsource", "montserrat", "files", "montserrat-latin-400-normal.woff"),
     file("public", "brand", "mapa-logo-dark.png"),
     file("public", "brand", "academia-dark.png"),
     file("public", "brand", "procine-dark.png"),
@@ -33,7 +34,7 @@ export default async function OpenGraphImage() {
           justifyContent: "space-between",
           padding: "64px 80px 56px",
           color: "#fff",
-          fontFamily: "Biennale",
+          fontFamily: "Montserrat",
           backgroundColor: "#0c1a36",
           backgroundImage:
             "radial-gradient(circle at 14% 40%, rgba(219,39,187,0.34) 0%, rgba(138,83,194,0.16) 30%, rgba(12,26,54,0) 62%), linear-gradient(135deg, #12274d 0%, #090d16 100%)",
@@ -59,7 +60,7 @@ export default async function OpenGraphImage() {
     {
       ...size,
       fonts: [
-        { name: "Biennale", data: book, weight: 400, style: "normal" },
+        { name: "Montserrat", data: book, weight: 400, style: "normal" },
       ],
     },
   );

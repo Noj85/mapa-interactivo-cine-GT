@@ -17,7 +17,7 @@ function ThemedLogo({ name, alt, className, width, height }: { name: string; alt
 }
 
 /**
- * Logo del Mapa del Cine de Guatemala: cinta de película con el pin y el nombre escrito en Biennale. Con `markOnly` solo la cinta y el pin.
+ * Logo del Mapa del Cine de Guatemala: cinta de película con el pin y el nombre escrito en Montserrat. Con `markOnly` solo la cinta y el pin.
  * Tiene variantes para fondo claro y oscuro (ver scripts/brand-mapa.mjs para la marca y scripts/brand-mapa-logo.mjs para el logo completo).
  */
 export function MapLogo({ className, markOnly }: { className?: string; markOnly?: boolean }) {

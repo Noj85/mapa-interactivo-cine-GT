@@ -30,9 +30,8 @@ código abierto.
    c) Marcas y logotipos. Los nombres, logotipos y marcas de la Academia Guatemalteca de Artes y Ciencias Cinematográficas,
       de PROCINE y de terceros pertenecen a sus titulares.
 
-   d) Tipografía. La tipografía Biennale (carpeta fonts/biennale/) es propiedad de su
-      fabricante, se usa de forma temporal y no está licenciada para redistribución ni
-      para uso fuera de esta plataforma.
+   d) Tipografía. La tipografía Montserrat (paquete @fontsource/montserrat) se distribuye
+      bajo la licencia SIL Open Font License 1.1 y conserva esa licencia.
 
    e) Servicios y datos geográficos de terceros (OpenStreetMap, OpenMapTiles,
       OpenFreeMap, Esri, MINFIN / INE y otros) se rigen por sus propios términos, que se

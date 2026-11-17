@@ -11,7 +11,7 @@
  *   node scripts/brand-mapa.mjs
  *
  * Escribe:
- *   public/brand/mapa-logo-{light,dark}.png   NO se escribe aquí: el logo horizontal, con el nombre en Biennale, lo arma
+ *   public/brand/mapa-logo-{light,dark}.png   NO se escribe aquí: el logo horizontal, con el nombre en Montserrat, lo arma
  *                                             scripts/brand-mapa-logo.mjs a partir de la marca (córrelo después de este)
  *   public/brand/mapa-mark-{light,dark}.png   solo la marca (cinta de película + pin)
  *   app/icon.png, app/favicon.ico, app/apple-icon.png, public/icon-192.png, public/icon-512.png   íconos sobre azul institucional
