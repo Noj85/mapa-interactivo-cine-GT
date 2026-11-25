@@ -88,6 +88,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     description: "Ver quién cambió qué y cuándo en los registros.",
     enabled: false,
   },
+  {
+    id: "manual",
+    group: "Ayuda",
+    title: "Manual de la consola",
+    description: "Cómo publicar, importar, revisar aportes, pedir información y descargar datos.",
+    enabled: true,
+  },
 ];
 
 /** Secciones agrupadas, en el orden en que aparecen. */
