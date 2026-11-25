@@ -179,8 +179,8 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       source: "mask",
       paint: {
         "fill-color": bg,
-        // opaca: fuera de Guatemala no se ve el mapa base (vecinos, mar, satélite)
-        "fill-opacity": 1,
+        // solo Guatemala: opaca, fuera del país no se ve el mapa base (vecinos, mar, satélite); si no, un velo que lo atenúa
+        "fill-opacity": propsRef.current.data.mapScope?.onlyGuatemala === false ? ["interpolate", ["linear"], ["zoom"], 5, dark ? 0.72 : 0.62, 10, 0.5, 13, 0.25] : 1,
       },
     });
 
@@ -725,7 +725,8 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
     let map: MapLibre.Map | null = null;
     (async () => {
       const { theme, view } = propsRef.current;
-      const style = await buildStyle(theme, { within: countryShape(propsRef.current.geo.pais) });
+      const { geo, data } = propsRef.current;
+      const style = await buildStyle(theme, data.mapScope?.onlyGuatemala === false ? {} : { within: countryShape(geo.pais) });
       if (cancelled || !containerRef.current) return;
       themeApplied.current = theme;
 
@@ -932,7 +933,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
     if (!map || themeApplied.current === props.theme) return;
     themeApplied.current = props.theme;
     ready.current = false;
-    buildStyle(props.theme, { within: countryShape(props.geo.pais) }).then((style) => {
+    buildStyle(props.theme, props.data.mapScope?.onlyGuatemala === false ? {} : { within: countryShape(props.geo.pais) }).then((style) => {
       map.setStyle(style as any, { diff: false });
     });
   }, [props.theme]);

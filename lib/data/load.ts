@@ -2,14 +2,14 @@ import "server-only";
 import { publicStore } from "@/lib/auth";
 import { toMapPerson } from "@/lib/people";
 import { supabaseConfigured } from "@/lib/supabase/env";
-import { DEFAULT_PUBLIC_STATS, PUBLIC_STATS_KEY, readPublicStats } from "@/lib/site-settings";
+import { DEFAULT_MAP_SCOPE, DEFAULT_PUBLIC_STATS, MAP_SCOPE_KEY, PUBLIC_STATS_KEY, readMapScope, readPublicStats } from "@/lib/site-settings";
 import type { Dataset } from "@/lib/types";
 
 /** Conjunto de datos público: solo lo publicado. Si todavía no hay nada, el mapa se muestra vacío. */
 export async function loadDataset(): Promise<Dataset> {
   try {
     const store = publicStore();
-    const [films, orgs, people, links, stats] = await Promise.all([
+    const [films, orgs, people, links, stats, scope] = await Promise.all([
       store.listFilms(),
       store.listOrgs(),
       // sin la migración del directorio (0021) simplemente no hay personas
@@ -18,14 +18,15 @@ export async function loadDataset(): Promise<Dataset> {
       store.festivalOrgMap().catch(() => ({}) as Record<string, string>),
       // sin la tabla de ajustes (migración 0015) se usan los valores por defecto
       store.getSetting(PUBLIC_STATS_KEY).catch(() => null),
+      store.getSetting(MAP_SCOPE_KEY).catch(() => null),
     ]);
     // solo cuentan los vínculos a entidades publicadas
     const published = new Set(orgs.map((o) => o.id));
     const festivalOrgs = Object.fromEntries(Object.entries(links).filter(([, orgId]) => published.has(orgId)));
-    return { films, orgs, people: people.map(toMapPerson), festivalOrgs, mode: store.mode, publicStats: readPublicStats(stats) };
+    return { films, orgs, people: people.map(toMapPerson), festivalOrgs, mode: store.mode, publicStats: readPublicStats(stats), mapScope: readMapScope(scope) };
   } catch (e) {
     console.error("[dataset]", e);
-    return { films: [], orgs: [], people: [], festivalOrgs: {}, mode: supabaseConfigured() ? "supabase" : "local", publicStats: DEFAULT_PUBLIC_STATS };
+    return { films: [], orgs: [], people: [], festivalOrgs: {}, mode: supabaseConfigured() ? "supabase" : "local", publicStats: DEFAULT_PUBLIC_STATS, mapScope: DEFAULT_MAP_SCOPE };
   }
 }
 

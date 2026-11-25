@@ -19,6 +19,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     enabled: true,
   },
   {
+    id: "mapa",
+    group: "Mapa público",
+    title: "Zona del mapa",
+    description: "Elegir si el mapa muestra solo Guatemala o también los países vecinos y el mar.",
+    enabled: true,
+  },
+  {
     id: "festivales",
     group: "Catálogos",
     title: "Festivales",

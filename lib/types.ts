@@ -1,4 +1,4 @@
-import type { PublicStats } from "@/lib/site-settings";
+import type { MapScope, PublicStats } from "@/lib/site-settings";
 import type { FilmFormat, FilmNature } from "@/lib/film-types";
 export type LayerId = "produccion" | "circulacion" | "industria";
 
@@ -234,6 +234,8 @@ export interface Dataset {
   mode: "supabase" | "local";
   /** Qué cifras muestra el mapa público (Ajustes → Cifras públicas). */
   publicStats: PublicStats;
+  /** Zona del mapa (Ajustes → Zona del mapa). Sin él, solo Guatemala. */
+  mapScope?: MapScope;
 }
 
 export interface GazetteerEntry {

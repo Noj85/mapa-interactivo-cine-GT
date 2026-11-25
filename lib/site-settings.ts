@@ -22,3 +22,19 @@ export function readPublicStats(raw: unknown): PublicStats {
   if (raw && typeof raw === "object") for (const k of STAT_KEYS) if (typeof (raw as Record<string, unknown>)[k] === "boolean") out[k] = (raw as Record<string, boolean>)[k];
   return out;
 }
+
+/** Qué zona muestra el mapa: solo Guatemala o también los países vecinos (Ajustes → Zona del mapa). */
+export interface MapScope {
+  onlyGuatemala: boolean;
+}
+
+export const MAP_SCOPE_KEY = "map_scope";
+
+/** Por defecto el mapa muestra solo Guatemala. */
+export const DEFAULT_MAP_SCOPE: MapScope = { onlyGuatemala: true };
+
+/** Lee lo guardado; si falta o viene mal, solo Guatemala. */
+export function readMapScope(raw: unknown): MapScope {
+  const v = raw && typeof raw === "object" ? (raw as Record<string, unknown>).onlyGuatemala : undefined;
+  return { onlyGuatemala: v !== false };
+}
