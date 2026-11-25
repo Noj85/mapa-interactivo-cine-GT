@@ -47,7 +47,7 @@ export default function AbroadPanel({ ctx }: { ctx: PanelCtx }) {
       </div>
       <p className="mt-3 text-sm leading-relaxed text-muted">
         {films.length === 1 ? "Esta producción guatemalteca se rodó" : `Estas ${films.length.toLocaleString("es-GT")} producciones guatemaltecas se rodaron`} total o parcialmente en otros países. Se muestran en el marcador
-        «Fuera de Guatemala», en el Pacífico frente a la costa.
+        «Fuera de Guatemala», en la esquina superior derecha del mapa.
       </p>
 
       {films.length > 8 && (

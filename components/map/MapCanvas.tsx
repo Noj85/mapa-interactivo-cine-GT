@@ -11,7 +11,7 @@ import type { GeoBundle } from "@/lib/geo/load";
 import { INCOMPLETE_COLOR, LAYER_COLORS, MAP_BG, ramp, readableOn, type Theme } from "@/lib/map/colors";
 import { abroadFilms, ABROAD_BBOX, buildAbroad, buildFilmRoute, buildLabels, buildMask, buildNowhere, buildPins, hasAbroad, levels, locationPoint, NOWHERE_BBOX, isUnlocated, unlocatedFilms, withZones } from "@/lib/map/features";
 import { loadZoneIcons } from "@/lib/map/zone-icons";
-import { buildStyle, firstSymbolId } from "@/lib/map/style";
+import { buildStyle, countryShape, firstSymbolId } from "@/lib/map/style";
 import { personDepto } from "@/lib/people";
 import type { Dataset } from "@/lib/types";
 import { deptoOf, selectedDeptos, type Place, type ViewState } from "@/lib/view";
@@ -179,7 +179,8 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       source: "mask",
       paint: {
         "fill-color": bg,
-        "fill-opacity": ["interpolate", ["linear"], ["zoom"], 5, dark ? 0.72 : 0.62, 10, 0.5, 13, 0.25],
+        // opaca: fuera de Guatemala no se ve el mapa base (vecinos, mar, satélite)
+        "fill-opacity": 1,
       },
     });
 
@@ -232,7 +233,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       paint: { "fill-color": bg, "fill-opacity": dark ? 0.78 : 0.7 },
     });
 
-    // producciones sin lugar de rodaje y rodadas fuera: marcadores en el mar; el círculo es solo el área táctil (y un halo al elegirlo)
+    // producciones sin lugar de rodaje y rodadas fuera: marcadores en la esquina superior derecha, fuera del país; el círculo es solo el área táctil (y un halo al elegirlo)
     const neutral = dark ? "#9aa7bd" : "#5b6b85";
     const prodAccent = LAYER_COLORS.produccion[theme];
     loadZoneIcons(map, { fg: neutral, sel: prodAccent, bg });
@@ -724,7 +725,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
     let map: MapLibre.Map | null = null;
     (async () => {
       const { theme, view } = propsRef.current;
-      const style = await buildStyle(theme);
+      const style = await buildStyle(theme, { within: countryShape(propsRef.current.geo.pais) });
       if (cancelled || !containerRef.current) return;
       themeApplied.current = theme;
 
@@ -744,7 +745,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
         zoom: initial?.zoom ?? 6.3,
         minZoom: 5,
         maxZoom: 17.5,
-        // margen amplio: incluye la zona «Sin locación» (Pacífico) y deja alejar el mapa en pantallas altas
+        // margen amplio: incluye las zonas «Sin locación» y «Fuera de Guatemala» (esquina superior derecha) y deja alejar el mapa en pantallas altas
         maxBounds: [
           [-101, 8],
           [-80, 23],
@@ -931,7 +932,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
     if (!map || themeApplied.current === props.theme) return;
     themeApplied.current = props.theme;
     ready.current = false;
-    buildStyle(props.theme).then((style) => {
+    buildStyle(props.theme, { within: countryShape(props.geo.pais) }).then((style) => {
       map.setStyle(style as any, { diff: false });
     });
   }, [props.theme]);

@@ -268,9 +268,9 @@ export function StatsGrid({ items, stats, canEdit, className }: { items: StatIte
           </div>
         ))}
       </div>
-      {hidden && (
+      {canEdit && (
         <Link href="/admin/ajustes/cifras" className="mt-2 inline-block text-xs text-accent underline underline-offset-2">
-          Elegir qué cifras ve el público
+          {hidden ? "Elegir qué cifras ve el público" : "Cambiar qué cifras ve el público"}
         </Link>
       )}
     </div>

@@ -185,7 +185,7 @@ export function buildFilmRoute(film: Film, gaz: Gazetteer) {
   return { points, lines, coords: spreadPts.map((p) => [p.lng, p.lat] as [number, number]) };
 }
 
-/** Polígono "mundo menos Guatemala": atenúa lo que está fuera del país. */
+/** Polígono "mundo menos Guatemala": con él se tapa todo lo que está fuera del país. */
 export function buildMask(pais: GeometryCollection): FeatureCollection<Polygon> {
   const holes: number[][][] = [];
   for (const g of pais.geometries) {
@@ -209,17 +209,19 @@ export function buildMask(pais: GeometryCollection): FeatureCollection<Polygon> 
 // ───────────────────────── producciones sin lugar de rodaje y rodadas fuera de Guatemala ─────────────────────────
 
 /**
- * Las producciones sin locación no se esconden: se agrupan en un marcador en el Pacífico, frente a la costa,
- * fuera del territorio, para que se vea que existen pero que todavía no tienen lugar.
+ * Las producciones sin locación no se esconden: se agrupan en un marcador en la esquina superior derecha del mapa,
+ * al este de Petén y fuera del territorio, para que se vea que existen pero que todavía no tienen lugar.
  * `radius` es el área que se puede tocar; el marcador es un ícono (ver `zone-icons.ts`).
  */
-export const NOWHERE = { lng: -92.05, lat: 13.98, radius: 0.18 };
+export const NOWHERE = { lng: -87.55, lat: 17.45, radius: 0.18 };
 
-/** Las producciones con locaciones en otro país tienen su propio marcador, más al este sobre la misma costa. */
-export const ABROAD = { lng: -90.95, lat: 13.55, radius: 0.18 };
+/** Las producciones con locaciones en otro país tienen su propio marcador, justo debajo del anterior (con espacio para el nombre y el conteo de arriba). */
+export const ABROAD = { lng: -87.55, lat: 15.95, radius: 0.18 };
 
 /** Espacio bajo el marcador para su nombre y su conteo (grados). */
 const ZONE_LABEL_ROOM = 0.42;
+/** Mitad del ancho del nombre («Fuera de Guatemala»), para que el encuadre no lo corte por el borde (grados). */
+const ZONE_LABEL_HALF = 0.55;
 
 /** Sin ninguna locación que diga dónde se rodó (ni en Guatemala ni afuera). */
 export { isUnlocated };
@@ -232,12 +234,10 @@ export const abroadFilms = <F extends Pick<Film, "locations">>(films: F[]) => fi
 type Zone = { lng: number; lat: number; radius: number };
 type Bbox = [number, number, number, number];
 
-const zoneBbox = (z: Zone): Bbox => [
-  z.lng - z.radius / Math.cos((z.lat * Math.PI) / 180),
-  z.lat - z.radius - ZONE_LABEL_ROOM,
-  z.lng + z.radius / Math.cos((z.lat * Math.PI) / 180),
-  z.lat + z.radius,
-];
+const zoneBbox = (z: Zone): Bbox => {
+  const half = Math.max(z.radius / Math.cos((z.lat * Math.PI) / 180), ZONE_LABEL_HALF);
+  return [z.lng - half, z.lat - z.radius - ZONE_LABEL_ROOM, z.lng + half, z.lat + z.radius];
+};
 
 /** [oeste, sur, este, norte] de cada zona. */
 export const NOWHERE_BBOX: Bbox = zoneBbox(NOWHERE);
