@@ -155,6 +155,39 @@ export function filterPeople<T extends PersonFilterable>(people: T[], f: PersonF
   });
 }
 
+// ───────────────────────── orden de la descarga ─────────────────────────
+
+/** Campo por el que sale ordenado el archivo (`orden` en la URL). Sin él, el orden es el del mapa. */
+export type SortKey = "anio_desc" | "anio_asc" | "titulo" | "director" | "locacion" | "festival" | "nombre" | "departamento" | "categoria";
+
+export const SORT_LABELS: Record<SortKey, string> = {
+  anio_desc: "Año de producción (más reciente primero)",
+  anio_asc: "Año de producción (más antiguo primero)",
+  titulo: "Título (A–Z)",
+  director: "Director/a (A–Z)",
+  locacion: "Locación (A–Z)",
+  festival: "Festival (A–Z)",
+  nombre: "Nombre (A–Z)",
+  departamento: "Departamento (A–Z)",
+  categoria: "Categoría (A–Z)",
+};
+
+/** Opciones de orden de cada descarga, en el orden en que se ofrecen. */
+export function sortOptions(tipo: ExportKind, filas: ExportRows): SortKey[] {
+  if (tipo === "personas") return ["nombre", "departamento"];
+  if (tipo === "circulacion" || tipo === "entidades") return ["nombre", "departamento", "categoria"];
+  if (filas === "festivales") return ["anio_desc", "anio_asc", "titulo", "director", "festival"];
+  return ["anio_desc", "anio_asc", "titulo", "director", "locacion"];
+}
+
+/** `orden` de la URL, solo si corresponde a esta descarga; si no, null (orden por defecto). */
+export function parseSort(p: URLSearchParams, tipo: ExportKind, filas: ExportRows): SortKey | null {
+  const v = p.get("orden");
+  return sortOptions(tipo, filas).find((k) => k === v) ?? null;
+}
+
+export const describeSort = (k: SortKey) => SORT_LABELS[k];
+
 export function parseExportRequest(p: URLSearchParams): { tipo: ExportKind; filas: ExportRows } {
   const t = p.get("tipo");
   if (t === "personas") return { tipo: "personas", filas: "producciones" };

@@ -1,5 +1,6 @@
-import { AlertCircle, ArrowRight, Clapperboard, Download, Inbox, Landmark } from "lucide-react";
+import { AlertCircle, ArrowRight, Clapperboard, Inbox, Landmark } from "lucide-react";
 import Link from "next/link";
+import { ExportLinks } from "@/components/admin/ExportLinks";
 import { QuestionRow } from "@/components/admin/QuestionRow";
 import { CompletenessBadge } from "@/components/ui/Badges";
 import { adminStore } from "@/lib/auth";
@@ -69,16 +70,7 @@ export default async function AdminHome() {
         {stat("Preguntas sin responder", openQs.length)}
       </div>
 
-      <section className="mt-6 flex flex-wrap items-center gap-2 text-sm">
-        <span className="mr-1 flex items-center gap-1.5 text-muted">
-          <Download className="h-4 w-4" /> Descargar para informes (incluye borradores):
-        </span>
-        <a className="chip transition hover:border-accent hover:text-ink" href="/api/export?tipo=producciones&borradores=1" download>Producciones</a>
-        <a className="chip transition hover:border-accent hover:text-ink" href="/api/export?tipo=producciones&filas=locaciones&borradores=1" download>Locaciones por territorio</a>
-        <a className="chip transition hover:border-accent hover:text-ink" href="/api/export?tipo=circulacion&borradores=1" download>Circulación</a>
-        <a className="chip transition hover:border-accent hover:text-ink" href="/api/export?tipo=entidades&borradores=1" download>Entidades</a>
-        <a className="chip transition hover:border-accent hover:text-ink" href="/descargas">Con filtros →</a>
-      </section>
+      <ExportLinks />
 
       <section className="mt-10">
         <h2 className="mb-3 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Para completar</h2>

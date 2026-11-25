@@ -3,9 +3,10 @@ import { isAbroad } from "@/lib/completeness";
 import { companiesText } from "@/lib/companies";
 import { CAST_ROLE, castText, EXTRA_ROLES, namesOf, OTHER_ROLE } from "@/lib/crew";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
-import { filmFilterActive, locDepto, locationsMatching, orgFilterActive, type ExportKind, type ExportRows, type FilmFilter, type OrgFilter, type PersonFilter } from "@/lib/filters";
+import { filmFilterActive, locDepto, locationsMatching, orgFilterActive, type ExportKind, type ExportRows, type FilmFilter, type OrgFilter, type PersonFilter, type SortKey } from "@/lib/filters";
 import { formatLabel, natureLabel } from "@/lib/film-types";
 import { personRoleLabels } from "@/lib/people";
+import { sortFilmFests, sortFilmLocs, sortFilms, sortOrgs, sortPeople } from "@/lib/sort";
 import { FESTIVAL_RESULTS, INITIATIVE_TYPES, NATIONALITIES, type Film, type Org, type Person } from "@/lib/types";
 
 export interface Table {
@@ -31,9 +32,11 @@ export function buildTable(
   orgs: Org[],
   gaz: Gazetteer,
   filters: { film: FilmFilter; org: OrgFilter },
+  orden: SortKey | null = null,
 ): Table {
   const depto = (c: number | null) => gaz.depto(c)?.name ?? "";
   const muni = (c: number | null) => gaz.muni(c)?.name ?? "";
+  const names = { depto, muni };
 
   if (tipo === "producciones" && filas === "locaciones") {
     const f = filters.film;
@@ -42,10 +45,15 @@ export function buildTable(
       title: "Locaciones de rodaje",
       header: ["Producción", "Año", "Duración (min)", "Formato", "Naturaleza", "Géneros", "Departamento", "Municipio", "País (si fue fuera de Guatemala)", "Ciudad (fuera de Guatemala)", "Sitio", "Latitud", "Longitud", "Días de rodaje", "Inversión local", "Moneda", "Empleos", "Registro completo (%)", "Estado"],
       widths: [34, 7, 10, 16, 14, 26, 16, 18, 20, 20, 28, 10, 10, 10, 14, 8, 9, 12, 11],
-      rows: films.flatMap((film) => {
-        // Si se filtró por lugar, solo salen las locaciones de ese lugar.
-        const locs = locationsMatching(film.locations, f);
-        return (locs.length ? locs : film.locations.length ? [] : [null]).map((l) => [
+      rows: sortFilmLocs(
+        films.flatMap((film) => {
+          // Si se filtró por lugar, solo salen las locaciones de ese lugar.
+          const locs = locationsMatching(film.locations, f);
+          return (locs.length ? locs : film.locations.length ? [] : [null]).map((loc) => ({ film, loc }));
+        }),
+        orden,
+        names,
+      ).map(({ film, loc: l }) => [
           film.title,
           film.year,
           film.duration_min,
@@ -63,8 +71,7 @@ export function buildTable(
           l?.jobs,
           film.completeness,
           estado(film.status),
-        ]);
-      }),
+        ]),
     };
   }
 
@@ -76,9 +83,11 @@ export function buildTable(
       header: ["Producción", "Año de la producción", "Duración (min)", "Formato", "Naturaleza", "Géneros", "Festival", "Año del festival", "País", "Ciudad", "Resultado", "Sección", "Premio", "Enlace", "Estado"],
       widths: [34, 10, 10, 16, 14, 26, 36, 10, 16, 18, 18, 26, 30, 36, 11],
       // las producciones sin festivales no aparecen: la hoja es una fila por participación
-      rows: films.flatMap((film) =>
-        (film.festivals ?? []).map((x) => [film.title, film.year, film.duration_min, ...typeCells(film), x.name, x.year, x.country, x.city, resultLabel(x.result), x.section, x.award, x.url, estado(film.status)]),
-      ),
+      rows: sortFilmFests(
+        films.flatMap((film) => (film.festivals ?? []).map((fest) => ({ film, fest }))),
+        orden,
+        names,
+      ).map(({ film, fest: x }) => [film.title, film.year, film.duration_min, ...typeCells(film), x.name, x.year, x.country, x.city, resultLabel(x.result), x.section, x.award, x.url, estado(film.status)]),
     };
   }
 
@@ -88,7 +97,7 @@ export function buildTable(
       title: tipo === "circulacion" ? "Circulación" : "Entidades",
       header: ["Nombre", "Categorías", "Naturaleza", "Departamento", "Municipio", "Ciudad o referencia", "Latitud", "Longitud", "Sitio web", "Instagram", "Contacto", "Descripción", "Registro completo (%)", "Estado"],
       widths: [34, 26, 14, 16, 18, 22, 10, 10, 30, 22, 30, 60, 12, 11],
-      rows: orgs.map((o) => [
+      rows: sortOrgs(orgs, orden, names).map((o) => [
         o.name,
         categoriesText(o, "; "),
         iniLabel(o.initiative_type),
@@ -126,7 +135,7 @@ export function buildTable(
     title: "Producciones",
     header: ["Título", "Año", "Duración (min)", "Formato", "Naturaleza", "Géneros", "Director/a", "Productor/a", "Director/a de fotografía", "Guionista", ...roleCols.map((r) => r.label), ...(hasOther ? ["Otros roles"] : []), ...(hasCast ? ["Reparto"] : []), "Casas productoras", "Idiomas", "Nacionalidad", "Presupuesto", "Moneda", "Locaciones", "Departamentos", "Fuera de Guatemala", "Días de rodaje", "Inversión local", "Empleos", "Festivales", "Sinopsis", "Tráiler", "Película completa", "Registro completo (%)", "Falta", "Estado"],
     widths: [34, 7, 10, 16, 14, 26, 26, 26, 26, 26, ...roleCols.map(() => 26), ...(hasOther ? [34] : []), ...(hasCast ? [44] : []), 40, 22, 14, 14, 8, 10, 28, 22, 10, 14, 9, 10, 70, 30, 30, 12, 30, 11],
-    rows: films.map((f) => [
+    rows: sortFilms(films, orden, names).map((f) => [
       f.title,
       f.year,
       f.duration_min,
@@ -161,7 +170,7 @@ export function buildTable(
 }
 
 /** Directorio de personas: solo datos públicos. Nunca el correo con el que se verificó el registro. */
-export function buildPeopleTable(people: Person[], gaz: Gazetteer): Table {
+export function buildPeopleTable(people: Person[], gaz: Gazetteer, orden: SortKey | null = null): Table {
   const depto = (c: number | null) => gaz.depto(c)?.name ?? "";
   const muni = (c: number | null) => gaz.muni(c)?.name ?? "";
   return {
@@ -169,7 +178,7 @@ export function buildPeopleTable(people: Person[], gaz: Gazetteer): Table {
     title: "Directorio de técnicas y técnicos",
     header: ["Nombre", "Oficios", "Departamento", "Municipio", "Idiomas", "Presentación", "Web", "Instagram", "IMDb", "Portafolio", "Correo público", "Teléfono público", "Créditos", "Estado"],
     widths: [28, 32, 16, 18, 24, 40, 24, 18, 24, 24, 28, 16, 40, 11],
-    rows: people.map((p) => [
+    rows: sortPeople(people, orden, { depto, muni }).map((p) => [
       p.name,
       personRoleLabels(p).join("; "),
       depto(p.depto_ine),
@@ -209,7 +218,7 @@ const safeCell = (v: string | number | null | undefined) => {
 };
 
 /** Libro de Excel con los datos y una hoja «Léeme» que dice qué filtros se aplicaron. */
-export async function toXlsx(t: Table, notes: string[]): Promise<Buffer> {
+export async function toXlsx(t: Table, notes: string[], orden?: string | null): Promise<Buffer> {
   const XLSX = await import("xlsx");
   const ws = XLSX.utils.aoa_to_sheet([t.header, ...t.rows.map((r) => r.map(safeCell))]);
   ws["!cols"] = t.widths.map((wch) => ({ wch }));
@@ -223,6 +232,7 @@ export async function toXlsx(t: Table, notes: string[]): Promise<Buffer> {
     [],
     ["Filtros aplicados"],
     ...(notes.length ? notes.map((n) => [n]) : [["Ninguno (todos los registros)"]]),
+    ...(orden ? [[], ["Orden"], [orden]] : []),
   ];
   const wsInfo = XLSX.utils.aoa_to_sheet(info);
   wsInfo["!cols"] = [{ wch: 90 }];

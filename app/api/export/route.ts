@@ -1,7 +1,7 @@
 import { adminStore, getSession, publicStore } from "@/lib/auth";
 import { loadDatasetCached } from "@/lib/data/load";
 import { buildPeopleTable, buildTable, filterSlug, toCsv, toXlsx } from "@/lib/export";
-import { describeFilmFilter, describeOrgFilter, filterFilms, filterOrgs, filterPeople, kindLayer, parseExportRequest, parseFilmFilter, parseOrgFilter, parsePersonFilter } from "@/lib/filters";
+import { describeFilmFilter, describeOrgFilter, describeSort, filterFilms, filterOrgs, filterPeople, kindLayer, parseExportRequest, parseFilmFilter, parseOrgFilter, parsePersonFilter, parseSort } from "@/lib/filters";
 import { serverGazetteer } from "@/lib/geo/server";
 import type { Film, Org, Person } from "@/lib/types";
 
@@ -15,6 +15,12 @@ export const runtime = "nodejs";
  *  filas      solo en producciones: producciones (por defecto) | locaciones (una fila por lugar de rodaje) | festivales (una fila por participación)
  *             Los enlaces anteriores siguen funcionando: tipo=peliculas, tipo=locaciones y tipo=entidades&capa=circulacion.
  *  formato    csv (por defecto) | xlsx
+ *  orden      campo por el que sale ordenado el archivo (si no, el orden del mapa):
+ *               producciones y locaciones: anio_desc | anio_asc | titulo | director | locacion
+ *               festivales:                anio_desc | anio_asc | titulo | director | festival
+ *               circulacion y entidades:   nombre | departamento | categoria
+ *               personas:                  nombre | departamento
+ *             Lo alfabético va de la A a la Z y lo vacío al final; una clave que no corresponde a la descarga se ignora.
  *
  *  Filtros de producciones:
  *    depto=7,1            códigos INE de departamento (al menos una locación ahí)
@@ -42,6 +48,7 @@ export async function GET(req: Request) {
   const p = url.searchParams;
   const { tipo, filas } = parseExportRequest(p);
   const formato = p.get("formato") === "xlsx" ? "xlsx" : "csv";
+  const orden = parseSort(p, tipo, filas);
 
   const session = await getSession();
   const gaz = await serverGazetteer();
@@ -70,8 +77,8 @@ export async function GET(req: Request) {
       : await publicStore().listPeople().catch(() => []);
   }
   const table = isPeople
-    ? buildPeopleTable(filterPeople(people, pf), gaz)
-    : buildTable(tipo, filas, isOrgs ? [] : filterFilms(films, ff), isOrgs ? filterOrgs(orgs, of) : [], gaz, { film: ff, org: of });
+    ? buildPeopleTable(filterPeople(people, pf), gaz, orden)
+    : buildTable(tipo, filas, isOrgs ? [] : filterFilms(films, ff), isOrgs ? filterOrgs(orgs, of) : [], gaz, { film: ff, org: of }, orden);
 
   const deptoName = (c: number) => gaz.depto(c)?.name ?? String(c);
   const muniName = (c: number) => gaz.muni(c)?.name ?? String(c);
@@ -91,7 +98,7 @@ export async function GET(req: Request) {
   };
 
   if (formato === "xlsx") {
-    const buf = await toXlsx(table, notes);
+    const buf = await toXlsx(table, notes, orden ? describeSort(orden) : null);
     return new Response(new Uint8Array(buf), {
       headers: { ...headers, "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
     });

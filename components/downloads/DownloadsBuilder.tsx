@@ -27,13 +27,18 @@ import {
   kindLayer,
   parseExportRequest,
   parseOrgFilter,
+  parseSort,
+  SORT_LABELS,
+  sortOptions,
   type ExportFormat,
   type ExportKind,
   type ExportRows,
   type FilmFilter,
   type OrgFilter,
   type PersonFilter,
+  type SortKey,
 } from "@/lib/filters";
+import { sortFilms, sortOrgs, sortPeople } from "@/lib/sort";
 import { CREW_ROLES, languageOptions, OTHER_ROLE } from "@/lib/crew";
 import { personRoleLabels } from "@/lib/people";
 import { customGenres, filmTypeLabel, FORMATS, genreOptions, NATURES } from "@/lib/film-types";
@@ -67,6 +72,10 @@ export function DownloadsBuilder({ films, orgs, people = [], deptos, names, init
   const [ff, setFf] = useState<FilmFilter>(() => parseFilmFilter(init));
   const [of, setOf] = useState<OrgFilter>(() => parseOrgFilter(init));
   const [pf, setPf] = useState<PersonFilter>(() => parsePersonFilter(init));
+  const [ordenRaw, setOrden] = useState<SortKey | null>(() => {
+    const r = parseExportRequest(init);
+    return parseSort(init, r.tipo, r.filas);
+  });
   const [copied, setCopied] = useState(false);
 
   const extraGenres = useMemo(() => customGenres(films), [films]);
@@ -79,6 +88,16 @@ export function DownloadsBuilder({ films, orgs, people = [], deptos, names, init
   const isOrgs = tipo === "circulacion" || tipo === "entidades";
   const byLocation = !isOrgs && filas === "locaciones";
   const byFestival = !isOrgs && filas === "festivales";
+  // las opciones dependen de qué se descarga; si el orden elegido ya no aplica (cambió el tipo o las filas), vuelve al orden por defecto
+  const orderOptions = sortOptions(tipo, filas);
+  const orden = ordenRaw && orderOptions.includes(ordenRaw) ? ordenRaw : null;
+  const places = useMemo(
+    () => ({
+      depto: (c: number | null) => (c == null ? "" : names[`depto:${c}`] ?? ""),
+      muni: (c: number | null) => (c == null ? "" : names[`muni:${c}`] ?? ""),
+    }),
+    [names],
+  );
   // las categorías de circulación y de industria no se comparten: al cambiar de una a otra se limpia la categoría
   const setTipo = (t: ExportKind) => {
     if (t !== tipo && t !== "producciones" && isOrgs) setOf((f) => ({ ...f, categoria: [] }));
@@ -103,6 +122,7 @@ export function DownloadsBuilder({ films, orgs, people = [], deptos, names, init
     const p = new URLSearchParams();
     p.set("tipo", tipo);
     if (formato !== "csv") p.set("formato", formato);
+    if (orden) p.set("orden", orden);
     if (isPeople) personFilterToParams(pf, p);
     else if (isOrgs) orgFilterToParams({ ...of, capa: null }, p);
     else {
@@ -110,7 +130,11 @@ export function DownloadsBuilder({ films, orgs, people = [], deptos, names, init
       filmFilterToParams(ff, p);
     }
     return p.toString();
-  }, [tipo, isPeople, isOrgs, byLocation, byFestival, filas, formato, ff, of, pf]);
+  }, [tipo, isPeople, isOrgs, byLocation, byFestival, filas, formato, orden, ff, of, pf]);
+
+  useEffect(() => {
+    if (ordenRaw && !orden) setOrden(null);
+  }, [ordenRaw, orden]);
 
   // La dirección de la página refleja los filtros: se puede copiar y compartir.
   useEffect(() => {
@@ -164,7 +188,12 @@ export function DownloadsBuilder({ films, orgs, people = [], deptos, names, init
             { label: "Con presupuesto declarado", apply: () => setFf({ ...EMPTY_FILM_FILTER, presupuestoMin: 1 }) },
           ];
 
-  const sample = isPeople ? peopleHit.slice(0, 6) : isOrgs ? orgsHit.slice(0, 6) : filmsHit.slice(0, 6);
+  // la vista previa sale en el mismo orden que el archivo
+  const sample = isPeople
+    ? sortPeople(peopleHit, orden, places).slice(0, 6)
+    : isOrgs
+      ? sortOrgs(orgsHit, orden, places).slice(0, 6)
+      : sortFilms(filmsHit, orden, places).slice(0, 6);
   const empty = films.length + orgs.length + people.length === 0;
   const canDownload = count > 0;
 
@@ -393,7 +422,17 @@ export function DownloadsBuilder({ films, orgs, people = [], deptos, names, init
             </ul>
           )}
 
-          <div role="radiogroup" aria-label="Formato" className="mt-5 grid grid-cols-2 gap-2">
+          <div className="mt-5">
+            <label className="label" htmlFor="f-orden">Ordenar por</label>
+            <select id="f-orden" className="field" value={orden ?? ""} onChange={(e) => setOrden((orderOptions.find((k) => k === e.target.value) ?? null) as SortKey | null)}>
+              <option value="">Sin ordenar (como en el mapa)</option>
+              {orderOptions.map((k) => (
+                <option key={k} value={k}>{SORT_LABELS[k]}</option>
+              ))}
+            </select>
+          </div>
+
+          <div role="radiogroup" aria-label="Formato" className="mt-3 grid grid-cols-2 gap-2">
             {(
               [
                 { id: "csv", label: "CSV", icon: FileText, hint: "Universal" },

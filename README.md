@@ -296,6 +296,7 @@ La página `/descargas` es pública: cualquiera elige entre **Producciones**, **
 /api/export?tipo=producciones&nacionalidad=guatemalteca&presupuesto_min=1000000&moneda=GTQ
 /api/export?tipo=producciones&filas=locaciones&muni=101&desde=2015
 /api/export?tipo=circulacion&categoria=Festivales
+/api/export?tipo=producciones&depto=17&orden=director
 ```
 
 | Parámetro | Valores |
@@ -303,6 +304,7 @@ La página `/descargas` es pública: cualquiera elige entre **Producciones**, **
 | `tipo` | `producciones` (por defecto), `circulacion` (festivales, salas, cineclubs…), `entidades` (capa de industria) |
 | `filas` | solo en producciones: `producciones` (por defecto) o `locaciones` (una fila por lugar de rodaje) |
 | `formato` | `csv` (por defecto), `xlsx` (con hoja «Léeme» que lista los filtros aplicados) |
+| `orden` | campo por el que sale ordenado el archivo; sin él, el orden del mapa. Producciones y locaciones: `anio_desc`, `anio_asc`, `titulo`, `director`, `locacion` (en «una fila por locación» ordena por departamento, municipio y sitio). Festivales: las mismas, con `festival` en lugar de `locacion`. Circulación y entidades: `nombre`, `departamento`, `categoria`. Personas: `nombre`, `departamento`. Lo alfabético va de la A a la Z, lo vacío al final; una clave que no corresponde a la descarga se ignora. El director/a se ordena por el texto guardado (nombre de pila primero). |
 | `depto`, `muni` | códigos INE separados por coma (basta con que una locación esté ahí) |
 | `formato_obra` | `largometraje`, `mediometraje`, `cortometraje`, `serie`, `miniserie`, `video_musical`, `publicidad`, `programa_tv`, `web`, `videoarte`, `otro` (el parámetro `formato` es el tipo de archivo: csv o xlsx) |
 | `naturaleza` | `ficcion`, `documental`, `hibrido` |
