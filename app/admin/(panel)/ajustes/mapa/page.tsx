@@ -12,7 +12,7 @@ export default async function MapaAjustesPage() {
     <div>
       <h2 className="font-display text-2xl tracking-tight">Zona del mapa</h2>
       <p className="mt-1 max-w-2xl text-sm text-muted">
-        Elige si el mapa muestra solo Guatemala o también lo que la rodea. Aplica al mapa público y al de /admin; los marcadores «Sin locación» y «Fuera de Guatemala» se quedan en la esquina superior derecha en ambos casos.
+        Elige si el mapa muestra solo Guatemala o también lo que la rodea. Aplica al mapa público y al de /admin; los marcadores «Sin locación» y «Fuera de Guatemala» se quedan en el Pacífico, frente a Retalhuleu, en ambos casos.
       </p>
       <div className="mt-5" />
       {!ready && (

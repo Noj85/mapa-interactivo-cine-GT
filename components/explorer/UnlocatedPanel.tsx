@@ -33,7 +33,7 @@ export default function UnlocatedPanel({ ctx }: { ctx: PanelCtx }) {
       </div>
       <p className="mt-3 text-sm leading-relaxed text-muted">
         {films.length === 1 ? "Esta producción aún no tiene" : `Estas ${films.length.toLocaleString("es-GT")} producciones aún no tienen`} un lugar de rodaje registrado. Se
-        muestran en el marcador «Sin locación», en la esquina superior derecha del mapa, hasta que se sepa dónde se filmaron.
+        muestran en el marcador «Sin locación», en el océano Pacífico, frente a la costa de Retalhuleu, hasta que se sepa dónde se filmaron.
       </p>
       {canEdit && (
         <Link href="/admin/peliculas" className="mt-3 inline-block text-xs text-accent underline underline-offset-2">

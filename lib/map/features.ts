@@ -209,14 +209,14 @@ export function buildMask(pais: GeometryCollection): FeatureCollection<Polygon> 
 // ───────────────────────── producciones sin lugar de rodaje y rodadas fuera de Guatemala ─────────────────────────
 
 /**
- * Las producciones sin locación no se esconden: se agrupan en un marcador en la esquina superior derecha del mapa,
- * al este de Petén y fuera del territorio, para que se vea que existen pero que todavía no tienen lugar.
+ * Las producciones sin locación no se esconden: se agrupan en un marcador en el océano Pacífico, frente a la costa de
+ * Retalhuleu, fuera del territorio, para que se vea que existen pero que todavía no tienen lugar.
  * `radius` es el área que se puede tocar; el marcador es un ícono (ver `zone-icons.ts`).
  */
-export const NOWHERE = { lng: -87.55, lat: 17.45, radius: 0.18 };
+export const NOWHERE = { lng: -91.95, lat: 13.85, radius: 0.18 };
 
-/** Las producciones con locaciones en otro país tienen su propio marcador, justo debajo del anterior (con espacio para el nombre y el conteo de arriba). */
-export const ABROAD = { lng: -87.55, lat: 15.95, radius: 0.18 };
+/** Las producciones con locaciones en otro país tienen su propio marcador, justo debajo del anterior, también en el Pacífico (con espacio para el nombre y el conteo de arriba). */
+export const ABROAD = { lng: -91.95, lat: 13.05, radius: 0.18 };
 
 /** Espacio bajo el marcador para su nombre y su conteo (grados). */
 const ZONE_LABEL_ROOM = 0.42;

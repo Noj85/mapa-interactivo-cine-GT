@@ -233,7 +233,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
       paint: { "fill-color": bg, "fill-opacity": dark ? 0.78 : 0.7 },
     });
 
-    // producciones sin lugar de rodaje y rodadas fuera: marcadores en la esquina superior derecha, fuera del país; el círculo es solo el área táctil (y un halo al elegirlo)
+    // producciones sin lugar de rodaje y rodadas fuera: marcadores en el océano Pacífico frente a Retalhuleu, fuera del país; el círculo es solo el área táctil (y un halo al elegirlo)
     const neutral = dark ? "#9aa7bd" : "#5b6b85";
     const prodAccent = LAYER_COLORS.produccion[theme];
     loadZoneIcons(map, { fg: neutral, sel: prodAccent, bg });
@@ -746,7 +746,7 @@ const MapCanvas = forwardRef<MapHandle, Props>(function MapCanvas(props, ref) {
         zoom: initial?.zoom ?? 6.3,
         minZoom: 5,
         maxZoom: 17.5,
-        // margen amplio: incluye las zonas «Sin locación» y «Fuera de Guatemala» (esquina superior derecha) y deja alejar el mapa en pantallas altas
+        // margen amplio: incluye las zonas «Sin locación» y «Fuera de Guatemala» (en el Pacífico, al suroeste) y deja alejar el mapa en pantallas altas
         maxBounds: [
           [-101, 8],
           [-80, 23],
