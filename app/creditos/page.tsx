@@ -118,6 +118,13 @@ export default function CreditosPage() {
         </div>
 
         <section className="mt-6 rounded-2xl border border-line bg-surface p-5">
+          <h2 className="font-display text-xl font-semibold">Privacidad</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
+            Para saber cuánta gente usa el mapa medimos las visitas de forma anónima: sin cookies, sin guardar tu dirección IP y sin compartir nada con terceros. Si prefieres que no se cuente tu visita, activa «No rastrear» en tu navegador.
+          </p>
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-line bg-surface p-5">
           <h2 className="font-display text-xl font-semibold">Código abierto que usamos</h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
             Estas librerías conservan sus propias licencias. Aquí se resumen las principales; el texto completo de cada licencia y su aviso de copyright están en el{" "}

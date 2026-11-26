@@ -25,6 +25,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MapCanvas, { type MapHandle } from "@/components/map/MapCanvas";
 import { aggregate } from "@/lib/aggregate";
 import { loadGeo, type GeoBundle } from "@/lib/geo/load";
+import { track } from "@/lib/track";
 import { useTheme } from "@/lib/use-theme";
 import type { Dataset, LayerId } from "@/lib/types";
 import { DEFAULT_VIEW, defaultMetric, downloadHref, parseView, selectedDeptos, serializeView, type Place, type ViewState } from "@/lib/view";
@@ -144,6 +145,31 @@ export default function Explorer({ data, mode = "public" }: { data: Dataset; mod
         commit({ ...view, filmFilter: { ...view.filmFilter, locacion }, film: null, person: null, ...(locacion === "sin" ? { place: null, deptos: [] } : {}), noloc: false, abroad: false }),
     };
   }, [view, commit, data.orgs, geo]);
+
+  // ---------- estadísticas de visitas (anónimas; solo en la vista pública) ----------
+  const LAYER_NAMES: Record<LayerId, string> = { produccion: "Producción", circulacion: "Circulación", industria: "Industria" };
+  const firstLayer = useRef(true);
+  useEffect(() => {
+    if (firstLayer.current) {
+      firstLayer.current = false;
+      return;
+    }
+    if (!canEdit) track("layer", LAYER_NAMES[view.layer]);
+  }, [view.layer]); // eslint-disable-line react-hooks/exhaustive-deps
+  const trackedFilm = data.films.find((f) => f.slug === view.film)?.title ?? null;
+  useEffect(() => {
+    if (!canEdit && trackedFilm) track("film", trackedFilm);
+  }, [trackedFilm]); // eslint-disable-line react-hooks/exhaustive-deps
+  const trackedPlace = geo
+    ? view.place
+      ? (view.place.type === "depto" ? geo.gaz.depto(view.place.code) : geo.gaz.muni(view.place.code))?.name ?? null
+      : view.deptos.length
+        ? view.deptos.map((d) => geo.gaz.depto(d)?.name).filter(Boolean).join(", ") || null
+        : null
+    : null;
+  useEffect(() => {
+    if (!canEdit && trackedPlace) track("place", trackedPlace);
+  }, [trackedPlace]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // el logo lleva al inicio: vista por defecto y país completo (clic normal; con Cmd/Ctrl se abre en otra pestaña)
   const homeHref = canEdit ? "/admin" : "/";

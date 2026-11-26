@@ -10,6 +10,7 @@ import { cleanGenres, cleanMinutes, isFormat, isNature, legacyKind, upgradeFilmP
 import { festivalSearchKey } from "@/lib/festivals";
 import { normalize, upperTitle } from "@/lib/utils";
 import { hashPassword, hashToken, normPassword, verifyPassword } from "@/lib/info-requests";
+import { aggregateEvents, normalizeOverview, type AnalyticsOverview, type SiteEvent } from "@/lib/analytics";
 import { MAX_FAILED_ATTEMPTS } from "@/lib/request-state";
 import type {
   Festival,
@@ -140,6 +141,10 @@ export interface Store {
   getSetting(key: string): Promise<unknown | null>;
   saveSetting(key: string, value: unknown): Promise<void>;
 
+  /** Estadísticas de visitas. Registrar es público (anónimo); leer el resumen es solo del equipo. */
+  recordEvent(event: SiteEvent): Promise<void>;
+  analyticsOverview(from: string, to: string): Promise<AnalyticsOverview>;
+
   /** Solicitudes de información (enlace privado + contraseña). */
   createInfoRequest(input: NewInfoRequest): Promise<InfoRequest>;
   listInfoRequests(opts?: { kind?: SubmissionKind; target_id?: string }): Promise<InfoRequest[]>;
@@ -243,6 +248,24 @@ async function readDb(): Promise<LocalDb> {
   } catch {
     return { films: [], orgs: [], people: [], imports: [], questions: [], submissions: [], festivals: [], info_requests: [], settings: {} };
   }
+}
+
+/** Eventos de visitas en modo local: archivo aparte para no reescribir db.json en cada visita. */
+const EVENTS_PATH = path.join(process.cwd(), ".data", "events.json");
+const LOCAL_EVENTS_MAX = 20000;
+async function readEvents(): Promise<SiteEvent[]> {
+  try {
+    const j = JSON.parse(await fs.readFile(EVENTS_PATH, "utf8"));
+    return Array.isArray(j) ? (j as SiteEvent[]) : [];
+  } catch {
+    return [];
+  }
+}
+async function writeEvents(list: SiteEvent[]) {
+  await fs.mkdir(path.dirname(EVENTS_PATH), { recursive: true });
+  const tmp = `${EVENTS_PATH}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(list));
+  await fs.rename(tmp, EVENTS_PATH);
 }
 
 async function writeDb(db: LocalDb) {
@@ -527,6 +550,14 @@ export class LocalStore implements Store {
     const db = await readDb();
     db.settings = { ...db.settings, [key]: value };
     await writeDb(db);
+  }
+  async recordEvent(event: SiteEvent) {
+    const list = await readEvents();
+    list.push({ ...event, created_at: new Date().toISOString() });
+    await writeEvents(list.slice(-LOCAL_EVENTS_MAX));
+  }
+  async analyticsOverview(from: string, to: string) {
+    return aggregateEvents(await readEvents(), from, to);
   }
   async festivalOrgMap() {
     const out: Record<string, string> = {};
@@ -1237,6 +1268,25 @@ export class SupabaseStore implements Store {
   }
   async saveSetting(key: string, value: unknown) {
     must(await this.db.from("site_settings").upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" }));
+  }
+  async recordEvent(event: SiteEvent) {
+    // sin .select(): quien navega puede insertar pero no leer (RLS)
+    must(await this.db.from("site_events").insert({
+      kind: event.kind,
+      path: event.path ?? null,
+      visitor: event.visitor ?? null,
+      country: event.country ?? null,
+      device: event.device ?? null,
+      browser: event.browser ?? null,
+      ref_host: event.ref_host ?? null,
+      label: event.label ?? null,
+      meta: event.meta ?? null,
+    }));
+  }
+  async analyticsOverview(from: string, to: string) {
+    const res = await this.db.rpc("analytics_overview", { p_from: from, p_to: to });
+    if (res.error) throw new Error(res.error.message);
+    return normalizeOverview(res.data);
   }
   async festivalOrgMap() {
     const out: Record<string, string> = {};

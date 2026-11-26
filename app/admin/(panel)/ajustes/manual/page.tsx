@@ -71,7 +71,19 @@ export default function ManualPage() {
         </ul>
       </Section>
 
-      <Section title="8. Buenas prácticas">
+      <Section title="8. Estadísticas de visitas">
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            <Link className="text-accent underline underline-offset-2" href="/admin/visitas">Visitas</Link> (menú superior) muestra cómo se usa el sitio público. Elige el periodo arriba a la derecha: Hoy, 7, 30, 90 días o Todo.
+          </li>
+          <li>Las tarjetas comparan con el periodo anterior (flecha verde sube, roja baja). La gráfica cambia de métrica con las pestañas y muestra el detalle al pasar el cursor.</li>
+          <li>«Visitantes únicos» cuenta personas distintas por día: quien vuelve otro día suma otra vez.</li>
+          <li>No se cuentan las visitas del equipo con sesión iniciada, los robots ni quien activa «No rastrear». No se guarda la IP ni se usan cookies.</li>
+          <li>Si la página avisa que no puede leer las estadísticas, falta aplicar la migración <code>0023_analytics.sql</code> en Supabase.</li>
+        </ul>
+      </Section>
+
+      <Section title="9. Buenas prácticas">
         <ul className="list-disc space-y-1 pl-5">
           <li>Publica cuando el dato esté verificado; si duda, déjalo en borrador.</li>
           <li>El porcentaje de completitud orienta qué falta; no obliga a llenar todo para publicar.</li>

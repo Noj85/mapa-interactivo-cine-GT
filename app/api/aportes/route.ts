@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordServerEvent } from "@/lib/analytics-server";
 import { publicStore } from "@/lib/auth";
 import { sanitizeFestivalIds } from "@/lib/festivals-server";
 import { rateLimit } from "@/lib/rate-limit";
@@ -66,6 +67,7 @@ export async function POST(req: Request) {
       note: m.note,
       contact: m.contact,
     });
+    await recordServerEvent(req, { kind: "contribute", label: `Enviado · ${d.kind === "film" ? "Producción" : d.kind === "org" ? "Entidad" : "Persona"}` });
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[aportes]", e);

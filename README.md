@@ -23,12 +23,13 @@ Copia `.env.example` a `.env.local` (o configúralas en Vercel).
 | `NEXT_PUBLIC_SITE_URL` | URL pública del sitio, sin `/` al final. Se usa en las imágenes al compartir enlaces; debe existir al construir. En Vercel, si falta, se usa el dominio del proyecto. |
 | `ANTHROPIC_API_KEY` | Activa el análisis con Claude en la carga inteligente. Sin clave se usa un reconocimiento básico de columnas y de PDF. |
 | `ANTHROPIC_MODEL` | Opcional. Modelo de Claude a usar (por defecto `claude-sonnet-5`). |
+| `ANALYTICS_SALT` | Opcional. Texto secreto para el hash diario de visitantes (ver «Estadísticas de visitas»). |
 | `ADMIN_PASSWORD` | Modo local: contraseña única del equipo. Defínela en `.env.local` (nunca en `.env.example`, que se sube al repositorio). En desarrollo, si no está definida, `/admin` queda abierto. Reinicia `next dev` después de cambiarla. |
 
 ## Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0020`, ver cada sección) de `supabase/migrations/`:
+2. En el editor SQL ejecuta, **en orden**, las migraciones (las seis primeras abajo; después `0007` a `0023`, ver cada sección) de `supabase/migrations/`:
    - `0001_init.sql`: tablas, políticas RLS y perfiles.
    - `0002_posters.sql`: campo del póster y bucket público `posters` en Storage.
    - `0003_submissions.sql`: aportes del público.
@@ -337,6 +338,18 @@ Para que una empresa o persona externa jale los datos **sin entrar al panel de S
 ## Exportación para informes (equipo)
 
 Desde `/admin` el equipo descarga también los borradores (`borradores=1`).
+
+## Estadísticas de visitas (equipo)
+
+En `/admin/visitas` (menú «Visitas») el equipo ve cómo se usa el sitio público: páginas vistas, visitantes únicos, producciones abiertas y descargas, con gráfica por día y cambio frente al periodo anterior (Hoy, 7, 30, 90 días o Todo), más listas de lo más visto (páginas, producciones, departamentos, búsquedas, capas, descargas) y de quién visita (país, dispositivo, navegador, origen).
+
+- **Migración `0023_analytics.sql`** (aplicar en el SQL Editor, después de la `0022`): tabla `site_events` y las funciones `analytics_overview` y `analytics_prune`. Sin ella el sitio funciona igual; solo no se mide y la página «Visitas» avisa.
+- **Privacidad:** medición propia, sin cookies ni servicios de terceros, así que no necesita aviso de cookies. Nunca se guarda la IP: «visitante» es un hash que cambia cada día (IP + navegador + fecha + sal) calculado en el servidor; por eso los visitantes únicos son *por día*. Se guardan el país (encabezado `x-vercel-ip-country`), el tipo de dispositivo, el navegador y el dominio de origen. Los términos de búsqueda se guardan en minúsculas y sin correos ni números largos.
+- **Qué no se cuenta:** personas del equipo con sesión iniciada, robots y vistas previas de enlaces, `/admin`, y quien envíe «No rastrear» (DNT / GPC).
+- **Cómo funciona:** el navegador avisa a `POST /api/track` (páginas vistas y uso del mapa: ficha abierta, lugar, capa, búsqueda, aporte iniciado); las descargas (`/api/export`) y los aportes enviados (`/api/aportes`) se registran en el servidor. Cualquiera puede insertar eventos (clave anónima, con límites de tipo y largo); solo el equipo puede leerlos (RLS).
+- **Variable opcional `ANALYTICS_SALT`:** texto secreto que se mezcla en el hash del visitante. Si falta se usa uno fijo.
+- **Retención:** los eventos de más de 13 meses se borran con `select public.analytics_prune();` (desde el SQL Editor) o programando esa llamada con `pg_cron`.
+- En modo local los eventos se guardan en `.data/events.json` (máximo 20 000).
 
 ## Geodatos
 

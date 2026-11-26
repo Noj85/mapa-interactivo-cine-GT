@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Clapperboard, Landmark, Loader2, Send, UserRound } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { submitCollectedAction } from "@/app/completar/actions";
 import { filmDraft, filmPayload, orgContactErrors, orgDraft, orgPayload, personDraft, personEmailError, personPayload, type FilmDraft, type OrgDraft, type OrgLayerId, type PersonDraft } from "@/components/records/drafts";
 import { FestivalsEditor } from "@/components/records/FestivalsEditor";
@@ -14,6 +14,7 @@ import { PersonFields } from "@/components/records/PersonFields";
 import { SimilarRecords } from "@/components/aportar/SimilarRecords";
 import { CompletenessMeter } from "@/components/ui/Badges";
 import { filmCompleteness, orgCompleteness, personCompleteness } from "@/lib/completeness";
+import { track } from "@/lib/track";
 import type { Film, Org, Person } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -75,6 +76,14 @@ export function ContributeForm({
   const [consent, setConsent] = useState(false);
   // Sugerir la ficha que ya existe: solo en un aporte nuevo del público (no al corregir ni con enlace de recopilación).
   const suggest = !correcting && !collect;
+  // estadísticas (anónimas): cuenta cuando alguien empieza a escribir un aporte nuevo, no cada visita a la página
+  const started = !!(f.title.trim() || o.name.trim() || p.name.trim());
+  const countedStart = useRef(false);
+  useEffect(() => {
+    if (!started || countedStart.current || correcting || collect) return;
+    countedStart.current = true;
+    track("contribute", `Iniciado · ${kind === "film" ? "Producción" : kind === "org" ? "Entidad" : "Persona"}`);
+  }, [started, correcting, collect, kind]);
   // ¿escribió algo más que el título o el nombre? Si sí, cambiar de ficha le haría perder datos.
   const initialDrafts = useRef({ f, o, p });
   const dirty =

@@ -9,6 +9,7 @@ import "@fontsource/montserrat/400-italic.css";
 import "@fontsource/montserrat/500.css";
 import "@fontsource/montserrat/600.css";
 import "@fontsource/montserrat/700.css";
+import { PageViewTracker } from "@/components/PageViewTracker";
 import { Providers } from "@/components/Providers";
 import "./globals.css";
 
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Saltar al contenido
         </a>
         <Providers>
+          <PageViewTracker />
           <div id="contenido">{children}</div>
         </Providers>
       </body>

@@ -1,7 +1,7 @@
 "use client";
 
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Database, Globe, Inbox, LayoutDashboard, LogOut, Map as MapIcon, PlusCircle, Settings } from "lucide-react";
+import { BarChart3, Database, Globe, Inbox, LayoutDashboard, LogOut, Map as MapIcon, PlusCircle, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ const isAdd = (p: string) => ADD_ROUTES.some((r) => p === r || p.startsWith(`${r
 const items = [
   { href: "/admin", label: "Mapa", icon: MapIcon, isActive: (p: string) => p === "/admin" },
   { href: "/admin/resumen", label: "Resumen", icon: LayoutDashboard, isActive: (p: string) => p.startsWith("/admin/resumen") },
+  { href: "/admin/visitas", label: "Visitas", icon: BarChart3, isActive: (p: string) => p.startsWith("/admin/visitas") },
   { href: "/admin/aportes", label: "Aportes", icon: Inbox, badge: true, isActive: (p: string) => p.startsWith("/admin/aportes") },
   { href: "/admin/agregar", label: "Agregar datos", icon: PlusCircle, isActive: isAdd },
   {

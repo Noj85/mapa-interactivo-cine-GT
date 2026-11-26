@@ -1,3 +1,4 @@
+import { recordServerEvent } from "@/lib/analytics-server";
 import { adminStore, getSession, publicStore } from "@/lib/auth";
 import { loadDatasetCached } from "@/lib/data/load";
 import { buildPeopleTable, buildTable, filterSlug, toCsv, toXlsx } from "@/lib/export";
@@ -96,6 +97,11 @@ export async function GET(req: Request) {
     "Cache-Control": "no-store",
     "X-Total-Rows": String(table.rows.length),
   };
+
+  // estadísticas de visitas: qué se descarga y en qué formato (anónimo; no frena la descarga si falla)
+  const TIPOS = { producciones: "Producciones", circulacion: "Circulación", entidades: "Entidades", personas: "Directorio" } as const;
+  const FILAS = { locaciones: " (por locación)", festivales: " (por festival)", producciones: "" } as const;
+  await recordServerEvent(req, { kind: "download", label: `${TIPOS[tipo]}${tipo === "producciones" ? FILAS[filas] : ""} · ${formato === "xlsx" ? "Excel" : "CSV"}` });
 
   if (formato === "xlsx") {
     const buf = await toXlsx(table, notes, orden ? describeSort(orden) : null);

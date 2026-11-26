@@ -6,6 +6,7 @@ import { crewMatch } from "@/lib/crew";
 import { AnimatePresence, motion } from "framer-motion";
 import { Clapperboard, Landmark, MapPin, Search, UserRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { track } from "@/lib/track";
 import { filmTypeLabel } from "@/lib/film-types";
 import { PosterImage } from "@/components/ui/PosterImage";
 import type { Gazetteer } from "@/lib/geo/gazetteer";
@@ -117,6 +118,7 @@ export function SearchPalette({
 
   const pick = (r: Result) => {
     onClose();
+    track("search", q);
     if (r.kind === "place") onPlace(r.place);
     else if (r.kind === "film") onFilm(r.slug);
     else if (r.kind === "person") onPerson?.(r.slug);
